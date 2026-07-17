@@ -1,0 +1,72 @@
+.shell {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+  text-align: left;
+}
+
+.shell h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+}
+
+.sub {
+  margin: 0.25rem 0 2rem;
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+.checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.checks li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgb(128 128 128 / 0.25);
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #9ca3af;
+}
+
+.checking .dot {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.ok .dot {
+  background: #16a34a;
+}
+.failed .dot {
+  background: #dc2626;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.detail {
+  margin-left: auto;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
