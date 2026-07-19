@@ -1,0 +1,35 @@
+# Normalize line endings across platforms.
+# Text files are stored as LF in the repo and checked out as LF everywhere,
+# so Windows autocrlf no longer rewrites them to CRLF (kills the "LF will be
+# replaced by CRLF" warnings).
+* text=auto eol=lf
+
+# Explicit text types (belt-and-suspenders for common source/config files).
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.md    text eol=lf
+*.py    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.svg   text eol=lf
+*.env   text eol=lf
+
+# Windows-only scripts should keep CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binary files — never touch line endings.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary

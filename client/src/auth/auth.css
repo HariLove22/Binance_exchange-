@@ -1,0 +1,434 @@
+/* ============================================================================
+   Novex auth — Login & Signup
+   Split panel: branded marketing side + form side. Shares the landing palette.
+   ========================================================================== */
+
+.auth {
+  --bg: #0b0e11;
+  --bg-2: #0f1318;
+  --surface: #161a21;
+  --surface-2: #1b212b;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #eaecef;
+  --text-dim: #9aa4b2;
+  --text-faint: #6b7482;
+  --gold: #f0b90b;
+  --gold-2: #fcd535;
+  --up: #0ecb81;
+  --down: #f6465d;
+  --radius: 16px;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.auth-grid {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+}
+
+/* ---------- brand panel ---------- */
+.auth-brand {
+  position: relative;
+  overflow: hidden;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(700px 400px at 20% 0%, rgba(240, 185, 11, 0.14), transparent 60%),
+    linear-gradient(160deg, #14100a, var(--bg-2) 60%);
+  border-right: 1px solid var(--border);
+}
+.auth-brand-glow {
+  position: absolute;
+  bottom: -120px;
+  left: -80px;
+  width: 460px;
+  height: 460px;
+  background: radial-gradient(circle, rgba(98, 126, 234, 0.16), transparent 65%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+.auth-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+  position: relative;
+  width: fit-content;
+}
+.auth-logo .brand-mark {
+  color: var(--gold);
+  font-size: 1.4rem;
+  filter: drop-shadow(0 0 10px rgba(240, 185, 11, 0.5));
+}
+.auth-brand-body {
+  margin-top: auto;
+  position: relative;
+}
+.auth-brand-body h2 {
+  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 0;
+  max-width: 20ch;
+}
+.auth-brand-body p {
+  color: var(--text-dim);
+  margin: 0.9rem 0 1.6rem;
+  max-width: 34ch;
+  line-height: 1.6;
+}
+.auth-highlights {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.auth-highlights li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+.auth-highlights .tick {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  color: #1a1400;
+  background: linear-gradient(180deg, var(--gold-2), var(--gold));
+}
+.auth-brand-foot {
+  margin-top: 2rem;
+  position: relative;
+}
+.mini-book {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.7rem;
+  max-width: 15rem;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.78rem;
+}
+.mb-row {
+  position: relative;
+  display: block;
+  padding: 0.22rem 0.4rem;
+  text-align: right;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.mb-row i {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  opacity: 0.16;
+  display: block;
+}
+.mb-row.up {
+  color: var(--up);
+}
+.mb-row.up i {
+  background: var(--up);
+}
+.mb-row.down {
+  color: var(--down);
+}
+.mb-row.down i {
+  background: var(--down);
+}
+.mb-mid {
+  display: block;
+  text-align: right;
+  padding: 0.3rem 0.4rem;
+  font-weight: 700;
+  color: var(--up);
+}
+
+/* ---------- form panel ---------- */
+.auth-panel {
+  display: grid;
+  place-items: center;
+  padding: 2.5rem 1.5rem;
+}
+.auth-form-wrap {
+  width: 100%;
+  max-width: 25rem;
+}
+.auth-head h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+}
+.auth-head p {
+  color: var(--text-dim);
+  margin: 0.4rem 0 1.6rem;
+  font-size: 0.95rem;
+}
+
+/* social buttons */
+.social-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.btn-social {
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 0.7rem;
+  color: var(--text);
+  font-weight: 600;
+}
+.btn-social:hover {
+  border-color: var(--gold);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 1.3rem 0;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.8rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.field input::placeholder {
+  color: var(--text-faint);
+}
+.field input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(240, 185, 11, 0.15);
+}
+.field-error input {
+  border-color: var(--down);
+}
+.field-error input:focus {
+  box-shadow: 0 0 0 3px rgba(246, 70, 93, 0.15);
+}
+.field-toggle {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+}
+.field-toggle:hover {
+  color: var(--gold-2);
+}
+.field-msg {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+.field-msg.err {
+  color: var(--down);
+}
+
+/* password strength */
+.strength {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: -0.4rem;
+}
+.strength-bars {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+.strength-bars i {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--border-strong);
+  transition: background 0.2s ease;
+}
+.strength.s-1 .strength-bars i.on { background: var(--down); }
+.strength.s-2 .strength-bars i.on { background: #f0a020; }
+.strength.s-3 .strength-bars i.on { background: var(--gold-2); }
+.strength.s-4 .strength-bars i.on { background: var(--up); }
+.strength-label {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+/* rows, checkbox, links */
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: -0.2rem;
+}
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+}
+.checkbox.terms {
+  align-items: flex-start;
+  line-height: 1.4;
+}
+.checkbox.terms input {
+  margin-top: 2px;
+}
+.auth-link {
+  color: var(--gold-2);
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+.auth-link:hover {
+  text-decoration: underline;
+}
+.auth-link.strong {
+  font-weight: 600;
+}
+
+/* primary block button (reuses landing-style gradient) */
+.btn {
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  color: var(--text);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background: linear-gradient(180deg, var(--gold-2), var(--gold));
+  color: #1a1400;
+  box-shadow: 0 6px 22px -8px rgba(240, 185, 11, 0.6);
+}
+.btn-primary:hover {
+  box-shadow: 0 10px 30px -8px rgba(240, 185, 11, 0.7);
+}
+.btn-block {
+  width: 100%;
+  justify-content: center;
+  padding: 0.85rem;
+  font-size: 1rem;
+  margin-top: 0.3rem;
+}
+
+.auth-notice {
+  margin-top: 0.3rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(240, 185, 11, 0.3);
+  background: rgba(240, 185, 11, 0.08);
+  color: var(--gold-2);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.auth-alt {
+  margin: 1.6rem 0 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 860px) {
+  .auth-grid {
+    grid-template-columns: 1fr;
+  }
+  .auth-brand {
+    display: none;
+  }
+  .auth-panel {
+    padding-top: 3.5rem;
+  }
+  /* compact brand header on mobile since the side panel is hidden */
+  .auth-form-wrap::before {
+    content: "◈ Novex";
+    display: block;
+    color: var(--gold);
+    font-weight: 700;
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+  }
+}
