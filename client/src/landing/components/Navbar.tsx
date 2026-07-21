@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { navigate } from "../../router";
+import { useAuth } from "../../auth/AuthContext";
 
 const LINKS = [
   { label: "Markets", href: "#markets" },
@@ -10,6 +11,7 @@ const LINKS = [
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -35,12 +37,25 @@ export function Navbar() {
         </nav>
 
         <div className="nav-actions">
-          <button className="btn btn-ghost" onClick={() => navigate("login")}>
-            Log in
-          </button>
-          <button className="btn btn-primary" onClick={() => navigate("signup")}>
-            Sign up
-          </button>
+          {user ? (
+            <>
+              <button className="btn btn-ghost" onClick={logout}>
+                Log out
+              </button>
+              <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
+                Dashboard
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-ghost" onClick={() => navigate("/login")}>
+                Log in
+              </button>
+              <button className="btn btn-primary" onClick={() => navigate("/signup")}>
+                Sign up
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>

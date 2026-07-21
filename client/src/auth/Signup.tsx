@@ -1,6 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { navigate } from "../router";
-import { AuthShell, AuthNotice } from "./components/AuthShell";
+import { useAuth } from "./AuthContext";
+import { api, ApiError } from "../lib/api";
+import { AuthShell } from "./components/AuthShell";
 import { Field } from "./components/Field";
 import { SocialButtons } from "./components/SocialButtons";
 
@@ -18,27 +20,59 @@ function scorePassword(pw: string): number {
 
 const STRENGTH_LABELS = ["Too short", "Weak", "Fair", "Good", "Strong"];
 
+// Mirrors the server policy (server is the real gate; this is instant feedback).
+function passwordProblem(pw: string): string | undefined {
+  if (pw.length < 8) return "Use at least 8 characters";
+  if (!/[a-z]/.test(pw)) return "Add a lowercase letter";
+  if (!/[A-Z]/.test(pw)) return "Add an uppercase letter";
+  if (!/\d/.test(pw)) return "Add a number";
+  return undefined;
+}
+
 export function Signup() {
+  const { login } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [agree, setAgree] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const strength = useMemo(() => scorePassword(password), [password]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    setFormError("");
+    setNotice("");
+
     const next: Record<string, string> = {};
     if (name.trim().length < 2) next.name = "Enter your full name";
     if (!EMAIL_RE.test(email)) next.email = "Enter a valid email address";
-    if (password.length < 8) next.password = "Use at least 8 characters";
+    const pwProblem = passwordProblem(password);
+    if (pwProblem) next.password = pwProblem;
     if (confirm !== password) next.confirm = "Passwords don't match";
     if (!agree) next.agree = "Please accept the terms to continue";
     setErrors(next);
-    setSubmitted(Object.keys(next).length === 0);
+    if (Object.keys(next).length > 0) return;
+
+    setLoading(true);
+    try {
+      const res = await api.register({ email, full_name: name, password });
+      if (res.requires_verification) {
+        // Only reachable once email verification is enabled server-side.
+        setNotice("Account created! Check your email to verify before logging in.");
+      } else if (res.access_token) {
+        login(res.access_token, res.user);
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -53,6 +87,9 @@ export function Signup() {
         <div className="auth-divider"><span>or sign up with email</span></div>
 
         <form className="auth-form" onSubmit={onSubmit} noValidate>
+          {formError && <div className="auth-notice err" role="alert">{formError}</div>}
+          {notice && <div className="auth-notice" role="status">{notice}</div>}
+
           <Field
             id="signup-name"
             label="Full name"
@@ -81,6 +118,7 @@ export function Signup() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             error={errors.password}
+            hint="8+ chars with upper, lower & a number"
           />
 
           {password && (
@@ -114,11 +152,9 @@ export function Signup() {
           </label>
           {errors.agree && <span className="field-msg err">{errors.agree}</span>}
 
-          <button className="btn btn-primary btn-block" type="submit">
-            Create account
+          <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
+            {loading ? "Creating account…" : "Create account"}
           </button>
-
-          <AuthNotice show={submitted} />
         </form>
 
         <p className="auth-alt">
@@ -128,7 +164,7 @@ export function Signup() {
             href="#/login"
             onClick={(e) => {
               e.preventDefault();
-              navigate("login");
+              navigate("/login");
             }}
           >
             Log in

@@ -34,6 +34,29 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # --- Auth / JWT ---------------------------------------------------------
+    # In production the secret MUST come from the environment and never be committed —
+    # anyone holding it can mint a valid token for any user.
+    jwt_secret: str = "dev-only-change-me-in-production-please"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24  # 24h; shorten + add refresh tokens in prod
+
+    # --- Email verification (currently DISABLED) ---------------------------
+    # require_email_verification=False → users can log in immediately after registering.
+    # Flip to True (plus email_enabled=True + SMTP below) to enforce the verify flow.
+    require_email_verification: bool = False
+    # email_enabled=False → verification links are logged to the console, not actually sent.
+    email_enabled: bool = False
+    verification_token_expire_hours: int = 48
+    frontend_url: str = "http://localhost:5173"
+
+    # SMTP — unused while email_enabled is False, wired for later.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "no-reply@novex.local"
+
     @property
     def database_url(self) -> str:
         return (

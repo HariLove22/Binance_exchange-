@@ -402,6 +402,17 @@
   font-size: 0.85rem;
   line-height: 1.5;
 }
+.auth-notice.err {
+  border-color: rgba(246, 70, 93, 0.4);
+  background: rgba(246, 70, 93, 0.1);
+  color: #ff8497;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
 
 .auth-alt {
   margin: 1.6rem 0 0;

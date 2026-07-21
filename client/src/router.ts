@@ -1,19 +1,17 @@
 import { useEffect, useState } from "react";
 
-// Minimal hash-based router — no dependency, consistent with the project's
-// minimal-deps philosophy. Swap for react-router if real deep-linking is needed.
+// Minimal hash-based, path-style router — no dependency, consistent with the project's
+// minimal-deps philosophy. Paths look like "/", "/login", "/dashboard/assets".
+// Swap for react-router if real deep-linking / server routes are needed.
 
-export type Route = "landing" | "login" | "signup";
-
-function parse(hash: string): Route {
-  const h = hash.replace(/^#\/?/, "").toLowerCase();
-  if (h === "login") return "login";
-  if (h === "signup") return "signup";
-  return "landing";
+export function currentPath(): string {
+  const h = window.location.hash.replace(/^#/, "");
+  if (h === "" || h === "/") return "/";
+  return h.replace(/\/+$/, "") || "/";
 }
 
-export function navigate(route: Route): void {
-  const target = route === "landing" ? "#/" : `#/${route}`;
+export function navigate(path: string): void {
+  const target = `#${path}`;
   if (window.location.hash !== target) {
     window.location.hash = target;
   }
@@ -21,14 +19,14 @@ export function navigate(route: Route): void {
   window.scrollTo({ top: 0 });
 }
 
-export function useHashRoute(): Route {
-  const [route, setRoute] = useState<Route>(() => parse(window.location.hash));
+export function useRoutePath(): string {
+  const [path, setPath] = useState<string>(currentPath);
 
   useEffect(() => {
-    const onChange = () => setRoute(parse(window.location.hash));
+    const onChange = () => setPath(currentPath());
     window.addEventListener("hashchange", onChange);
     return () => window.removeEventListener("hashchange", onChange);
   }, []);
 
-  return route;
+  return path;
 }

@@ -21,7 +21,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
             href="#/"
             onClick={(e) => {
               e.preventDefault();
-              navigate("landing");
+              navigate("/");
             }}
           >
             <span className="brand-mark" aria-hidden>◈</span>
@@ -54,18 +54,6 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
         <main className="auth-panel">{children}</main>
       </div>
-    </div>
-  );
-}
-
-// Small "unavailable" notice shown after submit — the backend has no auth yet
-// (per docs: "no auth yet"). Honest placeholder instead of a fake success.
-export function AuthNotice({ show }: { show: boolean }) {
-  if (!show) return null;
-  return (
-    <div className="auth-notice" role="status">
-      Looks good — but the auth backend isn't wired up yet. This form is ready for the API once
-      the accounts endpoint lands.
     </div>
   );
 }

@@ -1,24 +1,43 @@
 import { useState, type FormEvent } from "react";
 import { navigate } from "../router";
-import { AuthShell, AuthNotice } from "./components/AuthShell";
+import { useAuth } from "./AuthContext";
+import { api, ApiError } from "../lib/api";
+import { AuthShell } from "./components/AuthShell";
 import { Field } from "./components/Field";
 import { SocialButtons } from "./components/SocialButtons";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function Login() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    setFormError("");
+
     const next: typeof errors = {};
     if (!EMAIL_RE.test(email)) next.email = "Enter a valid email address";
-    if (password.length < 8) next.password = "Password must be at least 8 characters";
+    if (!password) next.password = "Enter your password";
     setErrors(next);
-    setSubmitted(Object.keys(next).length === 0);
+    if (Object.keys(next).length > 0) return;
+
+    setLoading(true);
+    try {
+      const res = await api.login({ email, password });
+      if (res.access_token) {
+        login(res.access_token, res.user);
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -33,6 +52,8 @@ export function Login() {
         <div className="auth-divider"><span>or continue with email</span></div>
 
         <form className="auth-form" onSubmit={onSubmit} noValidate>
+          {formError && <div className="auth-notice err" role="alert">{formError}</div>}
+
           <Field
             id="login-email"
             label="Email"
@@ -64,11 +85,9 @@ export function Login() {
             </a>
           </div>
 
-          <button className="btn btn-primary btn-block" type="submit">
-            Log in
+          <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
+            {loading ? "Logging in…" : "Log in"}
           </button>
-
-          <AuthNotice show={submitted} />
         </form>
 
         <p className="auth-alt">
@@ -78,7 +97,7 @@ export function Login() {
             href="#/signup"
             onClick={(e) => {
               e.preventDefault();
-              navigate("signup");
+              navigate("/signup");
             }}
           >
             Create an account

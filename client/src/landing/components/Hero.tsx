@@ -41,7 +41,7 @@ export function Hero() {
           </p>
 
           <div className="hero-cta">
-            <button className="btn btn-primary btn-lg" onClick={() => navigate("signup")}>
+            <button className="btn btn-primary btn-lg" onClick={() => navigate("/signup")}>
               Start trading <IconArrow className="ic" />
             </button>
             <a className="btn btn-outline btn-lg" href="#markets">
