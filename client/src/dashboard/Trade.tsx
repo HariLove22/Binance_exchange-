@@ -3,11 +3,13 @@ import {
   api,
   ApiError,
   trimAmount,
+  type Balance,
   type MarketInfo,
   type OrderBook,
   type OrderRow,
   type TradeTick,
 } from "../lib/api";
+import { useTicker } from "../lib/useLive";
 import { TradeChart } from "./TradeChart";
 import "./trade.css";
 
@@ -24,15 +26,30 @@ export function Trade() {
   const [markets, setMarkets] = useState<MarketInfo[]>([]);
   const [symbol, setSymbol] = useState("ETHUSDT");
   const [interval, setInterval] = useState("1m");
+  const [balances, setBalances] = useState<Balance[]>([]);
+
+  const loadBalances = useCallback(() => {
+    api.balances().then(setBalances).catch(() => setBalances([]));
+  }, []);
 
   useEffect(() => {
     api.marketSymbols().then((m) => {
       setMarkets(m);
       if (m.length && !m.find((x) => x.symbol === "ETHUSDT")) setSymbol(m[0].symbol);
     }).catch(() => {});
-  }, []);
+    loadBalances();
+  }, [loadBalances]);
+
+  // Refresh balances whenever an order changes them.
+  useEffect(() => {
+    const h = () => loadBalances();
+    window.addEventListener("orders-changed", h);
+    return () => window.removeEventListener("orders-changed", h);
+  }, [loadBalances]);
 
   const market = markets.find((m) => m.symbol === symbol);
+  const ticker = useTicker(symbol); // LIVE price from Binance WS
+  const up = (ticker?.changePercent ?? 0) >= 0;
 
   return (
     <div className="trade">
@@ -42,6 +59,19 @@ export function Trade() {
             <option key={m.symbol} value={m.symbol}>{m.symbol}</option>
           ))}
         </select>
+
+        {ticker && (
+          <div className="live-ticker">
+            <span className={`lt-price ${up ? "bid" : "ask"}`}>{ticker.price.toFixed(2)}</span>
+            <span className={`lt-chg ${up ? "bid" : "ask"}`}>
+              {up ? "+" : ""}{ticker.changePercent.toFixed(2)}%
+            </span>
+            <span className="lt-stat">24h H <b>{ticker.high.toFixed(2)}</b></span>
+            <span className="lt-stat">24h L <b>{ticker.low.toFixed(2)}</b></span>
+            <span className="lt-live">● live</span>
+          </div>
+        )}
+
         <SeedLiquidity />
       </div>
 
@@ -63,7 +93,7 @@ export function Trade() {
         </section>
 
         <section className="tp form-panel">
-          <OrderForm market={market} symbol={symbol} />
+          <OrderForm market={market} symbol={symbol} balances={balances} livePrice={ticker?.price ?? null} />
         </section>
 
         <section className="tp trades-panel">
@@ -166,7 +196,14 @@ function OrderBookPanel({ symbol }: { symbol: string }) {
 
 /* ------------------------------------------------------------------- form */
 
-function OrderForm({ market, symbol }: { market?: MarketInfo; symbol: string }) {
+function OrderForm({
+  market, symbol, balances, livePrice,
+}: {
+  market?: MarketInfo;
+  symbol: string;
+  balances: Balance[];
+  livePrice: number | null;
+}) {
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [type, setType] = useState<"LIMIT" | "MARKET">("LIMIT");
   const [price, setPrice] = useState("");
@@ -175,6 +212,28 @@ function OrderForm({ market, symbol }: { market?: MarketInfo; symbol: string }) 
   const [busy, setBusy] = useState(false);
 
   const base = market?.base ?? symbol.replace(/USDT$/, "");
+  const quote = market?.quote ?? "USDT";
+
+  const availableOf = (asset: string) => Number(balances.find((b) => b.asset === asset)?.available ?? "0");
+  const quoteAvail = availableOf(quote); // spend this on a BUY
+  const baseAvail = availableOf(base); // sell this on a SELL
+
+  // The price used for sizing: the limit price if set, else the live price.
+  const refPrice = type === "LIMIT" && price ? Number(price) : livePrice ?? 0;
+
+  // Trade with what's actually in the account: BUY is limited by quote balance, SELL by base.
+  const maxQty = side === "BUY" ? (refPrice > 0 ? quoteAvail / refPrice : 0) : baseAvail;
+
+  function setPercent(pct: number) {
+    if (maxQty <= 0) return;
+    const step = Number(market?.qty_step ?? "0.0001");
+    let q = maxQty * pct;
+    // Round down to a whole number of steps so it never exceeds the balance.
+    q = Math.floor(q / step) * step;
+    setQty(q > 0 ? String(Number(q.toFixed(8))) : "");
+  }
+
+  const estCost = refPrice > 0 && qty ? refPrice * Number(qty) : 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -208,12 +267,19 @@ function OrderForm({ market, symbol }: { market?: MarketInfo; symbol: string }) 
           <button key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{t}</button>
         ))}
       </div>
+
+      {/* What this account can spend/sell, live. */}
+      <div className="avail-row">
+        Available: <b>{side === "BUY" ? `${quoteAvail.toFixed(2)} ${quote}` : `${trimAmount(baseAvail.toString())} ${base}`}</b>
+      </div>
+
       <form onSubmit={submit}>
         {type === "LIMIT" && (
           <label className="fld">
             <span>Price</span>
-            <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" required />
-            <span className="unit">USDT</span>
+            <input value={price} onChange={(e) => setPrice(e.target.value)}
+                   placeholder={livePrice ? livePrice.toFixed(2) : ""} inputMode="decimal" required />
+            <span className="unit">{quote}</span>
           </label>
         )}
         <label className="fld">
@@ -221,6 +287,18 @@ function OrderForm({ market, symbol }: { market?: MarketInfo; symbol: string }) 
           <input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="decimal" required />
           <span className="unit">{base}</span>
         </label>
+
+        <div className="pct-row">
+          {[0.25, 0.5, 0.75, 1].map((p) => (
+            <button type="button" key={p} onClick={() => setPercent(p)}>{p * 100}%</button>
+          ))}
+        </div>
+
+        <div className="est-row">
+          <span>{side === "BUY" ? "Cost" : "Proceeds"}</span>
+          <span className="mono">{estCost > 0 ? `${estCost.toFixed(2)} ${quote}` : "—"}</span>
+        </div>
+
         <button className={`submit ${side.toLowerCase()}`} disabled={busy}>
           {busy ? "…" : `${side} ${base}`}
         </button>
@@ -228,7 +306,7 @@ function OrderForm({ market, symbol }: { market?: MarketInfo; symbol: string }) 
       {note && <p className="form-note">{note}</p>}
       {market && (
         <p className="form-hint">
-          tick {trimAmount(market.price_tick)} · step {trimAmount(market.qty_step)} · min {trimAmount(market.min_notional)} USDT · taker fee {(Number(market.taker_fee) * 100).toFixed(2)}%
+          tick {trimAmount(market.price_tick)} · step {trimAmount(market.qty_step)} · min {trimAmount(market.min_notional)} {quote} · taker fee {(Number(market.taker_fee) * 100).toFixed(2)}%
         </p>
       )}
     </>

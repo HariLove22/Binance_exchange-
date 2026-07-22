@@ -23,7 +23,6 @@ type NavItem = { key: string; label: string; icon: ComponentType<SVGProps<SVGSVG
 // key is the path segment after /dashboard ("" = the overview root).
 const NAV: NavItem[] = [
   { key: "", label: "Dashboard", icon: IHome },
-  { key: "trade", label: "Trade", icon: IList },
   { key: "assets", label: "Assets", icon: IWallet },
   { key: "orders", label: "Orders", icon: IList },
   { key: "rewards", label: "Rewards Hub", icon: IGift },
@@ -33,7 +32,15 @@ const NAV: NavItem[] = [
   { key: "settings", label: "Settings", icon: IGear },
 ];
 
-const TOP_LINKS = ["Buy Crypto", "Markets", "Trade", "Futures", "Earn", "Square", "More"];
+// The Trade dropdown, like Binance's top nav. Spot is live; the rest are not built yet and say so.
+type TradeOption = { label: string; desc: string; to?: string; tag?: string };
+const TRADE_OPTIONS: TradeOption[] = [
+  { label: "Spot", desc: "Trade crypto on the order book", to: "/dashboard/trade" },
+  { label: "Margin", desc: "Leverage — not built yet", tag: "soon" },
+  { label: "P2P", desc: "Buy & sell with bank transfer — not built yet", tag: "soon" },
+  { label: "Convert", desc: "Instant swap — not built yet", tag: "soon" },
+  { label: "Demo Trading", desc: "Practice with virtual funds — not built yet", tag: "soon" },
+];
 
 function segmentOf(path: string): string {
   // "/dashboard" -> "", "/dashboard/assets" -> "assets"
@@ -44,17 +51,19 @@ export function Dashboard({ path }: { path: string }) {
   const { user, logout } = useAuth();
   const seg = segmentOf(path);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tradeOpen, setTradeOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const tradeRef = useRef<HTMLDivElement>(null);
 
-  // Close the user dropdown on any outside click.
+  // Close either dropdown on an outside click.
   useEffect(() => {
-    if (!menuOpen) return;
     const onClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (tradeRef.current && !tradeRef.current.contains(e.target as Node)) setTradeOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
-  }, [menuOpen]);
+  }, []);
 
   if (!user) return null; // guarded by App; satisfies the type here.
 
@@ -67,9 +76,44 @@ export function Dashboard({ path }: { path: string }) {
           <span className="brand-mark" aria-hidden>◈</span> Novex
         </a>
         <nav className="dash-topnav">
-          {TOP_LINKS.map((l) => (
-            <a key={l} href="#/dashboard" onClick={(e) => e.preventDefault()}>{l}</a>
-          ))}
+          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Buy Crypto</a>
+          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Markets</a>
+
+          <div className="topnav-drop" ref={tradeRef}>
+            <button
+              className={`topnav-trigger ${seg === "trade" ? "active" : ""}`}
+              onClick={() => setTradeOpen((o) => !o)}
+            >
+              Trade ▾
+            </button>
+            {tradeOpen && (
+              <div className="trade-dropdown">
+                {TRADE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.label}
+                    className={`td-item ${opt.to ? "" : "disabled"}`}
+                    disabled={!opt.to}
+                    onClick={() => {
+                      if (opt.to) {
+                        navigate(opt.to);
+                        setTradeOpen(false);
+                      }
+                    }}
+                  >
+                    <span className="td-label">
+                      {opt.label}
+                      {opt.tag && <span className="td-tag">{opt.tag}</span>}
+                    </span>
+                    <span className="td-desc">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Futures</a>
+          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Earn</a>
+          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>More</a>
         </nav>
 
         <div className="dash-top-right">

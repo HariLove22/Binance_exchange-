@@ -152,3 +152,24 @@
 .oo-r { border-bottom: 1px solid rgba(148,163,184,0.07); font-family: ui-monospace, monospace; }
 .cancel { background: none; border: none; color: #848e9c; cursor: pointer; font-size: 0.85rem; }
 .cancel:hover { color: var(--ask); }
+
+/* live ticker header */
+.live-ticker { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.lt-price { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lt-chg { font-size: 0.85rem; font-weight: 600; }
+.lt-stat { font-size: 0.72rem; color: #848e9c; }
+.lt-stat b { color: #eaecef; font-variant-numeric: tabular-nums; }
+.lt-live { font-size: 0.65rem; color: var(--bid); animation: ltpulse 1.4s ease-in-out infinite; }
+@keyframes ltpulse { 50% { opacity: 0.4; } }
+
+/* balance-aware order form */
+.avail-row { padding: 0.5rem 0.7rem 0; font-size: 0.74rem; color: #848e9c; }
+.avail-row b { color: #eaecef; font-variant-numeric: tabular-nums; }
+.pct-row { display: flex; gap: 0.3rem; margin-top: 0.55rem; }
+.pct-row button {
+  flex: 1; padding: 0.3rem; border: 1px solid var(--line); border-radius: 6px; background: none;
+  color: #848e9c; font: inherit; font-size: 0.7rem; cursor: pointer;
+}
+.pct-row button:hover { border-color: currentColor; color: inherit; }
+.est-row { display: flex; justify-content: space-between; margin-top: 0.6rem; font-size: 0.76rem; color: #848e9c; }
+.est-row .mono { font-family: ui-monospace, monospace; color: #eaecef; }

@@ -498,3 +498,28 @@
 .da-memo { font-size: .8rem; color: var(--text-faint); }
 .btn-outline-d.small { padding: .25rem .6rem; font-size: .75rem; }
 .assets-note.mono { font-family: ui-monospace, monospace; color: #0ecb81; word-break: break-all; }
+
+/* --- top nav Trade dropdown ------------------------------------------- */
+.topnav-drop { position: relative; display: inline-block; }
+.topnav-trigger {
+  background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 0;
+}
+.topnav-trigger.active { color: #f0b90b; }
+.trade-dropdown {
+  position: absolute; top: 140%; left: 0; z-index: 50; width: 20rem;
+  background: #1e2329; border: 1px solid #2b3139; border-radius: 12px; padding: 0.5rem;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+}
+.td-item {
+  display: flex; flex-direction: column; gap: 0.15rem; width: 100%; text-align: left;
+  background: none; border: none; color: #eaecef; font: inherit; padding: 0.6rem 0.7rem;
+  border-radius: 8px; cursor: pointer;
+}
+.td-item:hover:not(.disabled) { background: rgba(240,185,11,0.08); }
+.td-item.disabled { opacity: 0.45; cursor: not-allowed; }
+.td-label { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+.td-tag {
+  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.1rem 0.35rem;
+  border-radius: 4px; background: rgba(148,163,184,0.2); color: #848e9c;
+}
+.td-desc { font-size: 0.74rem; color: #848e9c; }

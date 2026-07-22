@@ -7,6 +7,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { api, type Kline } from "../lib/api";
+import { subscribeCandles } from "../lib/liveFeed";
 
 /**
  * Candles from Binance's public feed (proxied through our API), via lightweight-charts —
@@ -43,8 +44,11 @@ export function TradeChart({ symbol, interval }: { symbol: string; interval: str
     };
   }, []);
 
+  // Load history once per symbol/interval, then stream the live candle on top.
   useEffect(() => {
     let cancelled = false;
+    let unsub: (() => void) | undefined;
+
     api.klines(symbol, interval, 300).then((rows: Kline[]) => {
       if (cancelled || !series.current) return;
       series.current.setData(
@@ -54,8 +58,21 @@ export function TradeChart({ symbol, interval }: { symbol: string; interval: str
         })),
       );
       chart.current?.timeScale().fitContent();
+
+      // Live: each tick updates the in-progress candle in place; when it closes, the next tick
+      // arrives with a new timestamp and appends. `update` handles both.
+      unsub = subscribeCandles(symbol, interval, (c) => {
+        series.current?.update({
+          time: c.time as UTCTimestamp,
+          open: c.open, high: c.high, low: c.low, close: c.close,
+        });
+      });
     }).catch(() => {});
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, [symbol, interval]);
 
   return <div className="trade-chart" ref={host} />;

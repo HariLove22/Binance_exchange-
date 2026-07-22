@@ -1,6 +1,37 @@
 import { useEffect, useState } from "react";
 import { api, type AuthUser, type Balance } from "../lib/api";
+import { useTickers } from "../lib/useLive";
 import { navigate } from "../router";
+
+// Assets valued at ~1 USDT without needing a live feed.
+const STABLE = new Set(["USDT", "USDC"]);
+
+/** Live portfolio value + 24h PnL in USDT, priced from the live Binance feed. */
+function usePortfolio(balances: Balance[] | null) {
+  // Value every non-stable holding via its USDT pair.
+  const symbols = (balances ?? [])
+    .filter((b) => !STABLE.has(b.asset) && Number(b.total) > 0)
+    .map((b) => `${b.asset}USDT`);
+  const tickers = useTickers(symbols);
+
+  let value = 0;
+  let pnl24h = 0;
+  for (const b of balances ?? []) {
+    const total = Number(b.total);
+    if (total <= 0) continue;
+    if (STABLE.has(b.asset)) {
+      value += total;
+      continue;
+    }
+    const t = tickers[`${b.asset}USDT`];
+    if (!t) continue;
+    const worth = total * t.price;
+    value += worth;
+    // Today's PnL: how much this holding's value moved over 24h, from its live change%.
+    pnl24h += worth - worth / (1 + t.changePercent / 100);
+  }
+  return { value, pnl24h, priced: symbols.every((s) => tickers[s]) };
+}
 
 function initial(user: AuthUser): string {
   return (user.full_name?.trim()?.[0] ?? user.email[0] ?? "U").toUpperCase();
@@ -25,6 +56,8 @@ export function Overview({ user }: { user: AuthUser }) {
 
   const assetCount = balances?.filter((b) => b.total !== "0" && Number(b.available) + Number(b.locked) > 0).length ?? 0;
   const funded = assetCount > 0;
+  const { value, pnl24h } = usePortfolio(balances);
+  const pnlUp = pnl24h >= 0;
 
   return (
     <div>
@@ -96,30 +129,34 @@ export function Overview({ user }: { user: AuthUser }) {
         </div>
       </div>
 
-      {/* balance — real, from the ledger. No fiat total: we don't price assets yet, and a
-          faked "≈ ₹0.00" would misrepresent what exists. */}
+      {/* balance — real, from the ledger, valued live from the Binance feed. */}
       <div className="balance-card">
         <div>
-          <div className="balance-label">Spot assets held</div>
+          <div className="balance-label">Est. Total Value ⓘ</div>
           <div className="balance-value">
-            {balances === null ? "…" : assetCount}
-            <span className="unit">{assetCount === 1 ? "asset" : "assets"}</span>
+            {balances === null ? "…" : value.toFixed(2)}
+            <span className="unit">USDT</span>
           </div>
           <div className="balance-sub">
-            {funded
-              ? "View balances on the Assets → Spot page"
-              : "No funds yet — credit test funds via python -m app.dev_credit"}
+            {funded ? (
+              <>
+                Today's PnL{" "}
+                <span style={{ color: pnlUp ? "#0ecb81" : "#f6465d" }}>
+                  {pnlUp ? "+" : ""}{pnl24h.toFixed(2)} USDT
+                </span>{" "}
+                · live
+              </>
+            ) : (
+              "No funds yet — an admin can credit test funds"
+            )}
           </div>
         </div>
         <div className="balance-actions">
-          <button className="btn-gold" onClick={() => navigate("/dashboard/assets")}>
-            View Assets
+          <button className="btn-gold" onClick={() => navigate("/dashboard/trade")}>
+            Trade
           </button>
-          <button className="btn-outline-d" disabled title="Needs a custody provider">
-            Deposit
-          </button>
-          <button className="btn-outline-d" disabled title="Needs a custody provider">
-            Withdraw
+          <button className="btn-outline-d" onClick={() => navigate("/dashboard/assets")}>
+            Assets
           </button>
         </div>
       </div>
