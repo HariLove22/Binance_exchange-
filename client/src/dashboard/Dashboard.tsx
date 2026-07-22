@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 import { navigate } from "../router";
 import { Overview, Placeholder } from "./pages";
 import { Assets } from "./Assets";
+import { Trade } from "./Trade";
 import {
   IDeposit,
   IGear,
@@ -22,6 +23,7 @@ type NavItem = { key: string; label: string; icon: ComponentType<SVGProps<SVGSVG
 // key is the path segment after /dashboard ("" = the overview root).
 const NAV: NavItem[] = [
   { key: "", label: "Dashboard", icon: IHome },
+  { key: "trade", label: "Trade", icon: IList },
   { key: "assets", label: "Assets", icon: IWallet },
   { key: "orders", label: "Orders", icon: IList },
   { key: "rewards", label: "Rewards Hub", icon: IGift },
@@ -113,6 +115,8 @@ export function Dashboard({ path }: { path: string }) {
         <main className="dash-main">
           {seg === "" ? (
             <Overview user={user} />
+          ) : seg === "trade" ? (
+            <Trade />
           ) : seg === "assets" ? (
             <Assets />
           ) : (

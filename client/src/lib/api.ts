@@ -168,6 +168,49 @@ export interface ReconciliationRow {
   balanced: boolean;
 }
 
+export interface MarketInfo {
+  symbol: string;
+  base: string;
+  quote: string;
+  price_tick: string;
+  qty_step: string;
+  min_notional: string;
+  maker_fee: string;
+  taker_fee: string;
+}
+
+export interface DepthLevel {
+  price: string;
+  quantity: string;
+}
+export interface OrderBook {
+  symbol: string;
+  bids: DepthLevel[];
+  asks: DepthLevel[];
+}
+
+export interface TradeTick {
+  id: number;
+  price: string;
+  quantity: string;
+  taker_side: string;
+  created_at: string;
+}
+
+export interface OrderRow {
+  id: number;
+  symbol: string;
+  side: string;
+  type: string;
+  price: string | null;
+  quantity: string;
+  filled_quantity: string;
+  status: string;
+}
+
+/** Binance kline: [openTime, open, high, low, close, volume, ...]. */
+export type Kline = [number, string, string, string, string, string, ...unknown[]];
+
 export const api = {
   health: () => request<HealthResponse>("/health"),
   dbHealth: () => request<DbHealthResponse>("/health/db"),
@@ -213,6 +256,26 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  // market data
+  marketSymbols: () => request<MarketInfo[]>("/market/symbols"),
+  klines: (symbol: string, interval: string, limit = 200) =>
+    request<Kline[]>(`/market/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`),
+  orderBook: (symbol: string) => request<OrderBook>(`/market/depth?symbol=${symbol}&limit=12`),
+  marketTrades: (symbol: string) => request<TradeTick[]>(`/market/trades?symbol=${symbol}&limit=30`),
+
+  // trading
+  placeOrder: (body: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    type: "LIMIT" | "MARKET";
+    quantity: string;
+    price?: string | null;
+  }) => request<OrderRow>("/trade/order", { method: "POST", body: JSON.stringify(body) }),
+  cancelOrder: (id: number) => request<OrderRow>(`/trade/order/${id}`, { method: "DELETE" }),
+  openOrders: () => request<OrderRow[]>("/trade/orders"),
+  refreshMarketMaker: () =>
+    request<Record<string, number>>("/trade/dev/market-maker/refresh", { method: "POST" }),
 };
 
 /** Trim trailing zeros from a fixed-scale amount string for display only. Never used for math. */
