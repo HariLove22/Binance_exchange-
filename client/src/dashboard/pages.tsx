@@ -1,5 +1,6 @@
-import type { AuthUser } from "../lib/api";
-import { ISpark } from "./icons";
+import { useEffect, useState } from "react";
+import { api, type AuthUser, type Balance } from "../lib/api";
+import { navigate } from "../router";
 
 function initial(user: AuthUser): string {
   return (user.full_name?.trim()?.[0] ?? user.email[0] ?? "U").toUpperCase();
@@ -15,6 +16,16 @@ function handle(user: AuthUser): string {
 }
 
 export function Overview({ user }: { user: AuthUser }) {
+  const [balances, setBalances] = useState<Balance[] | null>(null);
+
+  useEffect(() => {
+    // Best-effort: the overview still renders if this fails; the Assets page surfaces errors.
+    api.balances().then(setBalances).catch(() => setBalances([]));
+  }, []);
+
+  const assetCount = balances?.filter((b) => b.total !== "0" && Number(b.available) + Number(b.locked) > 0).length ?? 0;
+  const funded = assetCount > 0;
+
   return (
     <div>
       {/* profile header */}
@@ -85,22 +96,31 @@ export function Overview({ user }: { user: AuthUser }) {
         </div>
       </div>
 
-      {/* balance */}
+      {/* balance — real, from the ledger. No fiat total: we don't price assets yet, and a
+          faked "≈ ₹0.00" would misrepresent what exists. */}
       <div className="balance-card">
         <div>
-          <div className="balance-label">Est. Total Value ⓘ</div>
+          <div className="balance-label">Spot assets held</div>
           <div className="balance-value">
-            0.00<span className="unit">BTC</span>
+            {balances === null ? "…" : assetCount}
+            <span className="unit">{assetCount === 1 ? "asset" : "assets"}</span>
           </div>
-          <div className="balance-sub">≈ ₹0.00</div>
+          <div className="balance-sub">
+            {funded
+              ? "View balances on the Assets → Spot page"
+              : "No funds yet — credit test funds via python -m app.dev_credit"}
+          </div>
         </div>
         <div className="balance-actions">
-          <button className="chip-ai">
-            <ISpark className="ic" style={{ width: 16, height: 16 }} /> How's the market today?
+          <button className="btn-gold" onClick={() => navigate("/dashboard/assets")}>
+            View Assets
           </button>
-          <button className="btn-gold">Deposit</button>
-          <button className="btn-outline-d">Withdraw</button>
-          <button className="btn-outline-d">Cash In</button>
+          <button className="btn-outline-d" disabled title="Needs a custody provider">
+            Deposit
+          </button>
+          <button className="btn-outline-d" disabled title="Needs a custody provider">
+            Withdraw
+          </button>
         </div>
       </div>
     </div>

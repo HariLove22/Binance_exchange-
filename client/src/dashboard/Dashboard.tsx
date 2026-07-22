@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "
 import { useAuth } from "../auth/AuthContext";
 import { navigate } from "../router";
 import { Overview, Placeholder } from "./pages";
+import { Assets } from "./Assets";
 import {
   IDeposit,
   IGear,
@@ -110,7 +111,13 @@ export function Dashboard({ path }: { path: string }) {
         </aside>
 
         <main className="dash-main">
-          {seg === "" ? <Overview user={user} /> : <Placeholder title={active.label} icon="🚧" />}
+          {seg === "" ? (
+            <Overview user={user} />
+          ) : seg === "assets" ? (
+            <Assets />
+          ) : (
+            <Placeholder title={active.label} icon="🚧" />
+          )}
         </main>
       </div>
     </div>

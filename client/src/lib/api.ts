@@ -104,6 +104,17 @@ export interface LoginBody {
   password: string;
 }
 
+export interface Balance {
+  asset: string;
+  scale: number;
+  // Fixed-scale strings, never numbers — the ledger stores NUMERIC(36,18) and a JSON number
+  // would be parsed into a double here, losing precision. Do arithmetic on these as strings /
+  // BigInt if it is ever needed; for display, format the string.
+  available: string;
+  locked: string;
+  total: string;
+}
+
 export const api = {
   health: () => request<HealthResponse>("/health"),
   dbHealth: () => request<DbHealthResponse>("/health/db"),
@@ -113,4 +124,13 @@ export const api = {
   login: (body: LoginBody) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request<AuthUser>("/auth/me"),
+
+  balances: () => request<Balance[]>("/wallet/balances"),
 };
+
+/** Trim trailing zeros from a fixed-scale amount string for display only. Never used for math. */
+export function trimAmount(value: string): string {
+  if (!value.includes(".")) return value;
+  const trimmed = value.replace(/0+$/, "").replace(/\.$/, "");
+  return trimmed === "" || trimmed === "-" ? "0" : trimmed;
+}
