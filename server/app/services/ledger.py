@@ -334,6 +334,56 @@ async def refund_withdrawal(
     )
 
 
+async def settle_trade(
+    db: AsyncSession,
+    *,
+    base_asset_id: int,
+    quote_asset_id: int,
+    buyer_id: int,
+    seller_id: int,
+    price: Decimal,
+    quantity: Decimal,
+    buyer_fee: Decimal,
+    seller_fee: Decimal,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Settle one fill: the buyer gets base, the seller gets quote, each pays a fee on what they
+    receive. Both sides' funds are already LOCKED (buyer's quote, seller's base).
+
+        quote (buyer.LOCKED -> seller.AVAILABLE, minus seller's fee to FEE_INCOME)
+        base  (seller.LOCKED -> buyer.AVAILABLE, minus buyer's fee to FEE_INCOME)
+
+    Sums to zero in each asset independently. Fees are taken from the received side, exactly as
+    Binance does — the buyer pays their fee in base, the seller in quote.
+    """
+    quote_amount = price * quantity
+
+    buyer_quote_locked = await get_or_create_account(db, quote_asset_id, AccountType.LOCKED, buyer_id)
+    seller_quote_avail = await get_or_create_account(db, quote_asset_id, AccountType.AVAILABLE, seller_id)
+    seller_base_locked = await get_or_create_account(db, base_asset_id, AccountType.LOCKED, seller_id)
+    buyer_base_avail = await get_or_create_account(db, base_asset_id, AccountType.AVAILABLE, buyer_id)
+
+    movements = [
+        Movement(buyer_quote_locked, -quote_amount),
+        Movement(seller_quote_avail, quote_amount - seller_fee),
+        Movement(seller_base_locked, -quantity),
+        Movement(buyer_base_avail, quantity - buyer_fee),
+    ]
+    if seller_fee > 0:
+        movements.append(Movement(await get_or_create_account(db, quote_asset_id, AccountType.FEE_INCOME), seller_fee))
+    if buyer_fee > 0:
+        movements.append(Movement(await get_or_create_account(db, base_asset_id, AccountType.FEE_INCOME), buyer_fee))
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.TRADE,
+        reference=reference,
+        movements=movements,
+    )
+
+
 @dataclass(frozen=True)
 class Balance:
     asset_id: int

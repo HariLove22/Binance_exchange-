@@ -17,7 +17,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.core.db import AsyncSessionLocal
-from app.models import AddressModel, Asset, AssetKind, AssetNetwork, Chain, ChainFamily
+from app.models import AddressModel, Asset, AssetKind, AssetNetwork, Chain, ChainFamily, Market
 
 # EVM rows differ only in chain id, gas asset and explorer — the whole argument for grouping by
 # family: one adapter serves all seven.
@@ -133,9 +133,35 @@ async def seed() -> None:
                 for k, v in values.items():
                     setattr(existing, k, v)
 
+        # --- markets ---------------------------------------------------------------------
+        # Pairs we can both price (live Binance data) and fund (USDT quote + a base we support).
+        # Symbol -> (base, quote, price_tick, qty_step, min_notional).
+        MARKETS = [
+            ("ETHUSDT", "ETH", "USDT", "0.01", "0.0001", "5"),
+            ("BNBUSDT", "BNB", "USDT", "0.01", "0.001", "5"),
+        ]
+        for symbol, base, quote, tick, step, min_notional in MARKETS:
+            existing = (
+                await db.execute(select(Market).where(Market.symbol == symbol))
+            ).scalar_one_or_none()
+            values = dict(
+                base_asset_id=assets[base].id,
+                quote_asset_id=assets[quote].id,
+                price_tick=Decimal(tick),
+                qty_step=Decimal(step),
+                min_notional=Decimal(min_notional),
+                enabled=True,
+            )
+            if existing is None:
+                db.add(Market(symbol=symbol, **values))
+            else:
+                for k, v in values.items():
+                    setattr(existing, k, v)
+
         await db.commit()
 
-    print(f"seeded {len(CHAINS)} chains, {len(ASSETS)} assets, {len(NETWORKS)} networks")
+    print(f"seeded {len(CHAINS)} chains, {len(ASSETS)} assets, {len(NETWORKS)} networks, "
+          f"{len(MARKETS)} markets")
 
 
 if __name__ == "__main__":

@@ -22,6 +22,15 @@ from app.models.ledger import (
     LedgerTransaction,
     TransactionKind,
 )
+from app.models.market import (
+    Market,
+    OPEN_STATUSES,
+    Order,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    Trade,
+)
 from app.models.user import User, UserRole
 from app.models.wallet import (
     Deposit,
@@ -47,6 +56,13 @@ __all__ = [
     "DepositStatus",
     "LedgerEntry",
     "LedgerTransaction",
+    "Market",
+    "OPEN_STATUSES",
+    "Order",
+    "OrderSide",
+    "OrderStatus",
+    "OrderType",
+    "Trade",
     "TransactionKind",
     "User",
     "UserRole",
