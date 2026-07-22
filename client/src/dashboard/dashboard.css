@@ -399,6 +399,162 @@
   cursor: pointer;
 }
 
+/* ---------- assets page ---------- */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.page-head h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.checkbox-inline input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--gold);
+}
+
+.faucet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1.25rem;
+}
+.faucet-title {
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.faucet-title .tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--gold-2);
+  border: 1px solid rgba(240, 185, 11, 0.4);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+}
+.faucet-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.faucet-row select,
+.faucet-row input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  outline: none;
+}
+.faucet-row select:focus,
+.faucet-row input:focus {
+  border-color: var(--gold);
+}
+.faucet-row input {
+  flex: 1;
+  min-width: 8rem;
+}
+.faucet-msg {
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+}
+.faucet-msg.ok {
+  color: var(--up);
+}
+.faucet-msg.err {
+  color: var(--down);
+}
+
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+.asset-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  min-width: 34rem;
+}
+.asset-table th {
+  text-align: left;
+  color: var(--text-faint);
+  font-weight: 500;
+  font-size: 0.82rem;
+  padding: 0.9rem 1.15rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.asset-table td {
+  padding: 0.9rem 1.15rem;
+  border-bottom: 1px solid var(--border);
+}
+.asset-table tr:last-child td {
+  border-bottom: none;
+}
+.asset-table .num {
+  text-align: right;
+}
+.asset-table .mono {
+  font-family: ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.asset-table .dim {
+  color: var(--text-faint);
+}
+.asset-table .strong {
+  font-weight: 600;
+}
+.asset-table .empty {
+  text-align: center;
+  color: var(--text-faint);
+  padding: 2.5rem 1rem;
+}
+.coin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.coin-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.coin strong {
+  display: block;
+  font-size: 0.92rem;
+}
+.coin em {
+  display: block;
+  font-style: normal;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+
 /* ---------- generic placeholder page ---------- */
 .placeholder {
   display: grid;

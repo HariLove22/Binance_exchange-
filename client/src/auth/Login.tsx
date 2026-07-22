@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { navigate } from "../router";
+import { currentQuery, navigate } from "../router";
 import { useAuth } from "./AuthContext";
 import { api, ApiError } from "../lib/api";
 import { AuthShell } from "./components/AuthShell";
@@ -15,6 +15,8 @@ export function Login() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Set once on mount: "?registered=1" means they just came from a successful signup.
+  const [justRegistered] = useState(() => currentQuery().get("registered") === "1");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -52,6 +54,11 @@ export function Login() {
         <div className="auth-divider"><span>or continue with email</span></div>
 
         <form className="auth-form" onSubmit={onSubmit} noValidate>
+          {justRegistered && !formError && (
+            <div className="auth-notice ok" role="status">
+              Account created — please log in to continue.
+            </div>
+          )}
           {formError && <div className="auth-notice err" role="alert">{formError}</div>}
 
           <Field

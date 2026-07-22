@@ -28,6 +28,7 @@ from app.schemas.auth import (
     LoginRequest,
     MessageResponse,
     RegisterRequest,
+    RegisterResponse,
     UserOut,
 )
 
@@ -38,8 +39,8 @@ async def _get_user_by_email(db: AsyncSession, email: str) -> User | None:
     return await db.scalar(select(User).where(User.email == email.lower()))
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) -> RegisterResponse:
     email = body.email.lower()
 
     if await _get_user_by_email(db, email) is not None:
@@ -63,12 +64,17 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) ->
 
     if settings.require_email_verification:
         send_verification_email(user.email, create_verification_token(user.id))
-        return AuthResponse(
-            access_token=None, requires_verification=True, user=UserOut.model_validate(user)
+        return RegisterResponse(
+            user=UserOut.model_validate(user),
+            requires_verification=True,
+            message="Account created. Check your email to verify it, then log in.",
         )
 
-    return AuthResponse(
-        access_token=create_access_token(user.id), user=UserOut.model_validate(user)
+    # No token: registering does not start a session. The user logs in next.
+    return RegisterResponse(
+        user=UserOut.model_validate(user),
+        requires_verification=False,
+        message="Account created. Please log in to continue.",
     )
 
 

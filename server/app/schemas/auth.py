@@ -58,16 +58,26 @@ class UserOut(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    """Returned by both /register and /login.
-
-    access_token is None only when email verification is required and pending — in that case
-    the client shows a "check your email" screen instead of logging in.
-    """
+    """Returned by /login and /verify-email — i.e. wherever a session actually starts."""
 
     access_token: str | None = None
     token_type: str = "bearer"
     requires_verification: bool = False
     user: UserOut
+
+
+class RegisterResponse(BaseModel):
+    """Returned by /register — deliberately carries NO access token.
+
+    Registering creates an account; it does not start a session. The user must log in with
+    the credentials they just chose. That confirms they can actually reproduce the password
+    (a typo in a password manager is caught immediately, not on the next visit), and it keeps
+    "create account" and "authenticate" as two separate, auditable events.
+    """
+
+    user: UserOut
+    requires_verification: bool = False
+    message: str
 
 
 class MessageResponse(BaseModel):

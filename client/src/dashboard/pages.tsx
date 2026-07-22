@@ -1,5 +1,7 @@
 import type { AuthUser } from "../lib/api";
 import { ISpark } from "./icons";
+import { navigate } from "../router";
+import { isNonZero, useBalances } from "./useBalances";
 
 function initial(user: AuthUser): string {
   return (user.full_name?.trim()?.[0] ?? user.email[0] ?? "U").toUpperCase();
@@ -15,6 +17,10 @@ function handle(user: AuthUser): string {
 }
 
 export function Overview({ user }: { user: AuthUser }) {
+  const { balances, loading } = useBalances();
+  const btc = balances.find((b) => b.asset === "BTC");
+  const funded = balances.some((b) => isNonZero(b.total));
+
   return (
     <div>
       {/* profile header */}
@@ -66,39 +72,60 @@ export function Overview({ user }: { user: AuthUser }) {
           </div>
         </div>
 
-        <div className="step-card active">
+        <div className={`step-card ${funded ? "" : "active"}`}>
           <span className="step-num">2</span>
-          <h3>Complete a Deposit to Start Your Trading Journey</h3>
-          <p>Add funds to your account to begin trading crypto on Novex.</p>
+          <h3>{funded ? "Funds Added" : "Complete a Deposit to Start Your Trading Journey"}</h3>
+          <p>
+            {funded
+              ? "Your account is funded. You're ready to place your first order."
+              : "Add funds to your account to begin trading crypto on Novex."}
+          </p>
           <div className="step-cta">
-            <button className="btn-gold">Deposit</button>
+            <button className="btn-gold" onClick={() => navigate("/dashboard/assets")}>
+              {funded ? "View assets" : "Deposit"}
+            </button>
           </div>
         </div>
 
-        <div className="step-card">
+        <div className={`step-card ${funded ? "active" : ""}`}>
           <span className="step-num">3</span>
           <h3>Trade</h3>
-          <p>Buy and sell crypto once your deposit lands.</p>
+          <p>Buy and sell crypto on the order book.</p>
           <div className="step-cta">
-            <span className="step-pending">◷ Pending</span>
+            {funded ? (
+              <button className="btn-outline-d">Trade (coming next)</button>
+            ) : (
+              <span className="step-pending">◷ Pending</span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* balance */}
+      {/* balances — real numbers from the ledger */}
       <div className="balance-card">
         <div>
-          <div className="balance-label">Est. Total Value ⓘ</div>
+          <div className="balance-label">BTC Balance</div>
           <div className="balance-value">
-            0.00<span className="unit">BTC</span>
+            {loading ? "…" : (btc?.total ?? "0.00000000")}
+            <span className="unit">BTC</span>
           </div>
-          <div className="balance-sub">≈ ₹0.00</div>
+          <div className="balance-sub">
+            {/* An "Est. Total Value" across assets needs a price feed — that arrives with trading. */}
+            {loading
+              ? " "
+              : balances.filter((b) => isNonZero(b.total) && b.asset !== "BTC").length > 0
+                ? balances
+                    .filter((b) => isNonZero(b.total) && b.asset !== "BTC")
+                    .map((b) => `${b.total} ${b.asset}`)
+                    .join(" · ")
+                : "No other holdings yet"}
+          </div>
         </div>
         <div className="balance-actions">
           <button className="chip-ai">
             <ISpark className="ic" style={{ width: 16, height: 16 }} /> How's the market today?
           </button>
-          <button className="btn-gold">Deposit</button>
+          <button className="btn-gold" onClick={() => navigate("/dashboard/assets")}>Deposit</button>
           <button className="btn-outline-d">Withdraw</button>
           <button className="btn-outline-d">Cash In</button>
         </div>

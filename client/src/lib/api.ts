@@ -94,6 +94,13 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+// Registering creates the account but does NOT start a session — no token here by design.
+export interface RegisterResponse {
+  user: AuthUser;
+  requires_verification: boolean;
+  message: string;
+}
+
 export interface RegisterBody {
   email: string;
   full_name: string;
@@ -104,12 +111,37 @@ export interface LoginBody {
   password: string;
 }
 
+// Amounts arrive as STRINGS (never JSON numbers) so precision survives the wire.
+// Keep them as strings for display; only parse when you must compute, and then carefully.
+export interface Balance {
+  asset: string;
+  name: string;
+  available: string;
+  locked: string;
+  total: string;
+}
+export interface BalancesResponse {
+  balances: Balance[];
+}
+export interface FaucetResponse {
+  asset: string;
+  credited: string;
+  available: string;
+}
+
 export const api = {
   health: () => request<HealthResponse>("/health"),
   dbHealth: () => request<DbHealthResponse>("/health/db"),
 
+  balances: () => request<BalancesResponse>("/wallet/balances"),
+  faucet: (asset: string, amount: string) =>
+    request<FaucetResponse>("/wallet/faucet", {
+      method: "POST",
+      body: JSON.stringify({ asset, amount }),
+    }),
+
   register: (body: RegisterBody) =>
-    request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+    request<RegisterResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body: LoginBody) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request<AuthUser>("/auth/me"),
