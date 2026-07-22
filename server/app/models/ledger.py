@@ -46,7 +46,13 @@ from app.models.asset import MONEY, TimestampMixin, str_enum
 class AccountType(str, enum.Enum):
     """What an account is for.
 
-    User-owned:  AVAILABLE (spendable), LOCKED (reserved against an open order).
+    User-owned:
+      AVAILABLE           — spendable.
+      LOCKED              — reserved against an open order.
+      PENDING_WITHDRAWAL  — reserved for a withdrawal in flight: debited from AVAILABLE when the
+                            withdrawal is requested, and only leaves for EXTERNAL once the on-chain
+                            transaction confirms. Still the user's money until then, so a failed
+                            broadcast can refund it without inventing anything.
     System-owned (user_id NULL):
       EXTERNAL     — the outside world; deposits come from it, withdrawals go to it.
       FEE_INCOME   — fees we have earned.
@@ -56,12 +62,15 @@ class AccountType(str, enum.Enum):
 
     AVAILABLE = "AVAILABLE"
     LOCKED = "LOCKED"
+    PENDING_WITHDRAWAL = "PENDING_WITHDRAWAL"
     EXTERNAL = "EXTERNAL"
     FEE_INCOME = "FEE_INCOME"
     TDS_PAYABLE = "TDS_PAYABLE"
 
 
-USER_ACCOUNT_TYPES = frozenset({AccountType.AVAILABLE, AccountType.LOCKED})
+USER_ACCOUNT_TYPES = frozenset(
+    {AccountType.AVAILABLE, AccountType.LOCKED, AccountType.PENDING_WITHDRAWAL}
+)
 # May legitimately go negative. EXTERNAL is negative by construction; TDS accrues as a liability.
 NEGATIVE_ALLOWED = frozenset({AccountType.EXTERNAL, AccountType.TDS_PAYABLE})
 
@@ -119,8 +128,8 @@ class Account(TimestampMixin, Base):
         # A user account must have an owner; a system account must not. Mixing them means fees
         # credited to a user, or a balance nobody owns.
         CheckConstraint(
-            "(account_type IN ('AVAILABLE', 'LOCKED') AND user_id IS NOT NULL)"
-            " OR (account_type NOT IN ('AVAILABLE', 'LOCKED') AND user_id IS NULL)",
+            "(account_type IN ('AVAILABLE', 'LOCKED', 'PENDING_WITHDRAWAL') AND user_id IS NOT NULL)"
+            " OR (account_type NOT IN ('AVAILABLE', 'LOCKED', 'PENDING_WITHDRAWAL') AND user_id IS NULL)",
             name="ck_accounts_user_type_consistency",
         ),
         # A negative user balance means we let someone spend money they did not have.

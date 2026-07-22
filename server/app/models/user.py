@@ -1,9 +1,20 @@
+import enum
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
+
+
+class UserRole(str, enum.Enum):
+    """Two roles, deliberately. The full brief wants a hierarchy (compliance, finance, support…),
+    but inventing seats nobody occupies produces permissions nobody has reasoned about. This
+    splits the only boundary that exists today: can you see and move other people's money.
+    """
+
+    USER = "USER"
+    ADMIN = "ADMIN"
 
 
 class User(Base):
@@ -17,6 +28,14 @@ class User(Base):
 
     # bcrypt hash — never the plaintext.
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Never settable through any endpoint — registration always produces a USER. An admin is made
+    # by an operator running SQL, deliberately. That keeps privilege escalation off the request path.
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", native_enum=False, length=16,
+             values_callable=lambda e: [m.value for m in e]),
+        default=UserRole.USER, nullable=False,
+    )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

@@ -242,6 +242,98 @@ async def unlock(
     )
 
 
+async def reserve_withdrawal(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    total: Decimal,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move funds out of AVAILABLE into PENDING_WITHDRAWAL: AVAILABLE -> PENDING_WITHDRAWAL.
+
+    `total` is amount + fee — the user commits both the moment they request, so neither can be
+    spent elsewhere while the withdrawal is in flight. The funds stay the user's (in
+    PENDING_WITHDRAWAL) until the chain confirms, which is what lets a failed broadcast refund
+    cleanly.
+    """
+    if total <= 0:
+        raise LedgerError("withdrawal total must be positive")
+
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
+    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id)
+    if available.balance < total:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), total, available.balance)
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.WITHDRAWAL,
+        reference=reference,
+        movements=[Movement(available, -total), Movement(pending, total)],
+    )
+
+
+async def settle_withdrawal(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    fee: Decimal,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Finalise a confirmed withdrawal: the amount leaves the system, the fee becomes revenue.
+
+    PENDING_WITHDRAWAL -= amount+fee ; EXTERNAL += amount ; FEE_INCOME += fee. Sums to zero: the
+    amount crossing into EXTERNAL is the money that actually left on-chain, and the fee we keep.
+    """
+    if amount <= 0 or fee < 0:
+        raise LedgerError("bad settle amounts")
+
+    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id)
+    external = await get_or_create_account(db, asset_id, AccountType.EXTERNAL)
+    movements = [Movement(pending, -(amount + fee)), Movement(external, amount)]
+    if fee > 0:
+        fee_income = await get_or_create_account(db, asset_id, AccountType.FEE_INCOME)
+        movements.append(Movement(fee_income, fee))
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.WITHDRAWAL,
+        reference=reference,
+        movements=movements,
+    )
+
+
+async def refund_withdrawal(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    total: Decimal,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Return a failed or cancelled withdrawal's funds: PENDING_WITHDRAWAL -> AVAILABLE."""
+    if total <= 0:
+        raise LedgerError("refund total must be positive")
+
+    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.WITHDRAWAL,
+        reference=reference,
+        movements=[Movement(pending, -total), Movement(available, total)],
+    )
+
+
 @dataclass(frozen=True)
 class Balance:
     asset_id: int

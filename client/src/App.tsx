@@ -3,6 +3,7 @@ import { Landing } from "./landing/Landing";
 import { Login } from "./auth/Login";
 import { Signup } from "./auth/Signup";
 import { Dashboard } from "./dashboard/Dashboard";
+import { AdminDashboard } from "./admin/AdminDashboard";
 import { useAuth } from "./auth/AuthContext";
 import { useRoutePath, navigate } from "./router";
 import { FullScreenLoader } from "./components/Loader";
@@ -33,7 +34,15 @@ function App() {
 
   if (path === "/login") return <Login />;
   if (path === "/signup") return <Signup />;
-  if (isProtected) return <Dashboard path={path} />;
+  if (isProtected) {
+    // Admins get a separate dashboard entirely — a different surface, not a tab inside the user
+    // one. The server enforces the boundary on every admin route regardless of what renders here.
+    return user && user.role === "ADMIN" ? (
+      <AdminDashboard user={user} />
+    ) : (
+      <Dashboard path={path} />
+    );
+  }
   return <Landing />;
 }
 

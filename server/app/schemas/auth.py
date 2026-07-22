@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.models.user import UserRole
+
 # Server-side password policy — mirrors the client hints, but the server is the real gate
 # (a client check can always be bypassed).
 _HAS_LOWER = re.compile(r"[a-z]")
@@ -53,6 +55,10 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
     full_name: str
+    # Returned so the client can decide what to render (e.g. an admin nav). It is NOT an
+    # authorisation decision — the server checks the role on every admin route regardless of what
+    # the UI believes. A hidden button is convenience; the 403 is the control.
+    role: UserRole
     is_verified: bool
     created_at: datetime
 

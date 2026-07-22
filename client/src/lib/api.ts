@@ -84,6 +84,7 @@ export interface AuthUser {
   id: number;
   email: string;
   full_name: string;
+  role: "USER" | "ADMIN";
   is_verified: boolean;
   created_at: string;
 }
@@ -115,6 +116,58 @@ export interface Balance {
   total: string;
 }
 
+export interface WalletNetwork {
+  asset_network_id: number;
+  asset: string;
+  chain: string;
+  chain_name: string;
+  min_withdrawal: string;
+  withdrawal_fee: string;
+  confirmations: number;
+  deposit_enabled: boolean;
+  withdraw_enabled: boolean;
+}
+
+export interface DepositRecord {
+  id: number;
+  asset: string;
+  chain: string;
+  tx_hash: string;
+  amount: string;
+  status: string;
+  confirmations: number;
+  required_confirmations: number;
+}
+
+export interface WithdrawalRecord {
+  id: number;
+  asset: string;
+  chain: string;
+  to_address: string;
+  amount: string;
+  fee: string;
+  status: string;
+  tx_hash: string | null;
+}
+
+export interface AdminUserRow {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  is_verified: boolean;
+  is_active: boolean;
+  asset_count: number;
+}
+
+export interface ReconciliationRow {
+  asset: string;
+  trial_balance: string;
+  ledger_external: string;
+  custody_onchain: string;
+  balanced: boolean;
+}
+
 export const api = {
   health: () => request<HealthResponse>("/health"),
   dbHealth: () => request<DbHealthResponse>("/health/db"),
@@ -126,6 +179,40 @@ export const api = {
   me: () => request<AuthUser>("/auth/me"),
 
   balances: () => request<Balance[]>("/wallet/balances"),
+  networks: (asset?: string) =>
+    request<WalletNetwork[]>(`/wallet/networks${asset ? `?asset=${asset}` : ""}`),
+  depositAddress: (assetNetworkId: number) =>
+    request<{ asset_network_id: number; address: string; memo: string | null }>(
+      `/wallet/deposit/address?asset_network_id=${assetNetworkId}`,
+      { method: "POST" },
+    ),
+  deposits: () => request<DepositRecord[]>("/wallet/deposits"),
+  withdraw: (body: {
+    asset_network_id: number;
+    to_address: string;
+    amount: string;
+    memo?: string | null;
+  }) => request<WithdrawalRecord>("/wallet/withdraw", { method: "POST", body: JSON.stringify(body) }),
+  withdrawals: () => request<WithdrawalRecord[]>("/wallet/withdrawals"),
+  reconcile: () => request<ReconciliationRow[]>("/wallet/reconcile"),
+
+  // dev-only: stand in for chain events
+  simulateDeposit: (assetNetworkId: number, amount: string) =>
+    request<DepositRecord>("/wallet/dev/simulate-deposit", {
+      method: "POST",
+      body: JSON.stringify({ asset_network_id: assetNetworkId, amount }),
+    }),
+  confirmWithdrawal: (id: number) =>
+    request<WithdrawalRecord>(`/wallet/dev/withdrawals/${id}/confirm`, { method: "POST" }),
+
+  // admin
+  adminUsers: () => request<AdminUserRow[]>("/admin/users"),
+  adminReconcile: () => request<ReconciliationRow[]>("/admin/reconcile"),
+  adminCredit: (body: { user_id: number; asset: string; amount: string; chain?: string }) =>
+    request<{ deposit_id: number; asset: string; amount: string; status: string }>("/admin/credit", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 /** Trim trailing zeros from a fixed-scale amount string for display only. Never used for math. */

@@ -1,18 +1,45 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, trimAmount, type Balance } from "../lib/api";
+import {
+  api,
+  ApiError,
+  trimAmount,
+  type Balance,
+  type DepositRecord,
+  type WalletNetwork,
+  type WithdrawalRecord,
+} from "../lib/api";
 
 /**
- * The Spot wallet — real balances from the ledger, the page the Binance "Assets → Spot"
- * screenshot maps to.
+ * The Spot wallet — balances, plus the deposit and withdrawal flows.
  *
- * `available` and `locked` are shown side by side, always. Once orders exist, placing one moves
- * funds from available to locked, and a UI that showed only available would read as "my money
- * disappeared". The money is still the user's — locked is reserved, not gone.
- *
- * Amounts are formatted from the server's fixed-scale strings and never parsed into a number. The
- * ledger keeps 18 decimals of precision; a `Number()` here would quietly throw some of it away.
+ * There is no real custody, so the chain side is mocked: a deposit address is a plausible-looking
+ * but non-functional string, and "Simulate deposit" stands in for the on-chain event a real
+ * provider would deliver. Everything the exchange owns — the ledger postings, confirmations,
+ * reserve-on-request, refund-on-fail — is real.
  */
 export function Assets() {
+  const [tab, setTab] = useState<"balances" | "deposit" | "withdraw">("balances");
+
+  return (
+    <div className="assets">
+      <div className="assets-tabs">
+        {(["balances", "deposit", "withdraw"] as const).map((t) => (
+          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
+            {t[0].toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {tab === "balances" && <Balances />}
+      {tab === "deposit" && <Deposit />}
+      {tab === "withdraw" && <Withdraw />}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ balances */
+
+function Balances() {
   const [balances, setBalances] = useState<Balance[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,41 +51,27 @@ export function Assets() {
       setError(e instanceof ApiError ? e.message : String(e));
     }
   }, []);
+  useEffect(() => void load(), [load]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const hasFunds = balances && balances.length > 0;
+  const has = balances && balances.length > 0;
 
   return (
-    <div className="assets">
+    <>
       <div className="assets-head">
         <h2>Spot</h2>
         <button className="btn-outline-d" onClick={() => void load()}>
           Refresh
         </button>
       </div>
-
       {error && <p className="assets-error">{error}</p>}
-
       {balances === null && !error && <p className="assets-muted">Loading…</p>}
-
-      {balances !== null && !hasFunds && (
+      {balances !== null && !has && (
         <div className="assets-empty">
           <p>No assets yet.</p>
-          <p className="assets-muted">
-            There is no deposit pipeline — that needs a custody provider, and there isn't one yet.
-            For development, credit test funds from the server:
-          </p>
-          <pre>python -m app.dev_credit YOUR_EMAIL USDT 5000</pre>
-          <p className="assets-muted">
-            That posts a real double-entry ledger transaction, not a hardcoded number.
-          </p>
+          <p className="assets-muted">Use the Deposit tab to add funds (mock custody, dev only).</p>
         </div>
       )}
-
-      {hasFunds && (
+      {has && (
         <div className="assets-table">
           <div className="at-head">
             <span>Asset</span>
@@ -74,21 +87,246 @@ export function Assets() {
               </span>
               <span className="num">{trimAmount(b.total)}</span>
               <span className="num">{trimAmount(b.available)}</span>
-              <span className="num at-locked" title="Reserved against open orders">
-                {trimAmount(b.locked)}
+              <span className="num at-locked">{trimAmount(b.locked)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="assets-note">
+        <strong>Available</strong> is spendable; <strong>In order</strong> is reserved against open
+        orders — still yours, not spendable twice.
+      </p>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------- deposit */
+
+function useNetworks() {
+  const [networks, setNetworks] = useState<WalletNetwork[]>([]);
+  useEffect(() => {
+    api.networks().then(setNetworks).catch(() => setNetworks([]));
+  }, []);
+  return networks;
+}
+
+function Deposit() {
+  const networks = useNetworks();
+  const [netId, setNetId] = useState<number | "">("");
+  const [address, setAddress] = useState<{ address: string; memo: string | null } | null>(null);
+  const [amount, setAmount] = useState("1000");
+  const [deposits, setDeposits] = useState<DepositRecord[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const loadDeposits = useCallback(async () => {
+    setDeposits(await api.deposits().catch(() => []));
+  }, []);
+  useEffect(() => void loadDeposits(), [loadDeposits]);
+
+  async function getAddress() {
+    if (!netId) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      setAddress(await api.depositAddress(Number(netId)));
+    } catch (e) {
+      setNote(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function simulate() {
+    if (!netId) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const d = await api.simulateDeposit(Number(netId), amount);
+      setNote(`deposit #${d.id} ${d.status} — ${d.amount} ${d.asset}`);
+      await loadDeposits();
+    } catch (e) {
+      setNote(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const enabled = networks.filter((n) => n.deposit_enabled);
+
+  return (
+    <>
+      <h2>Deposit</h2>
+      {enabled.length === 0 && (
+        <p className="assets-muted">
+          No networks are enabled for deposit. In dev, an admin can enable them; the seeder ships
+          them off so nothing accepts real funds before custody exists.
+        </p>
+      )}
+      <div className="wallet-form">
+        <label>
+          <span>Network</span>
+          <select value={netId} onChange={(e) => setNetId(Number(e.target.value) || "")}>
+            <option value="">select…</option>
+            {enabled.map((n) => (
+              <option key={n.asset_network_id} value={n.asset_network_id}>
+                {n.asset} · {n.chain_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="btn-outline-d" onClick={getAddress} disabled={busy || !netId}>
+          Get address
+        </button>
+      </div>
+
+      {address && (
+        <div className="deposit-address">
+          <span className="da-label">Deposit address (mock — do not send real funds)</span>
+          <code>{address.address}</code>
+          {address.memo && <span className="da-memo">Memo: {address.memo}</span>}
+        </div>
+      )}
+
+      <div className="wallet-form" style={{ marginTop: "1rem" }}>
+        <label>
+          <span>Simulate a deposit</span>
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+        </label>
+        <button className="btn-gold" onClick={simulate} disabled={busy || !netId}>
+          Simulate deposit
+        </button>
+      </div>
+      {note && <p className="assets-note mono">{note}</p>}
+
+      {deposits.length > 0 && (
+        <div className="assets-table" style={{ marginTop: "1.25rem" }}>
+          <div className="at-head" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+            <span>Asset</span>
+            <span>Chain</span>
+            <span className="num">Amount</span>
+            <span>Status</span>
+          </div>
+          {deposits.map((d) => (
+            <div className="at-row" key={d.id} style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+              <span className="mono">{d.asset}</span>
+              <span className="mono">{d.chain}</span>
+              <span className="num">{trimAmount(d.amount)}</span>
+              <span className="mono">{d.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ withdraw */
+
+function Withdraw() {
+  const networks = useNetworks();
+  const [netId, setNetId] = useState<number | "">("");
+  const [address, setAddress] = useState("");
+  const [amount, setAmount] = useState("");
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setWithdrawals(await api.withdrawals().catch(() => []));
+  }, []);
+  useEffect(() => void load(), [load]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!netId) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const w = await api.withdraw({ asset_network_id: Number(netId), to_address: address, amount });
+      setNote(`withdrawal #${w.id} ${w.status} — reserved ${trimAmount(w.amount)} + ${trimAmount(w.fee)} fee`);
+      await load();
+    } catch (err) {
+      setNote(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirm(id: number) {
+    setBusy(true);
+    try {
+      await api.confirmWithdrawal(id);
+      await load();
+    } catch (e) {
+      setNote(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const enabled = networks.filter((n) => n.withdraw_enabled);
+  const selected = networks.find((n) => n.asset_network_id === netId);
+
+  return (
+    <>
+      <h2>Withdraw</h2>
+      <form className="wallet-form-col" onSubmit={submit}>
+        <label>
+          <span>Network</span>
+          <select value={netId} onChange={(e) => setNetId(Number(e.target.value) || "")} required>
+            <option value="">select…</option>
+            {enabled.map((n) => (
+              <option key={n.asset_network_id} value={n.asset_network_id}>
+                {n.asset} · {n.chain_name} (fee {trimAmount(n.withdrawal_fee)})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Destination address</span>
+          <input value={address} onChange={(e) => setAddress(e.target.value)} required minLength={4} />
+        </label>
+        <label>
+          <span>Amount{selected ? ` (fee ${trimAmount(selected.withdrawal_fee)} ${selected.asset})` : ""}</span>
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" required />
+        </label>
+        <button className="btn-gold" disabled={busy || !netId}>
+          Request withdrawal
+        </button>
+      </form>
+      {note && <p className="assets-note mono">{note}</p>}
+
+      <p className="assets-muted" style={{ marginTop: "0.75rem" }}>
+        Real withdrawals also gate on 2FA, email confirmation and an address whitelist with a
+        time-lock. Those are not built yet — the funds move AVAILABLE → PENDING on request and only
+        leave on confirmation. "Confirm" below stands in for the chain-confirmation event.
+      </p>
+
+      {withdrawals.length > 0 && (
+        <div className="assets-table" style={{ marginTop: "1rem" }}>
+          <div className="at-head" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+            <span>Asset</span>
+            <span className="num">Amount</span>
+            <span>Status</span>
+            <span></span>
+          </div>
+          {withdrawals.map((w) => (
+            <div className="at-row" key={w.id} style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+              <span className="mono">{w.asset}</span>
+              <span className="num">{trimAmount(w.amount)}</span>
+              <span className="mono">{w.status}</span>
+              <span className="num">
+                {w.status === "BROADCAST" && (
+                  <button className="btn-outline-d small" onClick={() => confirm(w.id)} disabled={busy}>
+                    Confirm
+                  </button>
+                )}
               </span>
             </div>
           ))}
         </div>
       )}
-
-      <p className="assets-note">
-        <strong>Available</strong> is spendable. <strong>In order</strong> (locked) is reserved
-        against an open order — still yours, not spendable twice. Funds are locked <em>before</em>
-        an order reaches the matching engine, never after: the engine has no database and cannot
-        check balances, so an unfunded order reaching it would produce a trade the ledger cannot
-        settle.
-      </p>
-    </div>
+    </>
   );
 }

@@ -1,15 +1,16 @@
-"""Credit test funds to a user — development only.
+"""Fund a user with test money — development only, through the real deposit flow.
 
-    python -m app.dev_credit <email> <asset> <amount>
+    python -m app.dev_credit <email> <asset> <amount> [chain]
     python -m app.dev_credit wallet-demo@example.com USDT 5000
+    python -m app.dev_credit wallet-demo@example.com USDT 5000 TRON
 
-There is no deposit pipeline yet (it needs a custody provider), so this is how a balance becomes
-non-zero for now. It posts a real double-entry `ADMIN_CREDIT` transaction through the ledger — it
-does not set a number — so the trial balance stays zero and the entry is visible in the ledger
-like any other.
+This does NOT mint a raw ledger credit. It simulates an on-chain deposit end to end: derive an
+address, record the deposit, confirm it, credit the ledger. That matters because reconciliation
+compares the ledger's EXTERNAL balance against custody's on-chain holdings — a raw credit with no
+deposit behind it would (correctly) show up as unbacked and break reconciliation. Funds created
+here are backed, so reconciliation stays green.
 
-Refuses to run outside a development environment. In production this would mint balances no
-deposit backs, breaking the reconciliation that matters: user balances against on-chain holdings.
+Refuses to run outside development.
 """
 
 import asyncio
@@ -20,11 +21,11 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.db import AsyncSessionLocal
-from app.models import Asset, TransactionKind, User
-from app.services import ledger
+from app.models import Asset, AssetNetwork, Chain, User
+from app.services import deposits as deposit_service
 
 
-async def main(email: str, symbol: str, amount_str: str) -> int:
+async def main(email: str, symbol: str, amount_str: str, chain_code: str | None) -> int:
     if settings.environment.lower() not in {"development", "dev", "local", "test"}:
         print(f"refusing: environment is {settings.environment!r}, not development")
         return 2
@@ -44,39 +45,50 @@ async def main(email: str, symbol: str, amount_str: str) -> int:
             print(f"no user with email {email!r}")
             return 1
 
-        asset = (await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))).scalar_one_or_none()
-        if asset is None:
-            print(f"no asset {symbol!r}")
+        # Pick the network: the named chain, or the first one this asset lives on.
+        query = (
+            select(AssetNetwork)
+            .join(Asset, Asset.id == AssetNetwork.asset_id)
+            .where(Asset.symbol == symbol.upper())
+        )
+        if chain_code:
+            query = query.join(Chain, Chain.id == AssetNetwork.chain_id).where(Chain.code == chain_code.upper())
+        network = (await db.execute(query.order_by(AssetNetwork.id))).scalars().first()
+        if network is None:
+            print(f"no network for {symbol!r}" + (f" on {chain_code}" if chain_code else ""))
             return 1
 
-        if amount.as_tuple().exponent < -asset.scale:
-            print(f"{amount_str} has more precision than {asset.symbol} allows (scale {asset.scale})")
-            return 2
+        # The seeder ships networks disabled; enable this one for the deposit (dev only).
+        if not network.deposit_enabled:
+            network.deposit_enabled = True
+            await db.flush()
 
-        # Distinct per invocation so repeated top-ups both apply — idempotency is for machine
-        # retries, not human intent.
+        address = await deposit_service.get_or_create_address(db, user.id, network.id)
+
         import time
 
-        key = f"dev-credit:{user.id}:{asset.symbol}:{amount_str}:{int(time.time() * 1000)}"
-        txn = await ledger.credit(
-            db,
-            user_id=user.id,
-            asset_id=asset.id,
-            amount=amount,
-            kind=TransactionKind.ADMIN_CREDIT,
-            idempotency_key=key,
-            reference="dev_credit script",
+        tx_hash = f"0xdev{user.id}{int(time.time() * 1000)}"
+        deposit = await deposit_service.record_deposit(
+            db, asset_network_id=network.id, tx_hash=tx_hash, amount=amount
         )
+        deposit.user_id = user.id
+        deposit.deposit_address_id = address.id
+        deposit.confirmations = deposit.required_confirmations
+        db.add(deposit)
+        await db.flush()
+        await deposit_service.credit_if_confirmed(db, deposit)
         await db.commit()
 
-        print(f"credited {amount} {asset.symbol} to {email} (txn {txn.id if txn else 'already applied'})")
+        print(f"credited {amount} {symbol.upper()} to {email} via deposit {deposit.id} "
+              f"(backed, reconciliation stays balanced)")
         return 0
 
 
 if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5):
         print(__doc__)
         raise SystemExit(2)
-    raise SystemExit(asyncio.run(main(sys.argv[1], sys.argv[2], sys.argv[3])))
+    chain = sys.argv[4] if len(sys.argv) == 5 else None
+    raise SystemExit(asyncio.run(main(sys.argv[1], sys.argv[2], sys.argv[3], chain)))

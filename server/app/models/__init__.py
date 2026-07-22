@@ -22,7 +22,14 @@ from app.models.ledger import (
     LedgerTransaction,
     TransactionKind,
 )
-from app.models.user import User
+from app.models.user import User, UserRole
+from app.models.wallet import (
+    Deposit,
+    DepositAddress,
+    DepositStatus,
+    Withdrawal,
+    WithdrawalStatus,
+)
 
 __all__ = [
     "NEGATIVE_ALLOWED",
@@ -35,8 +42,14 @@ __all__ = [
     "AssetNetwork",
     "Chain",
     "ChainFamily",
+    "Deposit",
+    "DepositAddress",
+    "DepositStatus",
     "LedgerEntry",
     "LedgerTransaction",
     "TransactionKind",
     "User",
+    "UserRole",
+    "Withdrawal",
+    "WithdrawalStatus",
 ]
