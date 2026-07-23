@@ -43,23 +43,47 @@
 }
 .seed-btn:hover:not(:disabled) { border-color: currentColor; color: inherit; }
 
-/* terminal grid: order book+trades | chart+form+orders | market list */
-.term {
+/* terminal grid — Binance layout:
+   ┌ ticker ─────────────────────────┐
+   │ book │ chart        │ market     │
+   │ book │ order form   │ market     │
+   └ open orders (full width) ────────┘ */
+.term-grid {
   display: grid;
-  grid-template-columns: 15rem minmax(0, 1fr) 15rem;
+  grid-template-columns: 15rem minmax(0, 1fr) 15.5rem;
+  grid-template-areas:
+    "ticker ticker ticker"
+    "left   chart  market"
+    "left   form   market"
+    "orders orders orders";
   gap: 0.6rem;
-  align-items: start;
+  align-items: stretch;
 }
-@media (max-width: 74rem) {
-  .term { grid-template-columns: 15rem minmax(0, 1fr); }
-  .term-right { grid-column: 1 / -1; order: 3; }
+.g-ticker { grid-area: ticker; margin-bottom: 0; }
+.g-left { grid-area: left; display: flex; flex-direction: column; gap: 0.6rem; min-height: 0; }
+.g-chart { grid-area: chart; }
+.g-form { grid-area: form; }
+.g-market { grid-area: market; }
+.g-orders { grid-area: orders; }
+.g-left .book-box { flex: 1; min-height: 0; }
+
+@media (max-width: 76rem) {
+  .term-grid {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    grid-template-areas:
+      "ticker ticker"
+      "left   chart"
+      "left   form"
+      "market market"
+      "orders orders";
+  }
 }
 @media (max-width: 46rem) {
-  .term { grid-template-columns: 1fr; }
+  .term-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "ticker" "chart" "form" "left" "market" "orders";
+  }
 }
-
-.term-left { display: flex; flex-direction: column; gap: 0.6rem; }
-.term-center { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 
 .tp { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); min-width: 0; }
 .tp-head { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); }
@@ -168,3 +192,19 @@
 .mkt-dot { display: inline-block; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: #0ecb81; margin-right: 0.35rem; vertical-align: middle; }
 .mkt-row.tradeable .mkt-name { color: #eaecef; }
 .mkt-row:not(.tradeable) { opacity: 0.72; }
+
+/* ticker bar symbol + view-only */
+.tk-symbol { display: flex; align-items: center; gap: 0.6rem; }
+.tk-name { font-size: 1.2rem; font-weight: 700; }
+.tk-quote { color: #848e9c; font-weight: 400; font-size: 0.9rem; }
+.tk-viewonly { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.12rem 0.4rem; border-radius: 4px; background: rgba(240,185,11,0.15); color: #d9a406; }
+
+/* view-only form area */
+.viewonly-form { padding: 2rem 1rem; text-align: center; }
+.viewonly-form p { margin: 0 0 0.4rem; color: #848e9c; font-size: 0.85rem; }
+.viewonly-form .viewonly-sub { font-size: 0.75rem; opacity: 0.8; }
+
+/* let the order book fill the tall left column */
+.book-box { display: flex; flex-direction: column; }
+.book-box .ob-bids { flex: 1; }
+.tp.fill { display: flex; flex-direction: column; min-height: 20rem; }

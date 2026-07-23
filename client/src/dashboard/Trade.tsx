@@ -58,88 +58,91 @@ export function Trade() {
 
   return (
     <div className="trade">
-      {/* symbol + live ticker header */}
-      <div className="tk-bar">
-        <select className="sym-pick" value={symbol} onChange={(e) => setSymbol(e.target.value)}>
-          {markets.map((m) => (
-            <option key={m.symbol} value={m.symbol}>{m.symbol}</option>
-          ))}
-        </select>
-        {ticker ? (
-          <>
-            <span className={`tk-price ${up ? "bid" : "ask"}`}>{ticker.price.toFixed(2)}</span>
-            <div className="tk-stats">
-              <span className={`tk-chg ${up ? "bid" : "ask"}`}>{up ? "+" : ""}{ticker.changePercent.toFixed(2)}%</span>
-              <span className="tk-s"><i>24h High</i>{ticker.high.toFixed(2)}</span>
-              <span className="tk-s"><i>24h Low</i>{ticker.low.toFixed(2)}</span>
-              <span className="tk-s"><i>24h Vol</i>{(ticker.quoteVolume / 1e6).toFixed(1)}M</span>
-              <span className="tk-live">● live</span>
-            </div>
-          </>
-        ) : (
-          <span className="tk-loading">connecting to live feed…</span>
-        )}
-        <div className="tk-spacer" />
-        <SeedLiquidity />
-      </div>
-
-      {!tradeable && (
-        <div className="view-only-banner">
-          <b>{symbol}</b> is view-only — live chart and price, but not listed for trading on this
-          exchange yet. Pick a highlighted pair to trade.
+      <div className="term-grid">
+        {/* ── ticker bar (full width) ── */}
+        <div className="g-ticker tk-bar">
+          <div className="tk-symbol">
+            <span className="tk-name">{symbol.replace(/USDT$/, "")}<span className="tk-quote">/USDT</span></span>
+            {!tradeable && <span className="tk-viewonly">view only</span>}
+          </div>
+          {ticker ? (
+            <>
+              <span className={`tk-price ${up ? "bid" : "ask"}`}>{fmtPx(ticker.price)}</span>
+              <div className="tk-stats">
+                <span className={`tk-chg ${up ? "bid" : "ask"}`}>{up ? "+" : ""}{ticker.changePercent.toFixed(2)}%</span>
+                <span className="tk-s"><i>24h High</i>{fmtPx(ticker.high)}</span>
+                <span className="tk-s"><i>24h Low</i>{fmtPx(ticker.low)}</span>
+                <span className="tk-s"><i>24h Vol</i>{(ticker.quoteVolume / 1e6).toFixed(1)}M</span>
+                <span className="tk-live">● live</span>
+              </div>
+            </>
+          ) : (
+            <span className="tk-loading">connecting to live feed…</span>
+          )}
+          <div className="tk-spacer" />
+          <SeedLiquidity />
         </div>
-      )}
 
-      <div className="term">
-        <aside className="term-left">
+        {/* ── left: order book + our trades ── */}
+        <aside className="g-left">
           {tradeable ? (
             <>
               <OrderBookPanel symbol={symbol} onPick={setClickedPrice} live={ticker?.price ?? null} />
               <RecentTrades symbol={symbol} />
             </>
           ) : (
-            <div className="tp"><div className="tp-head"><span className="tp-title">Order book</span></div>
-              <p className="tp-empty">not traded here</p></div>
+            <div className="tp fill">
+              <div className="tp-head"><span className="tp-title">Order book</span></div>
+              <p className="tp-empty">Not traded on this exchange — view only.</p>
+            </div>
           )}
         </aside>
 
-        <main className="term-center">
-          <section className="tp chart-box">
-            <div className="tp-head">
-              <span className="tp-title">{symbol}</span>
-              <div className="ivals">
-                {INTERVALS.map((i) => (
-                  <button key={i} className={interval === i ? "on" : ""} onClick={() => setInterval(i)}>{i}</button>
-                ))}
-              </div>
+        {/* ── center top: chart ── */}
+        <section className="g-chart tp">
+          <div className="tp-head">
+            <span className="tp-title">{symbol}</span>
+            <div className="ivals">
+              {INTERVALS.map((i) => (
+                <button key={i} className={interval === i ? "on" : ""} onClick={() => setInterval(i)}>{i}</button>
+              ))}
             </div>
-            <TradeChart symbol={symbol} interval={interval} />
-          </section>
+          </div>
+          <TradeChart symbol={symbol} interval={interval} />
+        </section>
 
-          <section className="tp form-box">
-            {tradeable ? (
-              <OrderForm
-                market={market}
-                symbol={symbol}
-                balances={balances}
-                livePrice={ticker?.price ?? null}
-                clickedPrice={clickedPrice}
-              />
-            ) : (
-              <p className="tp-empty">Order entry is only available for pairs listed on this exchange.</p>
-            )}
-          </section>
-
-          {tradeable && (
-            <section className="tp orders-box">
-              <OpenOrders symbol={symbol} />
-            </section>
+        {/* ── center bottom: order form ── */}
+        <section className="g-form tp">
+          {tradeable ? (
+            <OrderForm
+              market={market}
+              symbol={symbol}
+              balances={balances}
+              livePrice={ticker?.price ?? null}
+              clickedPrice={clickedPrice}
+            />
+          ) : (
+            <div className="viewonly-form">
+              <p>Order entry is available only for pairs listed on this exchange.</p>
+              <p className="viewonly-sub">The chart and price above are live from the reference feed.</p>
+            </div>
           )}
-        </main>
+        </section>
 
-        <aside className="term-right">
+        {/* ── right: full market universe ── */}
+        <aside className="g-market">
           <MarketList current={symbol} onPick={setSymbol} />
         </aside>
+
+        {/* ── bottom: open orders (full width) ── */}
+        <section className="g-orders tp">
+          {tradeable ? <OpenOrders symbol={symbol} /> : (
+            <>
+              <div className="tp-head"><span className="tp-title">Open orders</span></div>
+              <p className="tp-empty">—</p>
+            </>
+          )}
+        </section>
       </div>
     </div>
   );
