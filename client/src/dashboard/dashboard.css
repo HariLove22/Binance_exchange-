@@ -168,6 +168,10 @@
   display: grid;
   grid-template-columns: 230px 1fr;
 }
+/* Trading terminal: no sidebar, full width. */
+.dash-body.full {
+  grid-template-columns: 1fr;
+}
 .dash-side {
   border-right: 1px solid var(--border);
   padding: 1rem 0.75rem;
@@ -206,6 +210,11 @@
 .dash-main {
   padding: 1.75rem;
   max-width: 1200px;
+}
+/* Terminal fills the viewport width, tighter padding. */
+.dash-main.full {
+  max-width: none;
+  padding: 0.75rem 1rem;
 }
 
 /* ---------- profile header ---------- */

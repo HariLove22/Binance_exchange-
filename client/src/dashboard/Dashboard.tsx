@@ -139,24 +139,27 @@ export function Dashboard({ path }: { path: string }) {
         </div>
       </header>
 
-      <div className="dash-body">
-        <aside className="dash-side">
-          {NAV.map((n) => {
-            const Icon = n.icon;
-            return (
-              <button
-                key={n.key || "home"}
-                className={`side-item ${n.key === seg ? "active" : ""}`}
-                onClick={() => navigate(`/dashboard${n.key ? `/${n.key}` : ""}`)}
-              >
-                <Icon />
-                {n.label}
-              </button>
-            );
-          })}
-        </aside>
+      {/* The trading terminal takes the full width — hide the sidebar there, like Binance. */}
+      <div className={`dash-body ${seg === "trade" ? "full" : ""}`}>
+        {seg !== "trade" && (
+          <aside className="dash-side">
+            {NAV.map((n) => {
+              const Icon = n.icon;
+              return (
+                <button
+                  key={n.key || "home"}
+                  className={`side-item ${n.key === seg ? "active" : ""}`}
+                  onClick={() => navigate(`/dashboard${n.key ? `/${n.key}` : ""}`)}
+                >
+                  <Icon />
+                  {n.label}
+                </button>
+              );
+            })}
+          </aside>
+        )}
 
-        <main className="dash-main">
+        <main className={`dash-main ${seg === "trade" ? "full" : ""}`}>
           {seg === "" ? (
             <Overview user={user} />
           ) : seg === "trade" ? (
