@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.models import Asset, Market, OPEN_STATUSES, Order, OrderSide, Trade
+from app.services import marketdata
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -53,6 +54,51 @@ async def symbols(db: AsyncSession = Depends(get_db)):
             maker_fee=f"{m.maker_fee.normalize():f}", taker_fee=f"{m.taker_fee.normalize():f}",
         ))
     return out
+
+
+class UniverseRow(BaseModel):
+    symbol: str
+    base: str
+    quote: str
+    price: float
+    change_percent: float
+    quote_volume: float
+    tradeable: bool
+
+
+class Universe(BaseModel):
+    segments: list[str]
+    markets: list[UniverseRow]
+
+
+@router.get("/all", response_model=Universe)
+async def all_markets(
+    quote: str | None = Query(default=None, description="Filter by quote asset, e.g. USDT"),
+    search: str | None = Query(default=None),
+    limit: int = Query(default=500, le=3000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Every Binance pair, live, flagged by whether it is tradeable here. All segments.
+
+    Tradeable pairs are the ones we have a market for; the rest are view-only — their chart works
+    (Binance datafeed) but no order can be placed against a market we do not run.
+    """
+    tradeable = set(
+        (await db.execute(select(Market.symbol).where(Market.enabled.is_(True)))).scalars().all()
+    )
+    rows = await marketdata.all_markets(tradeable)
+    segments = marketdata.quote_segments(rows)
+
+    if quote:
+        rows = [r for r in rows if r.quote == quote.upper()]
+    if search:
+        s = search.upper()
+        rows = [r for r in rows if s in r.symbol]
+
+    return Universe(
+        segments=segments,
+        markets=[UniverseRow(**vars(r)) for r in rows[:limit]],
+    )
 
 
 async def _binance_get(path: str, params: dict) -> object:

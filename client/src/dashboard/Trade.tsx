@@ -8,8 +8,9 @@ import {
   type OrderBook,
   type OrderRow,
   type TradeTick,
+  type UniverseRow,
 } from "../lib/api";
-import { useTicker, useTickers } from "../lib/useLive";
+import { useTicker } from "../lib/useLive";
 import { TradeChart } from "./TradeChart";
 import "./trade.css";
 
@@ -51,6 +52,7 @@ export function Trade() {
   }, [loadBalances]);
 
   const market = markets.find((m) => m.symbol === symbol);
+  const tradeable = market !== undefined; // only pairs we run a market for can be traded here
   const ticker = useTicker(symbol);
   const up = (ticker?.changePercent ?? 0) >= 0;
 
@@ -81,10 +83,24 @@ export function Trade() {
         <SeedLiquidity />
       </div>
 
+      {!tradeable && (
+        <div className="view-only-banner">
+          <b>{symbol}</b> is view-only — live chart and price, but not listed for trading on this
+          exchange yet. Pick a highlighted pair to trade.
+        </div>
+      )}
+
       <div className="term">
         <aside className="term-left">
-          <OrderBookPanel symbol={symbol} onPick={setClickedPrice} live={ticker?.price ?? null} />
-          <RecentTrades symbol={symbol} />
+          {tradeable ? (
+            <>
+              <OrderBookPanel symbol={symbol} onPick={setClickedPrice} live={ticker?.price ?? null} />
+              <RecentTrades symbol={symbol} />
+            </>
+          ) : (
+            <div className="tp"><div className="tp-head"><span className="tp-title">Order book</span></div>
+              <p className="tp-empty">not traded here</p></div>
+          )}
         </aside>
 
         <main className="term-center">
@@ -101,22 +117,28 @@ export function Trade() {
           </section>
 
           <section className="tp form-box">
-            <OrderForm
-              market={market}
-              symbol={symbol}
-              balances={balances}
-              livePrice={ticker?.price ?? null}
-              clickedPrice={clickedPrice}
-            />
+            {tradeable ? (
+              <OrderForm
+                market={market}
+                symbol={symbol}
+                balances={balances}
+                livePrice={ticker?.price ?? null}
+                clickedPrice={clickedPrice}
+              />
+            ) : (
+              <p className="tp-empty">Order entry is only available for pairs listed on this exchange.</p>
+            )}
           </section>
 
-          <section className="tp orders-box">
-            <OpenOrders symbol={symbol} />
-          </section>
+          {tradeable && (
+            <section className="tp orders-box">
+              <OpenOrders symbol={symbol} />
+            </section>
+          )}
         </main>
 
         <aside className="term-right">
-          <MarketList markets={markets} current={symbol} onPick={setSymbol} />
+          <MarketList current={symbol} onPick={setSymbol} />
         </aside>
       </div>
     </div>
@@ -125,34 +147,65 @@ export function Trade() {
 
 /* -------------------------------------------------------------- market list */
 
-function MarketList({
-  markets, current, onPick,
-}: {
-  markets: MarketInfo[];
-  current: string;
-  onPick: (s: string) => void;
-}) {
-  const [q, setQ] = useState("");
-  const tickers = useTickers(markets.map((m) => m.symbol));
+function fmtPx(p: number): string {
+  if (p >= 1000) return p.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (p >= 1) return p.toFixed(2);
+  if (p >= 0.01) return p.toFixed(4);
+  return p.toPrecision(4);
+}
 
-  const filtered = markets.filter((m) => m.symbol.toLowerCase().includes(q.toLowerCase()));
+/**
+ * The full Binance market universe, all segments, from /market/all. Pairs we list for trading are
+ * highlighted and come first; the rest are view-only. Prices refresh on a short poll (the whole
+ * universe is thousands of rows — too many for individual WebSocket subscriptions, so the snapshot
+ * is polled and the *selected* pair alone gets the live WS ticker in the header).
+ */
+function MarketList({ current, onPick }: { current: string; onPick: (s: string) => void }) {
+  const [segments, setSegments] = useState<string[]>(["USDT"]);
+  const [seg, setSeg] = useState("USDT");
+  const [rows, setRows] = useState<UniverseRow[]>([]);
+  const [q, setQ] = useState("");
+
+  const load = useCallback(() => {
+    api.marketUniverse(q ? undefined : seg, q || undefined)
+      .then((u) => { setRows(u.markets); if (u.segments.length) setSegments(u.segments); })
+      .catch(() => setRows([]));
+  }, [seg, q]);
+
+  useEffect(() => {
+    load();
+    const id = window.setInterval(load, 6000); // refresh prices
+    return () => window.clearInterval(id);
+  }, [load]);
 
   return (
     <div className="tp mkt-box">
       <div className="mkt-search">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search markets" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search all markets" />
       </div>
-      <div className="mkt-tabs"><span className="on">USDT</span></div>
-      <div className="mkt-cols"><span>Pair</span><span className="num">Last Price</span><span className="num">24h Chg</span></div>
+      <div className="mkt-tabs">
+        {segments.map((s) => (
+          <span key={s} className={!q && seg === s ? "on" : ""} onClick={() => { setQ(""); setSeg(s); }}>{s}</span>
+        ))}
+      </div>
+      <div className="mkt-cols"><span>Pair</span><span className="num">Price</span><span className="num">24h</span></div>
       <div className="mkt-list">
-        {filtered.map((m) => {
-          const t = tickers[m.symbol];
-          const up = (t?.changePercent ?? 0) >= 0;
+        {rows.length === 0 && <p className="tp-empty">loading markets…</p>}
+        {rows.map((m) => {
+          const up = m.change_percent >= 0;
           return (
-            <button key={m.symbol} className={`mkt-row ${m.symbol === current ? "on" : ""}`} onClick={() => onPick(m.symbol)}>
-              <span className="mkt-name">{m.base}<span className="mkt-quote">/{m.quote}</span></span>
-              <span className="num mono">{t ? t.price.toFixed(t.price < 1 ? 5 : 2) : "…"}</span>
-              <span className={`num ${up ? "bid" : "ask"}`}>{t ? `${up ? "+" : ""}${t.changePercent.toFixed(2)}%` : ""}</span>
+            <button
+              key={m.symbol}
+              className={`mkt-row ${m.symbol === current ? "on" : ""} ${m.tradeable ? "tradeable" : ""}`}
+              onClick={() => onPick(m.symbol)}
+              title={m.tradeable ? "Tradeable here" : "View only — not listed for trading"}
+            >
+              <span className="mkt-name">
+                {m.tradeable && <span className="mkt-dot" />}
+                {m.base}<span className="mkt-quote">/{m.quote}</span>
+              </span>
+              <span className="num mono">{fmtPx(m.price)}</span>
+              <span className={`num ${up ? "bid" : "ask"}`}>{up ? "+" : ""}{m.change_percent.toFixed(2)}%</span>
             </button>
           );
         })}

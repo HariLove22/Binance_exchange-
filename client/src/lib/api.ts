@@ -211,6 +211,20 @@ export interface OrderRow {
 /** Binance kline: [openTime, open, high, low, close, volume, ...]. */
 export type Kline = [number, string, string, string, string, string, ...unknown[]];
 
+export interface UniverseRow {
+  symbol: string;
+  base: string;
+  quote: string;
+  price: number;
+  change_percent: number;
+  quote_volume: number;
+  tradeable: boolean;
+}
+export interface Universe {
+  segments: string[];
+  markets: UniverseRow[];
+}
+
 export const api = {
   health: () => request<HealthResponse>("/health"),
   dbHealth: () => request<DbHealthResponse>("/health/db"),
@@ -259,6 +273,13 @@ export const api = {
 
   // market data
   marketSymbols: () => request<MarketInfo[]>("/market/symbols"),
+  marketUniverse: (quote?: string, search?: string) => {
+    const p = new URLSearchParams();
+    if (quote) p.set("quote", quote);
+    if (search) p.set("search", search);
+    p.set("limit", "800");
+    return request<Universe>(`/market/all?${p.toString()}`);
+  },
   klines: (symbol: string, interval: string, limit = 200) =>
     request<Kline[]>(`/market/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`),
   orderBook: (symbol: string) => request<OrderBook>(`/market/depth?symbol=${symbol}&limit=12`),
