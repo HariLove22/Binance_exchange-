@@ -276,7 +276,24 @@ export const api = {
   openOrders: () => request<OrderRow[]>("/trade/orders"),
   refreshMarketMaker: () =>
     request<Record<string, number>>("/trade/dev/market-maker/refresh", { method: "POST" }),
+
+  // fiat on-ramp
+  onrampCurrencies: () =>
+    request<{ code: string; name: string; per_usd: string }[]>("/wallet/onramp/currencies"),
+  onrampQuote: (body: { fiat: string; fiat_amount: string; asset: string }) =>
+    request<OnrampQuote>("/wallet/onramp/quote", { method: "POST", body: JSON.stringify(body) }),
+  onrampBuy: (body: { fiat: string; fiat_amount: string; asset: string }) =>
+    request<OnrampQuote>("/wallet/onramp/buy", { method: "POST", body: JSON.stringify(body) }),
 };
+
+export interface OnrampQuote {
+  fiat: string;
+  fiat_amount: string;
+  usd_amount: string;
+  asset: string;
+  unit_price_usd: string;
+  crypto_amount: string;
+}
 
 /** Trim trailing zeros from a fixed-scale amount string for display only. Never used for math. */
 export function trimAmount(value: string): string {

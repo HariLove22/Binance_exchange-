@@ -38,6 +38,10 @@ CHAINS = [
          native_asset_symbol="AVAX", explorer_tx_url="https://snowtrace.io/tx/"),
     dict(code="TRON", name="TRON", family=ChainFamily.TRON, evm_chain_id=None,
          native_asset_symbol="TRX", explorer_tx_url="https://tronscan.org/#/transaction/"),
+    dict(code="BITCOIN", name="Bitcoin", family=ChainFamily.UTXO, evm_chain_id=None,
+         native_asset_symbol="BTC", explorer_tx_url="https://mempool.space/tx/"),
+    dict(code="SOLANA", name="Solana", family=ChainFamily.SOLANA, evm_chain_id=None,
+         native_asset_symbol="SOL", explorer_tx_url="https://solscan.io/tx/"),
 ]
 
 # `scale` must cover the deepest chain an asset lives on. USDT is 6 decimals on Ethereum and TRON
@@ -52,6 +56,8 @@ ASSETS = [
     dict(symbol="POL", name="Polygon Ecosystem Token", scale=18),
     dict(symbol="AVAX", name="Avalanche", scale=18),
     dict(symbol="TRX", name="TRON", scale=6),
+    dict(symbol="BTC", name="Bitcoin", scale=8),
+    dict(symbol="SOL", name="Solana", scale=9),
 ]
 
 # (asset, chain, contract | None for native, onchain_decimals, confirmations, withdrawal_fee)
@@ -74,6 +80,8 @@ NETWORKS = [
     ("USDT", "TRON", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", 6, 20, "1"),
     ("USDC", "ETHEREUM", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", 6, 12, "8"),
     ("USDC", "BASE", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6, 20, "0.5"),
+    ("BTC", "BITCOIN", None, 8, 2, "0.0002"),
+    ("SOL", "SOLANA", None, 9, 32, "0.01"),
 ]
 
 
@@ -137,8 +145,13 @@ async def seed() -> None:
         # Pairs we can both price (live Binance data) and fund (USDT quote + a base we support).
         # Symbol -> (base, quote, price_tick, qty_step, min_notional).
         MARKETS = [
+            ("BTCUSDT", "BTC", "USDT", "0.01", "0.00001", "5"),
             ("ETHUSDT", "ETH", "USDT", "0.01", "0.0001", "5"),
+            ("SOLUSDT", "SOL", "USDT", "0.01", "0.001", "5"),
             ("BNBUSDT", "BNB", "USDT", "0.01", "0.001", "5"),
+            ("AVAXUSDT", "AVAX", "USDT", "0.001", "0.01", "5"),
+            ("POLUSDT", "POL", "USDT", "0.0001", "1", "5"),
+            ("TRXUSDT", "TRX", "USDT", "0.00001", "1", "5"),
         ]
         for symbol, base, quote, tick, step, min_notional in MARKETS:
             existing = (

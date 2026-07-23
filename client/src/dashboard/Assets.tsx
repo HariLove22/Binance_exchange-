@@ -5,6 +5,7 @@ import {
   trimAmount,
   type Balance,
   type DepositRecord,
+  type OnrampQuote,
   type WalletNetwork,
   type WithdrawalRecord,
 } from "../lib/api";
@@ -18,22 +19,118 @@ import {
  * reserve-on-request, refund-on-fail — is real.
  */
 export function Assets() {
-  const [tab, setTab] = useState<"balances" | "deposit" | "withdraw">("balances");
+  const [tab, setTab] = useState<"balances" | "buy" | "deposit" | "withdraw">("balances");
+
+  const tabs: [typeof tab, string][] = [
+    ["balances", "Balances"],
+    ["buy", "Buy Crypto"],
+    ["deposit", "Deposit"],
+    ["withdraw", "Withdraw"],
+  ];
 
   return (
     <div className="assets">
       <div className="assets-tabs">
-        {(["balances", "deposit", "withdraw"] as const).map((t) => (
-          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-            {t[0].toUpperCase() + t.slice(1)}
-          </button>
+        {tabs.map(([t, label]) => (
+          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{label}</button>
         ))}
       </div>
 
       {tab === "balances" && <Balances />}
+      {tab === "buy" && <BuyCrypto />}
       {tab === "deposit" && <Deposit />}
       {tab === "withdraw" && <Withdraw />}
     </div>
+  );
+}
+
+/* --------------------------------------------------------------- buy crypto */
+
+const CRYPTOS = ["BTC", "ETH", "SOL", "BNB", "USDT", "USDC", "AVAX", "POL", "TRX"];
+
+function BuyCrypto() {
+  const [currencies, setCurrencies] = useState<{ code: string; name: string }[]>([]);
+  const [fiat, setFiat] = useState("INR");
+  const [amount, setAmount] = useState("10000");
+  const [asset, setAsset] = useState("BTC");
+  const [quote, setQuote] = useState<OnrampQuote | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.onrampCurrencies().then((c) => setCurrencies(c)).catch(() => setCurrencies([]));
+  }, []);
+
+  // Live-ish quote as inputs change.
+  useEffect(() => {
+    if (!amount || Number(amount) <= 0) { setQuote(null); return; }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      api.onrampQuote({ fiat, fiat_amount: amount, asset })
+        .then((q) => !cancelled && setQuote(q))
+        .catch(() => !cancelled && setQuote(null));
+    }, 250);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [fiat, amount, asset]);
+
+  async function buy() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const q = await api.onrampBuy({ fiat, fiat_amount: amount, asset });
+      setNote(`bought ${trimAmount(q.crypto_amount)} ${q.asset} for ${q.fiat_amount} ${q.fiat}`);
+      window.dispatchEvent(new CustomEvent("orders-changed"));
+    } catch (e) {
+      setNote(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <h2>Buy Crypto</h2>
+      <p className="assets-muted">
+        Pay in any currency; it converts to crypto at the live price. A mock on-ramp — a real one
+        (MoonPay, Transak, a bank) would charge your card or take a transfer first. Credited through
+        the deposit flow, so it stays backed and reconciled.
+      </p>
+
+      <div className="buy-card">
+        <label className="buy-field">
+          <span>You pay</span>
+          <div className="buy-input">
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+            <select value={fiat} onChange={(e) => setFiat(e.target.value)}>
+              {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+            </select>
+          </div>
+        </label>
+
+        <div className="buy-arrow">↓</div>
+
+        <label className="buy-field">
+          <span>You receive (est.)</span>
+          <div className="buy-input">
+            <input value={quote ? trimAmount(quote.crypto_amount) : "…"} readOnly />
+            <select value={asset} onChange={(e) => setAsset(e.target.value)}>
+              {CRYPTOS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+        </label>
+
+        {quote && (
+          <p className="buy-rate">
+            1 {asset} ≈ ${Number(quote.unit_price_usd).toLocaleString()} · {amount} {fiat} ≈ ${quote.usd_amount}
+          </p>
+        )}
+
+        <button className="btn-gold buy-submit" onClick={buy} disabled={busy || !quote}>
+          {busy ? "…" : `Buy ${asset}`}
+        </button>
+        {note && <p className="assets-note mono">{note}</p>}
+      </div>
+    </>
   );
 }
 

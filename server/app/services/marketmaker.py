@@ -37,7 +37,10 @@ BINANCE_PRICE_URL = "https://data-api.binance.vision/api/v3/ticker/price"
 LEVELS = 5
 HALF_SPREAD_BPS = Decimal("10")
 STEP_BPS = Decimal("8")
-QTY_PER_LEVEL = Decimal("2")  # in base units; scaled to qty_step below
+# Quote a fixed *notional* per level, not a fixed base quantity — otherwise a cheap coin (TRX at
+# $0.33) would quote 2 units = $0.66, below a $5 min-notional, and every order would be rejected.
+# Sizing by dollar value gives every market sensible depth regardless of price.
+NOTIONAL_PER_LEVEL = Decimal("2000")
 
 
 async def get_market_maker(db: AsyncSession) -> User:
@@ -98,7 +101,11 @@ async def refresh_market(db: AsyncSession, market: Market, reference: Decimal) -
             pass
 
     placed = 0
-    qty = _round_to(QTY_PER_LEVEL, market.qty_step)
+    # Base quantity that is worth ~NOTIONAL_PER_LEVEL at the reference price, floored to a lot
+    # step, and never zero.
+    qty = _round_to(NOTIONAL_PER_LEVEL / reference, market.qty_step)
+    if qty <= 0:
+        qty = market.qty_step
     for level in range(LEVELS):
         offset_bps = HALF_SPREAD_BPS + STEP_BPS * level
         factor = offset_bps / Decimal(10000)

@@ -523,3 +523,15 @@
   border-radius: 4px; background: rgba(148,163,184,0.2); color: #848e9c;
 }
 .td-desc { font-size: 0.74rem; color: #848e9c; }
+
+/* --- buy crypto ------------------------------------------------------- */
+.buy-card { max-width: 26rem; margin-top: 1rem; }
+.buy-field { display: block; margin-bottom: 0.4rem; }
+.buy-field > span { display: block; font-size: 0.72rem; color: var(--text-faint); margin-bottom: 0.3rem; }
+.buy-input { display: flex; align-items: center; border: 1px solid var(--border, #2b3139); border-radius: 10px; padding: 0.6rem 0.8rem; gap: 0.5rem; }
+.buy-input input { flex: 1; min-width: 0; border: none; background: none; color: inherit; font: inherit; font-size: 1.15rem; font-family: ui-monospace, monospace; }
+.buy-input input:focus { outline: none; }
+.buy-input select { border: none; background: rgba(148,163,184,0.12); border-radius: 8px; color: inherit; font: inherit; font-weight: 600; padding: 0.35rem 0.5rem; cursor: pointer; }
+.buy-arrow { text-align: center; color: var(--text-faint); font-size: 1.1rem; margin: 0.3rem 0; }
+.buy-rate { margin: 0.7rem 0 0; font-size: 0.78rem; color: var(--text-faint); }
+.buy-submit { width: 100%; margin-top: 1rem; padding: 0.7rem; font-size: 0.95rem; }

@@ -20,9 +20,11 @@ from app.core.db import get_db
 from app.models import Asset, AssetNetwork, Deposit, DepositStatus, User, Withdrawal
 from app.services import deposits as deposit_service
 from app.services import ledger
+from app.services import onramp as onramp_service
 from app.services import reconcile as reconcile_service
 from app.services import withdrawals as withdrawal_service
 from app.services.deposits import DepositError
+from app.services.onramp import OnrampError
 from app.services.withdrawals import WithdrawalError
 
 router = APIRouter(prefix="/wallet", tags=["wallet"])
@@ -217,6 +219,68 @@ class ReconciliationRow(BaseModel):
 async def reconcile(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Ledger vs custody. Every row must be balanced."""
     return [ReconciliationRow(**vars(r)) for r in await reconcile_service.reconcile(db)]
+
+
+# --- fiat on-ramp (buy crypto with a currency, converted) -----------------------------------
+
+class CurrencyInfo(BaseModel):
+    code: str
+    name: str
+    per_usd: str
+
+
+@router.get("/onramp/currencies", response_model=list[CurrencyInfo])
+async def onramp_currencies():
+    return [
+        CurrencyInfo(code=c, name=onramp_service.FIAT_NAMES[c], per_usd=f"{r.normalize():f}")
+        for c, r in onramp_service.FIAT_RATES.items()
+    ]
+
+
+class QuoteRequest(BaseModel):
+    fiat: str
+    fiat_amount: str
+    asset: str
+
+
+class QuoteResponse(BaseModel):
+    fiat: str
+    fiat_amount: str
+    usd_amount: str
+    asset: str
+    unit_price_usd: str
+    crypto_amount: str
+
+
+def _quote_response(q: onramp_service.Quote) -> QuoteResponse:
+    return QuoteResponse(
+        fiat=q.fiat, fiat_amount=f"{q.fiat_amount:f}", usd_amount=f"{q.usd_amount:.2f}",
+        asset=q.asset, unit_price_usd=f"{q.unit_price_usd:f}", crypto_amount=f"{q.crypto_amount:f}",
+    )
+
+
+@router.post("/onramp/quote", response_model=QuoteResponse)
+async def onramp_quote(body: QuoteRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """What you'd receive for a fiat amount, at the live price. No funds move."""
+    try:
+        q = await onramp_service.quote(db, fiat=body.fiat, fiat_amount=Decimal(body.fiat_amount), asset_symbol=body.asset)
+    except (OnrampError, InvalidOperation) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return _quote_response(q)
+
+
+@router.post("/onramp/buy", response_model=QuoteResponse, status_code=status.HTTP_201_CREATED)
+async def onramp_buy(body: QuoteRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Buy crypto with fiat. Dev only — a mock stand-in for a real payment provider, which would
+    charge a card or take a bank transfer before we credit. Credits through the deposit flow so
+    the crypto is backed and reconciliation holds."""
+    _require_dev()
+    try:
+        q = await onramp_service.buy(db, user=user, fiat=body.fiat, fiat_amount=Decimal(body.fiat_amount), asset_symbol=body.asset)
+    except (OnrampError, InvalidOperation) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    await db.commit()
+    return _quote_response(q)
 
 
 # --- dev: stand in for chain events ---------------------------------------------------------

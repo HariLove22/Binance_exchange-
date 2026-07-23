@@ -9,7 +9,7 @@ import {
   type OrderRow,
   type TradeTick,
 } from "../lib/api";
-import { useTicker } from "../lib/useLive";
+import { useTicker, useTickers } from "../lib/useLive";
 import { TradeChart } from "./TradeChart";
 import "./trade.css";
 
@@ -84,6 +84,7 @@ export function Trade() {
       <div className="term">
         <aside className="term-left">
           <OrderBookPanel symbol={symbol} onPick={setClickedPrice} live={ticker?.price ?? null} />
+          <RecentTrades symbol={symbol} />
         </aside>
 
         <main className="term-center">
@@ -98,23 +99,64 @@ export function Trade() {
             </div>
             <TradeChart symbol={symbol} interval={interval} />
           </section>
+
+          <section className="tp form-box">
+            <OrderForm
+              market={market}
+              symbol={symbol}
+              balances={balances}
+              livePrice={ticker?.price ?? null}
+              clickedPrice={clickedPrice}
+            />
+          </section>
+
           <section className="tp orders-box">
             <OpenOrders symbol={symbol} />
           </section>
         </main>
 
         <aside className="term-right">
-          <OrderForm
-            market={market}
-            symbol={symbol}
-            balances={balances}
-            livePrice={ticker?.price ?? null}
-            clickedPrice={clickedPrice}
-          />
+          <MarketList markets={markets} current={symbol} onPick={setSymbol} />
         </aside>
       </div>
+    </div>
+  );
+}
 
-      <RecentTrades symbol={symbol} />
+/* -------------------------------------------------------------- market list */
+
+function MarketList({
+  markets, current, onPick,
+}: {
+  markets: MarketInfo[];
+  current: string;
+  onPick: (s: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const tickers = useTickers(markets.map((m) => m.symbol));
+
+  const filtered = markets.filter((m) => m.symbol.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div className="tp mkt-box">
+      <div className="mkt-search">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search markets" />
+      </div>
+      <div className="mkt-tabs"><span className="on">USDT</span></div>
+      <div className="mkt-cols"><span>Pair</span><span className="num">Last Price</span><span className="num">24h Chg</span></div>
+      <div className="mkt-list">
+        {filtered.map((m) => {
+          const t = tickers[m.symbol];
+          const up = (t?.changePercent ?? 0) >= 0;
+          return (
+            <button key={m.symbol} className={`mkt-row ${m.symbol === current ? "on" : ""}`} onClick={() => onPick(m.symbol)}>
+              <span className="mkt-name">{m.base}<span className="mkt-quote">/{m.quote}</span></span>
+              <span className="num mono">{t ? t.price.toFixed(t.price < 1 ? 5 : 2) : "…"}</span>
+              <span className={`num ${up ? "bid" : "ask"}`}>{t ? `${up ? "+" : ""}${t.changePercent.toFixed(2)}%` : ""}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -227,108 +269,129 @@ function OrderForm({
   livePrice: number | null;
   clickedPrice: string | null;
 }) {
-  const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [type, setType] = useState<"LIMIT" | "MARKET">("LIMIT");
+  // One shared price for both sides (Binance shares the price row). Defaults to live, click-fills.
   const [price, setPrice] = useState("");
-  const [pct, setPct] = useState(0);
   const [note, setNote] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   const base = market?.base ?? symbol.replace(/USDT$/, "");
   const quote = market?.quote ?? "USDT";
-  const step = Number(market?.qty_step ?? "0.0001");
 
-  // Price defaults to the live price and follows order-book clicks. Never something to type.
   useEffect(() => { if (clickedPrice) setPrice(clickedPrice); }, [clickedPrice]);
-  useEffect(() => {
-    setPrice((p) => (p === "" && livePrice ? livePrice.toFixed(2) : p));
-  }, [livePrice]);
+  useEffect(() => { setPrice((p) => (p === "" && livePrice ? livePrice.toFixed(2) : p)); }, [livePrice]);
 
   const availOf = (a: string) => Number(balances.find((b) => b.asset === a)?.available ?? "0");
-  const quoteAvail = availOf(quote);
-  const baseAvail = availOf(base);
+
+  return (
+    <>
+      <div className="of-tabs">
+        {(["LIMIT", "MARKET"] as const).map((t) => (
+          <button key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{t === "LIMIT" ? "Limit" : "Market"}</button>
+        ))}
+        <span className="of-tab-note">no manual entry — price from the book, size from the slider</span>
+      </div>
+
+      {/* Buy (green, left) and Sell (red, right) side by side, like Binance. */}
+      <div className="of-cols">
+        <SideForm
+          side="BUY" type={type} symbol={symbol} base={base} quote={quote}
+          market={market} price={price} setPrice={setPrice} livePrice={livePrice}
+          available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
+        />
+        <SideForm
+          side="SELL" type={type} symbol={symbol} base={base} quote={quote}
+          market={market} price={price} setPrice={setPrice} livePrice={livePrice}
+          available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
+        />
+      </div>
+      {note && <p className="of-note">{note}</p>}
+    </>
+  );
+}
+
+function SideForm({
+  side, type, symbol, base, quote, market, price, setPrice, livePrice, available, baseAvailable, onNote,
+}: {
+  side: "BUY" | "SELL";
+  type: "LIMIT" | "MARKET";
+  symbol: string;
+  base: string;
+  quote: string;
+  market?: MarketInfo;
+  price: string;
+  setPrice: (p: string) => void;
+  livePrice: number | null;
+  available: number; // quote balance
+  baseAvailable: number; // base balance
+  onNote: (n: string) => void;
+}) {
+  const [pct, setPct] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const step = Number(market?.qty_step ?? "0.0001");
 
   const refPrice = type === "LIMIT" && price ? Number(price) : livePrice ?? 0;
-  const maxQty = side === "BUY" ? (refPrice > 0 ? quoteAvail / refPrice : 0) : baseAvail;
-
-  // Amount comes from the slider (% of what the account holds), floored to a whole lot step.
+  const maxQty = side === "BUY" ? (refPrice > 0 ? available / refPrice : 0) : baseAvailable;
   const qty = maxQty > 0 ? Math.floor((maxQty * (pct / 100)) / step) * step : 0;
   const qtyStr = qty > 0 ? String(Number(qty.toFixed(8))) : "";
   const total = refPrice > 0 && qty > 0 ? refPrice * qty : 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (qty <= 0) { setNote("choose an amount with the slider"); return; }
+    if (qty <= 0) { onNote("choose an amount with the slider"); return; }
     setBusy(true);
-    setNote(null);
+    onNote("");
     try {
       const o = await api.placeOrder({ symbol, side, type, quantity: qtyStr, price: type === "LIMIT" ? price : null });
-      setNote(`${side} ${o.status} — filled ${trimAmount(o.filled_quantity)}/${trimAmount(o.quantity)} ${base}`);
+      onNote(`${side} ${o.status} — filled ${trimAmount(o.filled_quantity)}/${trimAmount(o.quantity)} ${base}`);
       setPct(0);
       window.dispatchEvent(new CustomEvent("orders-changed"));
       window.dispatchEvent(new CustomEvent("book-changed"));
     } catch (err) {
-      setNote(err instanceof ApiError ? err.message : String(err));
+      onNote(err instanceof ApiError ? err.message : String(err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="tp form-box">
-      <div className="of-tabs">
-        {(["LIMIT", "MARKET"] as const).map((t) => (
-          <button key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{t === "LIMIT" ? "Limit" : "Market"}</button>
-        ))}
+    <form className="of-col" onSubmit={submit}>
+      <div className="of-field">
+        <label>Price</label>
+        {type === "MARKET" ? (
+          <div className="of-market-px">Market</div>
+        ) : (
+          <div className="of-input">
+            <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" />
+            <span className="of-unit">{quote}</span>
+          </div>
+        )}
       </div>
 
-      <div className="of-side">
-        {(["BUY", "SELL"] as const).map((s) => (
-          <button key={s} className={`${s.toLowerCase()} ${side === s ? "on" : ""}`} onClick={() => { setSide(s); setPct(0); }}>{s === "BUY" ? "Buy" : "Sell"}</button>
-        ))}
+      <div className="of-field">
+        <label>Amount</label>
+        <div className="of-input readonly">
+          <input value={qtyStr} readOnly placeholder="0" />
+          <span className="of-unit">{base}</span>
+        </div>
       </div>
 
-      <form onSubmit={submit}>
-        <div className="of-field">
-          <label>Price</label>
-          {type === "MARKET" ? (
-            <div className="of-market-px">Market · {livePrice ? livePrice.toFixed(2) : "—"} <span>{quote}</span></div>
-          ) : (
-            <div className="of-input">
-              <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" />
-              <span className="of-unit">{quote}</span>
-            </div>
-          )}
+      <div className="of-slider">
+        <input type="range" min={0} max={100} step={1} value={pct}
+               onChange={(e) => setPct(Number(e.target.value))} className={side.toLowerCase()} />
+        <div className="of-pcts">
+          {[0, 25, 50, 75, 100].map((p) => (
+            <button type="button" key={p} className={pct === p ? "on" : ""} onClick={() => setPct(p)}>{p}%</button>
+          ))}
         </div>
+      </div>
 
-        <div className="of-field">
-          <label>Amount</label>
-          <div className="of-input readonly">
-            <input value={qtyStr} readOnly placeholder="0" />
-            <span className="of-unit">{base}</span>
-          </div>
-        </div>
+      <div className="of-row"><span>Avbl</span><span className="mono">{side === "BUY" ? `${available.toFixed(2)} ${quote}` : `${trimAmount(baseAvailable.toString())} ${base}`}</span></div>
+      <div className="of-row"><span>Total</span><span className="mono">{total > 0 ? `${total.toFixed(2)} ${quote}` : `Min ${trimAmount(market?.min_notional ?? "5")} ${quote}`}</span></div>
 
-        {/* Slider over the account's available balance — how you actually size a trade. */}
-        <div className="of-slider">
-          <input type="range" min={0} max={100} step={1} value={pct} onChange={(e) => setPct(Number(e.target.value))}
-                 className={side === "BUY" ? "buy" : "sell"} />
-          <div className="of-pcts">
-            {[0, 25, 50, 75, 100].map((p) => (
-              <button type="button" key={p} className={pct === p ? "on" : ""} onClick={() => setPct(p)}>{p}%</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="of-row"><span>Available</span><span className="mono">{side === "BUY" ? `${quoteAvail.toFixed(2)} ${quote}` : `${trimAmount(baseAvail.toString())} ${base}`}</span></div>
-        <div className="of-row"><span>{side === "BUY" ? "Cost" : "Proceeds"}</span><span className="mono">{total > 0 ? `${total.toFixed(2)} ${quote}` : `— ${quote}`}</span></div>
-
-        <button className={`of-submit ${side.toLowerCase()}`} disabled={busy}>
-          {busy ? "…" : `${side === "BUY" ? "Buy" : "Sell"} ${base}`}
-        </button>
-      </form>
-      {note && <p className="of-note">{note}</p>}
-    </div>
+      <button className={`of-submit ${side.toLowerCase()}`} disabled={busy}>
+        {busy ? "…" : `${side === "BUY" ? "Buy" : "Sell"} ${base}`}
+      </button>
+    </form>
   );
 }
 
