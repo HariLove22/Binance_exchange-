@@ -579,7 +579,7 @@ function PositionsTab({ positions, onClosed }: { positions: Position[]; onClosed
   return (
     <div className="oo-table">
       <div className="pos-h"><span>Asset</span><span className="num">Amount</span><span className="num">Avg entry</span><span className="num">Mark</span><span className="num">Value</span><span className="num">Unrealized PnL</span><span></span></div>
-      {positions.length === 0 && <p className="tp-empty">No open positions. Buy an asset and it appears here with live P&L.</p>}
+      {positions.length === 0 && <p className="tp-empty">No holdings yet. Buy an asset and it appears here with live P&L. Spot — you own the asset; there are no leveraged positions.</p>}
       {positions.map((p) => {
         const mark = tickers[p.symbol]?.price ?? 0;
         const value = mark * p.quantity;
@@ -652,7 +652,7 @@ function OpenOrders({ symbol, balances }: { symbol: string; balances: Balance[] 
   return (
     <>
       <div className="oo-tabs">
-        <button className={tab === "positions" ? "on" : ""} onClick={() => setTab("positions")}>Positions ({positions.length})</button>
+        <button className={tab === "positions" ? "on" : ""} onClick={() => setTab("positions")}>Holdings ({positions.length})</button>
         <button className={tab === "open" ? "on" : ""} onClick={() => setTab("open")}>Open Orders ({openRows.length})</button>
         <button className={tab === "history" ? "on" : ""} onClick={() => setTab("history")}>Order History</button>
         <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trade History</button>
