@@ -319,7 +319,20 @@ export const api = {
     request<OnrampQuote>("/wallet/onramp/quote", { method: "POST", body: JSON.stringify(body) }),
   onrampBuy: (body: { fiat: string; fiat_amount: string; asset: string }) =>
     request<OnrampQuote>("/wallet/onramp/buy", { method: "POST", body: JSON.stringify(body) }),
+
+  convertQuote: (body: { from_asset: string; to_asset: string; from_amount: string }) =>
+    request<ConvertQuote>("/wallet/convert/quote", { method: "POST", body: JSON.stringify(body) }),
+  convertExecute: (body: { from_asset: string; to_asset: string; from_amount: string }) =>
+    request<ConvertQuote>("/wallet/convert/execute", { method: "POST", body: JSON.stringify(body) }),
 };
+
+export interface ConvertQuote {
+  from_asset: string;
+  to_asset: string;
+  from_amount: string;
+  to_amount: string;
+  rate: string;
+}
 
 export interface OnrampQuote {
   fiat: string;

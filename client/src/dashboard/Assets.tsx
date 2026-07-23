@@ -4,6 +4,7 @@ import {
   ApiError,
   trimAmount,
   type Balance,
+  type ConvertQuote,
   type DepositRecord,
   type OnrampQuote,
   type WalletNetwork,
@@ -19,11 +20,12 @@ import {
  * reserve-on-request, refund-on-fail — is real.
  */
 export function Assets() {
-  const [tab, setTab] = useState<"balances" | "buy" | "deposit" | "withdraw">("balances");
+  const [tab, setTab] = useState<"balances" | "buy" | "convert" | "deposit" | "withdraw">("balances");
 
   const tabs: [typeof tab, string][] = [
     ["balances", "Balances"],
     ["buy", "Buy Crypto"],
+    ["convert", "Convert"],
     ["deposit", "Deposit"],
     ["withdraw", "Withdraw"],
   ];
@@ -38,9 +40,101 @@ export function Assets() {
 
       {tab === "balances" && <Balances />}
       {tab === "buy" && <BuyCrypto />}
+      {tab === "convert" && <Convert />}
       {tab === "deposit" && <Deposit />}
       {tab === "withdraw" && <Withdraw />}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ convert */
+
+const CONVERT_ASSETS = ["USDT", "USDC", "BTC", "ETH", "SOL", "BNB", "AVAX", "POL", "TRX"];
+
+function Convert() {
+  const [balances, setBalances] = useState<Balance[]>([]);
+  const [from, setFrom] = useState("USDT");
+  const [to, setTo] = useState("BTC");
+  const [amount, setAmount] = useState("100");
+  const [quote, setQuote] = useState<ConvertQuote | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const loadBalances = useCallback(() => {
+    api.balances().then(setBalances).catch(() => setBalances([]));
+  }, []);
+  useEffect(() => void loadBalances(), [loadBalances]);
+
+  // Live quote as inputs change.
+  useEffect(() => {
+    if (!amount || Number(amount) <= 0 || from === to) { setQuote(null); return; }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      api.convertQuote({ from_asset: from, to_asset: to, from_amount: amount })
+        .then((q) => !cancelled && setQuote(q))
+        .catch(() => !cancelled && setQuote(null));
+    }, 250);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [from, to, amount]);
+
+  const avail = Number(balances.find((b) => b.asset === from)?.available ?? "0");
+
+  async function doConvert() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const q = await api.convertExecute({ from_asset: from, to_asset: to, from_amount: amount });
+      setNote(`converted ${trimAmount(q.from_amount)} ${q.from_asset} → ${trimAmount(q.to_amount)} ${q.to_asset}`);
+      loadBalances();
+    } catch (e) {
+      setNote(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function flip() { setFrom(to); setTo(from); }
+
+  return (
+    <>
+      <h2>Convert</h2>
+      <p className="assets-muted">
+        Instantly swap one asset for another at the live price — no order book, no slippage. The
+        rate is locked in the quote; a 0.1% spread is the convert fee.
+      </p>
+
+      <div className="buy-card">
+        <label className="buy-field">
+          <span>From</span>
+          <div className="buy-input">
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+            <select value={from} onChange={(e) => setFrom(e.target.value)}>
+              {CONVERT_ASSETS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <span className="cv-avail">Available: {avail.toFixed(4)} {from}</span>
+        </label>
+
+        <button className="cv-flip" onClick={flip} title="Flip">⇅</button>
+
+        <label className="buy-field">
+          <span>To (est.)</span>
+          <div className="buy-input">
+            <input value={quote ? trimAmount(quote.to_amount) : "…"} readOnly />
+            <select value={to} onChange={(e) => setTo(e.target.value)}>
+              {CONVERT_ASSETS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+        </label>
+
+        {quote && <p className="buy-rate">1 {from} ≈ {trimAmount(quote.rate)} {to}</p>}
+
+        <button className="btn-gold buy-submit" onClick={doConvert} disabled={busy || !quote || from === to || avail < Number(amount)}>
+          {busy ? "…" : from === to ? "Pick different assets" : avail < Number(amount) ? `Insufficient ${from}` : "Convert"}
+        </button>
+        {note && <p className="assets-note mono">{note}</p>}
+      </div>
+    </>
   );
 }
 

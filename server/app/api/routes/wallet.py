@@ -18,11 +18,13 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.db import get_db
 from app.models import Asset, AssetNetwork, Deposit, DepositStatus, User, Withdrawal
+from app.services import convert as convert_service
 from app.services import deposits as deposit_service
 from app.services import ledger
 from app.services import onramp as onramp_service
 from app.services import reconcile as reconcile_service
 from app.services import withdrawals as withdrawal_service
+from app.services.convert import ConvertError
 from app.services.deposits import DepositError
 from app.services.onramp import OnrampError
 from app.services.withdrawals import WithdrawalError
@@ -281,6 +283,53 @@ async def onramp_buy(body: QuoteRequest, user: User = Depends(get_current_user),
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
     return _quote_response(q)
+
+
+# --- convert (instant swap) -----------------------------------------------------------------
+
+class ConvertRequest(BaseModel):
+    from_asset: str
+    to_asset: str
+    from_amount: str
+
+
+class ConvertResponse(BaseModel):
+    from_asset: str
+    to_asset: str
+    from_amount: str
+    to_amount: str
+    rate: str
+
+
+def _convert_response(q: convert_service.ConvertQuote) -> ConvertResponse:
+    return ConvertResponse(
+        from_asset=q.from_asset, to_asset=q.to_asset,
+        from_amount=f"{q.from_amount.normalize():f}", to_amount=f"{q.to_amount.normalize():f}",
+        rate=f"{q.rate:f}",
+    )
+
+
+@router.post("/convert/quote", response_model=ConvertResponse)
+async def convert_quote(body: ConvertRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """What you'd receive converting one asset to another at the live price. No funds move."""
+    try:
+        q = await convert_service.quote(db, from_symbol=body.from_asset, to_symbol=body.to_asset,
+                                        from_amount=Decimal(body.from_amount))
+    except (ConvertError, InvalidOperation) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return _convert_response(q)
+
+
+@router.post("/convert/execute", response_model=ConvertResponse, status_code=status.HTTP_201_CREATED)
+async def convert_execute(body: ConvertRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Instantly swap one asset for another at the live price, against the exchange."""
+    try:
+        q = await convert_service.execute(db, user=user, from_symbol=body.from_asset,
+                                          to_symbol=body.to_asset, from_amount=Decimal(body.from_amount))
+    except (ConvertError, InvalidOperation) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    await db.commit()
+    return _convert_response(q)
 
 
 # --- dev: stand in for chain events ---------------------------------------------------------

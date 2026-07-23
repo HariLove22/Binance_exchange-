@@ -544,3 +544,8 @@
 .buy-arrow { text-align: center; color: var(--text-faint); font-size: 1.1rem; margin: 0.3rem 0; }
 .buy-rate { margin: 0.7rem 0 0; font-size: 0.78rem; color: var(--text-faint); }
 .buy-submit { width: 100%; margin-top: 1rem; padding: 0.7rem; font-size: 0.95rem; }
+
+/* convert extras */
+.cv-avail { display: block; font-size: 0.72rem; color: var(--text-faint); margin-top: 0.3rem; }
+.cv-flip { display: block; margin: 0.3rem auto; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--border, #2b3139); background: var(--surface-2, #1e2329); color: inherit; cursor: pointer; font-size: 1rem; }
+.cv-flip:hover { border-color: #f0b90b; color: #f0b90b; }
