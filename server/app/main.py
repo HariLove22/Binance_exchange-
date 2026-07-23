@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, health, market, trade, wallet
+from app.api.routes import admin, auth, health, market, trade, wallet, ws
 from app.core.config import settings
 
 app = FastAPI(
@@ -25,6 +25,7 @@ app.include_router(wallet.router, prefix=settings.api_v1_prefix)
 app.include_router(admin.router, prefix=settings.api_v1_prefix)
 app.include_router(market.router, prefix=settings.api_v1_prefix)
 app.include_router(trade.router, prefix=settings.api_v1_prefix)
+app.include_router(ws.router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/")

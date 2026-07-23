@@ -25,7 +25,7 @@ from app.models import (
     Trade,
     User,
 )
-from app.services import listing, marketmaker, trading
+from app.services import listing, marketmaker, pubsub, trading
 from app.services.listing import ListingError
 from app.services.trading import TradingError
 
@@ -93,6 +93,7 @@ async def place_order(
     except TradingError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
+    pubsub.publish(pubsub.market_channel(market.symbol))  # wake live subscribers
     return _order_response(placed.order, market.symbol)
 
 
@@ -108,6 +109,7 @@ async def cancel_order(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     market = await db.get(Market, order.market_id)
     await db.commit()
+    pubsub.publish(pubsub.market_channel(market.symbol))
     return _order_response(order, market.symbol)
 
 
@@ -207,4 +209,7 @@ async def refresh_market_maker(
     seed liquidity on demand.
     """
     _dev_only()
-    return await marketmaker.refresh_all(db)
+    result = await marketmaker.refresh_all(db)
+    for sym in result:
+        pubsub.publish(pubsub.market_channel(sym))
+    return result

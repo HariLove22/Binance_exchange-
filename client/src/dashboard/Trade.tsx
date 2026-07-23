@@ -12,6 +12,7 @@ import {
   type UniverseRow,
 } from "../lib/api";
 import { useTicker, useTickers } from "../lib/useLive";
+import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
 import "./trade.css";
 
@@ -60,6 +61,9 @@ export function Trade() {
   const ticker = useTicker(symbol);
   const up = (ticker?.changePercent ?? 0) >= 0;
 
+  // Live order book + trades over our WebSocket (only for pairs we run a market for).
+  const { book, trades } = useMarketWs(tradeable ? symbol : null);
+
   return (
     <div className="trade">
       <div className="term-grid">
@@ -91,8 +95,8 @@ export function Trade() {
         <aside className="g-left">
           {tradeable ? (
             <>
-              <OrderBookPanel symbol={symbol} onPick={setClickedPrice} live={ticker?.price ?? null} />
-              <RecentTrades symbol={symbol} />
+              <OrderBookPanel book={book} onPick={setClickedPrice} live={ticker?.price ?? null} />
+              <RecentTrades symbol={symbol} trades={trades} />
             </>
           ) : (
             <div className="tp fill">
@@ -286,15 +290,12 @@ function usePoll(fn: () => void, ms: number) {
 /* ------------------------------------------------------------------- book */
 
 function OrderBookPanel({
-  symbol, onPick, live,
+  book, onPick, live,
 }: {
-  symbol: string;
+  book: OrderBook | null;
   onPick: (price: string) => void;
   live: number | null;
 }) {
-  const [book, setBook] = useState<OrderBook | null>(null);
-  usePoll(() => { api.orderBook(symbol).then(setBook).catch(() => setBook(null)); }, 800);
-
   const maxTotal = Math.max(
     ...(book?.asks ?? []).map((_, i, arr) => arr.slice(0, i + 1).reduce((s, l) => s + Number(l.quantity), 0)),
     ...(book?.bids ?? []).map((_, i, arr) => arr.slice(0, i + 1).reduce((s, l) => s + Number(l.quantity), 0)),
@@ -487,13 +488,10 @@ function SideForm({
 
 /* ---------------------------------------------------------------- trades */
 
-function RecentTrades({ symbol }: { symbol: string }) {
-  const [trades, setTrades] = useState<TradeTick[]>([]);
-  usePoll(() => { api.marketTrades(symbol).then(setTrades).catch(() => setTrades([])); }, 800);
-
+function RecentTrades({ symbol, trades }: { symbol: string; trades: TradeTick[] }) {
   return (
     <div className="tp trades-box">
-      <div className="tp-head"><span className="tp-title">Market trades</span><span className="tp-sub">ours</span></div>
+      <div className="tp-head"><span className="tp-title">Market trades</span><span className="tp-sub">ours · live</span></div>
       <div className="mt-cols"><span>Price(USDT)</span><span className="num">Amount({symbol.replace(/USDT$/, "")})</span><span className="num">Time</span></div>
       <div className="mt-list">
         {trades.length === 0 && <p className="tp-empty">no trades yet</p>}
