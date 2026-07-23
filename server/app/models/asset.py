@@ -167,6 +167,14 @@ class Asset(TimestampMixin, Base):
 
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # True: we custody it on-chain — it has networks, can be deposited/withdrawn, and its ledger
+    # EXTERNAL balance is reconciled against actual holdings. False: internal/synthetic — it exists
+    # only as a ledger balance you get by trading and can only sell back for a custodial asset. It
+    # never touches a chain, so it cannot be withdrawn and is NOT reconciled against custody (there
+    # is nothing on-chain to reconcile). This is what lets us list any market without custodying
+    # every coin: the base is synthetic, settlement is in the quote (USDT).
+    custodial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
     networks: Mapped[list["AssetNetwork"]] = relationship(back_populates="asset")
 
     __table_args__ = (

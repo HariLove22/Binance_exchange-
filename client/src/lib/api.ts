@@ -297,6 +297,8 @@ export const api = {
   openOrders: () => request<OrderRow[]>("/trade/orders"),
   refreshMarketMaker: () =>
     request<Record<string, number>>("/trade/dev/market-maker/refresh", { method: "POST" }),
+  listMarket: (symbol: string) =>
+    request<{ symbol: string; status: string }>("/trade/list", { method: "POST", body: JSON.stringify({ symbol }) }),
 
   // fiat on-ramp
   onrampCurrencies: () =>

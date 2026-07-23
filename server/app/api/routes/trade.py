@@ -25,7 +25,8 @@ from app.models import (
     Trade,
     User,
 )
-from app.services import marketmaker, trading
+from app.services import listing, marketmaker, trading
+from app.services.listing import ListingError
 from app.services.trading import TradingError
 
 router = APIRouter(prefix="/trade", tags=["trade"])
@@ -164,6 +165,35 @@ async def my_trades(user: User = Depends(get_current_user), db: AsyncSession = D
             side=user_side.value, role="taker" if is_taker else "maker", created_at=t.created_at.isoformat(),
         ))
     return out
+
+
+class ListRequest(BaseModel):
+    symbol: str
+
+
+@router.post("/list", status_code=status.HTTP_201_CREATED)
+async def list_market(
+    body: ListRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """List a Binance USDT pair for trading as a synthetic market, then seed it with liquidity.
+
+    Lets any user make a view-only pair tradeable. The base asset is internal (settlement in USDT,
+    not withdrawable). Idempotent — listing an existing market just re-seeds it.
+    """
+    try:
+        market = await listing.ensure_market(db, body.symbol)
+    except ListingError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+    # Quote the new market around the live price so it can be traded immediately.
+    reference = await marketmaker.fetch_reference_price(market.symbol)
+    if reference is not None:
+        await marketmaker.fund_market_maker(db)
+        await marketmaker.refresh_market(db, market, reference)
+    await db.commit()
+    return {"symbol": market.symbol, "status": "listed"}
 
 
 @router.post("/dev/market-maker/refresh")

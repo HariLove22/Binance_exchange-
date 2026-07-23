@@ -136,8 +136,9 @@ async def fund_market_maker(db: AsyncSession, per_asset: Decimal = Decimal("1000
     inventory is real ledger balance, not a mint. Only tops up assets below the target, so it is
     cheap to call before every refresh.
     """
-    from app.models import AssetNetwork
+    from app.models import Asset, AssetNetwork, TransactionKind
     from app.services import deposits as deposit_service
+    from app.services import ledger
 
     mm = await get_market_maker(db)
     markets = (await db.execute(select(Market).where(Market.enabled.is_(True)))).scalars().all()
@@ -147,6 +148,23 @@ async def fund_market_maker(db: AsyncSession, per_asset: Decimal = Decimal("1000
         current = await _available(db, mm.id, asset_id)
         if current >= per_asset:
             continue
+        top_up = per_asset - current
+        asset = await db.get(Asset, asset_id)
+
+        if not asset.custodial:
+            # Synthetic asset — no chain to deposit from. Mint MM inventory directly. This "creates"
+            # the asset, which is fine precisely because it has no custody and can never be
+            # withdrawn: total supply = what we mint here, users only ever trade it back for USDT,
+            # and reconciliation skips it (there is nothing on-chain to reconcile against).
+            await ledger.credit(
+                db, user_id=mm.id, asset_id=asset_id, amount=top_up,
+                kind=TransactionKind.ADJUSTMENT,
+                idempotency_key=f"mm-mint:{asset_id}:{await _mint_nonce(db, mm.id, asset_id)}",
+                reference="synthetic MM inventory",
+            )
+            continue
+
+        # Custodial asset — fund through the deposit flow so it stays backed and reconciled.
         network = (
             await db.execute(select(AssetNetwork).where(AssetNetwork.asset_id == asset_id).order_by(AssetNetwork.id))
         ).scalars().first()
@@ -158,7 +176,6 @@ async def fund_market_maker(db: AsyncSession, per_asset: Decimal = Decimal("1000
         addr = await deposit_service.get_or_create_address(db, mm.id, network.id)
         import time
 
-        top_up = per_asset - current
         deposit = await deposit_service.record_deposit(
             db, asset_network_id=network.id, tx_hash=f"0xmmfund{asset_id}-{int(time.time()*1000)}", amount=top_up
         )
@@ -168,6 +185,26 @@ async def fund_market_maker(db: AsyncSession, per_asset: Decimal = Decimal("1000
         db.add(deposit)
         await db.flush()
         await deposit_service.credit_if_confirmed(db, deposit)
+
+
+async def _mint_nonce(db: AsyncSession, user_id: int, asset_id: int) -> int:
+    """A stable-ish key so repeated top-ups of a synthetic asset don't collide as one idempotent
+    transaction. Uses the current entry count for that account — monotonic per account."""
+    from app.models import Account, LedgerEntry
+    from sqlalchemy import func
+
+    acct = (
+        await db.execute(
+            select(Account.id).where(
+                Account.user_id == user_id, Account.asset_id == asset_id
+            )
+        )
+    ).scalars().first()
+    if acct is None:
+        return 0
+    return (
+        await db.execute(select(func.count(LedgerEntry.id)).where(LedgerEntry.account_id == acct))
+    ).scalar_one()
 
 
 async def _available(db: AsyncSession, user_id: int, asset_id: int) -> Decimal:

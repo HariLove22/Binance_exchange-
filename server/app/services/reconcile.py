@@ -58,12 +58,19 @@ async def reconcile(db: AsyncSession) -> list[AssetReconciliation]:
         ).all()
     )
 
+    # Only custodial assets are reconciled: a synthetic asset has no chain, so there is nothing
+    # on-chain to compare against. Its consistency is covered by the trial balance alone.
+    custodial = {
+        s for s in (await db.execute(select(Asset.symbol).where(Asset.custodial.is_(True)))).scalars().all()
+    }
+
     # Custody's on-chain holdings per asset, summed across the chains the asset lives on.
     networks = (
         await db.execute(
             select(Asset.symbol, Chain)
             .join(AssetNetwork, AssetNetwork.asset_id == Asset.id)
             .join(Chain, Chain.id == AssetNetwork.chain_id)
+            .where(Asset.custodial.is_(True))
         )
     ).all()
 
@@ -76,7 +83,10 @@ async def reconcile(db: AsyncSession) -> list[AssetReconciliation]:
         onchain[symbol] = onchain.get(symbol, Decimal(0)) + await provider.on_chain_balance(chain, symbol)
 
     results: list[AssetReconciliation] = []
-    for symbol in sorted(set(trial) | set(external) | set(onchain)):
+    # Report only custodial assets — synthetic ones have no custody to compare against. Their
+    # internal consistency is still guaranteed by the ledger's per-asset zero-sum (the DB trigger),
+    # so leaving them out of this report does not weaken any money-integrity check.
+    for symbol in sorted(s for s in (set(trial) | set(external) | set(onchain)) if s in custodial):
         tb = Decimal(trial.get(symbol, 0))
         ext = Decimal(external.get(symbol, 0))
         oc = onchain.get(symbol, Decimal(0))

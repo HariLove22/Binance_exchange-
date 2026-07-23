@@ -36,6 +36,9 @@ export function Trade() {
   const loadBalances = useCallback(() => {
     api.balances().then(setBalances).catch(() => setBalances([]));
   }, []);
+  const loadMarkets = useCallback(() => {
+    return api.marketSymbols().then(setMarkets).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.marketSymbols().then((m) => {
@@ -122,10 +125,7 @@ export function Trade() {
               clickedPrice={clickedPrice}
             />
           ) : (
-            <div className="viewonly-form">
-              <p>Order entry is available only for pairs listed on this exchange.</p>
-              <p className="viewonly-sub">The chart and price above are live from the reference feed.</p>
-            </div>
+            <ListForTrading symbol={symbol} onListed={loadMarkets} />
           )}
         </section>
 
@@ -213,6 +213,39 @@ function MarketList({ current, onPick }: { current: string; onPick: (s: string) 
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function ListForTrading({ symbol, onListed }: { symbol: string; onListed: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function list() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.listMarket(symbol);
+      await onListed(); // markets refresh → this pair becomes tradeable
+      window.dispatchEvent(new CustomEvent("book-changed"));
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="viewonly-form">
+      <p><b>{symbol}</b> is not listed for trading yet.</p>
+      <p className="viewonly-sub">
+        List it as a synthetic market — settled in USDT, quoted from the live price. (Synthetic
+        assets can be traded but not withdrawn; only USDT is custodial.)
+      </p>
+      <button className="of-submit buy" style={{ maxWidth: "16rem", margin: "0.5rem auto 0" }} onClick={list} disabled={busy}>
+        {busy ? "listing…" : `List ${symbol} for trading`}
+      </button>
+      {err && <p className="of-note" style={{ color: "#f6465d" }}>{err}</p>}
     </div>
   );
 }

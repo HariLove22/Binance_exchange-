@@ -58,6 +58,9 @@ async def request_withdrawal(
     ).scalar_one_or_none()
     if network is None:
         raise WithdrawalError("unknown asset network")
+    if not network.asset.custodial:
+        # Synthetic assets never touch a chain — they can only be sold back for USDT, not sent out.
+        raise WithdrawalError(f"{network.asset.symbol} is a synthetic asset and cannot be withdrawn")
     if not network.withdraw_enabled:
         raise WithdrawalError("withdrawals are disabled for this network")
     if amount <= 0:
