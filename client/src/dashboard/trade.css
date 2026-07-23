@@ -65,7 +65,9 @@
 .g-form { grid-area: form; }
 .g-market { grid-area: market; }
 .g-orders { grid-area: orders; }
-.g-left .book-box { flex: 1; min-height: 0; }
+/* Order book sizes to its content; the trades panel fills the rest of the tall left column. */
+.g-left .trades-box { flex: 1; min-height: 8rem; display: flex; flex-direction: column; }
+.g-left .trades-box .mt-list { flex: 1; overflow-y: auto; }
 
 @media (max-width: 76rem) {
   .term-grid {

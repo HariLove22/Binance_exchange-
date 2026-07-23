@@ -34,9 +34,9 @@ BINANCE_PRICE_URL = "https://data-api.binance.vision/api/v3/ticker/price"
 
 # Quote LEVELS levels each side, STEP_BPS apart, HALF_SPREAD_BPS off mid. Basis points: 1 bp =
 # 0.01%. A 10 bp half-spread means the best bid/ask sit 0.1% below/above the reference.
-LEVELS = 5
-HALF_SPREAD_BPS = Decimal("10")
-STEP_BPS = Decimal("8")
+LEVELS = 15
+HALF_SPREAD_BPS = Decimal("8")
+STEP_BPS = Decimal("6")
 # Quote a fixed *notional* per level, not a fixed base quantity — otherwise a cheap coin (TRX at
 # $0.33) would quote 2 units = $0.66, below a $5 min-notional, and every order would be rejected.
 # Sizing by dollar value gives every market sensible depth regardless of price.
@@ -101,17 +101,21 @@ async def refresh_market(db: AsyncSession, market: Market, reference: Decimal) -
             pass
 
     placed = 0
-    # Base quantity that is worth ~NOTIONAL_PER_LEVEL at the reference price, floored to a lot
-    # step, and never zero.
-    qty = _round_to(NOTIONAL_PER_LEVEL / reference, market.qty_step)
-    if qty <= 0:
-        qty = market.qty_step
+    # Base quantity worth ~NOTIONAL_PER_LEVEL at the reference price, floored to a lot step.
+    base_qty = NOTIONAL_PER_LEVEL / reference
     for level in range(LEVELS):
         offset_bps = HALF_SPREAD_BPS + STEP_BPS * level
         factor = offset_bps / Decimal(10000)
 
         bid = _round_to(reference * (1 - factor), market.price_tick)
         ask = _round_to(reference * (1 + factor), market.price_tick, rounding=ROUND_UP)
+
+        # Deeper levels carry more size, the way a real book thickens away from the mid. A little
+        # variation also keeps the ladder from looking like identical robot rows.
+        depth_factor = Decimal(1) + Decimal("0.18") * level
+        qty = _round_to(base_qty * depth_factor, market.qty_step)
+        if qty <= 0:
+            qty = market.qty_step
 
         for side, px in ((OrderSide.BUY, bid), (OrderSide.SELL, ask)):
             if px <= 0:

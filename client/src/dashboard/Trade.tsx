@@ -293,7 +293,7 @@ function OrderBookPanel({
   live: number | null;
 }) {
   const [book, setBook] = useState<OrderBook | null>(null);
-  usePoll(() => { api.orderBook(symbol).then(setBook).catch(() => setBook(null)); }, 1500);
+  usePoll(() => { api.orderBook(symbol).then(setBook).catch(() => setBook(null)); }, 800);
 
   const maxTotal = Math.max(
     ...(book?.asks ?? []).map((_, i, arr) => arr.slice(0, i + 1).reduce((s, l) => s + Number(l.quantity), 0)),
@@ -312,7 +312,7 @@ function OrderBookPanel({
       {empty && <p className="tp-empty">no liquidity — press “Seed liquidity”</p>}
 
       <div className="ob-asks">
-        {[...(book?.asks ?? [])].slice(0, 12).reverse().map((l, ri, rev) => {
+        {[...(book?.asks ?? [])].slice(0, 16).reverse().map((l, ri, rev) => {
           const i = rev.length - 1 - ri;
           const c = cum(book!.asks, i);
           return (
@@ -332,7 +332,7 @@ function OrderBookPanel({
       </div>
 
       <div className="ob-bids">
-        {(book?.bids ?? []).slice(0, 12).map((l, i) => {
+        {(book?.bids ?? []).slice(0, 16).map((l, i) => {
           const c = cum(book!.bids, i);
           return (
             <button className="ob-row bid" key={`b${l.price}`} onClick={() => onPick(l.price)} title="Click to set price">
@@ -489,7 +489,7 @@ function SideForm({
 
 function RecentTrades({ symbol }: { symbol: string }) {
   const [trades, setTrades] = useState<TradeTick[]>([]);
-  usePoll(() => { api.marketTrades(symbol).then(setTrades).catch(() => setTrades([])); }, 1500);
+  usePoll(() => { api.marketTrades(symbol).then(setTrades).catch(() => setTrades([])); }, 800);
 
   return (
     <div className="tp trades-box">

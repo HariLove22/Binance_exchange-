@@ -292,7 +292,7 @@ export const api = {
   },
   klines: (symbol: string, interval: string, limit = 200) =>
     request<Kline[]>(`/market/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`),
-  orderBook: (symbol: string) => request<OrderBook>(`/market/depth?symbol=${symbol}&limit=12`),
+  orderBook: (symbol: string) => request<OrderBook>(`/market/depth?symbol=${symbol}&limit=16`),
   marketTrades: (symbol: string) => request<TradeTick[]>(`/market/trades?symbol=${symbol}&limit=30`),
 
   // trading
