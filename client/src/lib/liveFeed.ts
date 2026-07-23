@@ -29,7 +29,29 @@ export interface LiveCandle {
   high: number;
   low: number;
   close: number;
+  volume: number;
   isClosed: boolean;
+}
+
+/**
+ * Candle history straight from Binance's public REST, no proxy hop — the fastest path, and the
+ * host allows cross-origin reads (`Access-Control-Allow-Origin: *`). Returns oldest-first, which
+ * is what the chart wants.
+ */
+const REST_BASE = "https://data-api.binance.vision/api/v3";
+
+export async function fetchKlines(symbol: string, interval: string, limit = 500): Promise<LiveCandle[]> {
+  const url = `${REST_BASE}/klines?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
+  const rows = (await (await fetch(url)).json()) as unknown[][];
+  return rows.map((k) => ({
+    time: Number(k[0]) / 1000,
+    open: Number(k[1]),
+    high: Number(k[2]),
+    low: Number(k[3]),
+    close: Number(k[4]),
+    volume: Number(k[5]),
+    isClosed: true,
+  }));
 }
 
 type Listener = (data: unknown) => void;
@@ -129,6 +151,7 @@ export function subscribeCandles(symbol: string, interval: string, onCandle: (c:
       high: Number(k.h),
       low: Number(k.l),
       close: Number(k.c),
+      volume: Number(k.v),
       isClosed: Boolean(k.x),
     });
   });

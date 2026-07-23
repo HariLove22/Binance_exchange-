@@ -231,3 +231,7 @@
 .pos-close { padding: 0.25rem 0.7rem; border: 1px solid var(--ask); border-radius: 5px; background: none; color: var(--ask); font: inherit; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
 .pos-close:hover:not(:disabled) { background: rgba(246,70,93,0.12); }
 .pos-close:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* chart wrap + loading */
+.trade-chart-wrap { position: relative; }
+.chart-loading { position: absolute; top: 0.6rem; left: 0.7rem; font-size: 0.72rem; color: #848e9c; background: rgba(11,14,17,0.6); padding: 0.15rem 0.5rem; border-radius: 4px; }
