@@ -208,6 +208,16 @@ export interface OrderRow {
   status: string;
 }
 
+export interface MyTrade {
+  id: number;
+  symbol: string;
+  price: string;
+  quantity: string;
+  side: string;
+  role: string;
+  created_at: string;
+}
+
 /** Binance kline: [openTime, open, high, low, close, volume, ...]. */
 export type Kline = [number, string, string, string, string, string, ...unknown[]];
 
@@ -295,6 +305,8 @@ export const api = {
   }) => request<OrderRow>("/trade/order", { method: "POST", body: JSON.stringify(body) }),
   cancelOrder: (id: number) => request<OrderRow>(`/trade/order/${id}`, { method: "DELETE" }),
   openOrders: () => request<OrderRow[]>("/trade/orders"),
+  orderHistory: () => request<OrderRow[]>("/trade/orders?include_history=true"),
+  myTrades: () => request<MyTrade[]>("/trade/mytrades"),
   refreshMarketMaker: () =>
     request<Record<string, number>>("/trade/dev/market-maker/refresh", { method: "POST" }),
   listMarket: (symbol: string) =>

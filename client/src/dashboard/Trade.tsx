@@ -6,6 +6,7 @@ import {
   type Balance,
   type MarketInfo,
   type OrderBook,
+  type MyTrade,
   type OrderRow,
   type TradeTick,
   type UniverseRow,
@@ -510,9 +511,28 @@ function RecentTrades({ symbol }: { symbol: string }) {
 
 /* ------------------------------------------------------------ open orders */
 
+/**
+ * The bottom panel, tabbed like Binance: Open Orders / Order History / Trade History.
+ *
+ * A MARKET order fills instantly, so it never rests as an "open order" — it goes straight to
+ * FILLED. That is why a market buy does not appear under Open Orders; it appears under Order
+ * History (the order) and Trade History (the fills). This tabbed panel is what makes an executed
+ * trade visible. Spot has no "positions" — after a buy you simply hold the asset, shown in Assets.
+ */
+type OrdersTab = "open" | "history" | "trades";
+
 function OpenOrders({ symbol }: { symbol: string }) {
-  const [orders, setOrders] = useState<OrderRow[]>([]);
-  const load = useCallback(() => { api.openOrders().then(setOrders).catch(() => setOrders([])); }, []);
+  const [tab, setTab] = useState<OrdersTab>("open");
+  const [open, setOpen] = useState<OrderRow[]>([]);
+  const [history, setHistory] = useState<OrderRow[]>([]);
+  const [trades, setTrades] = useState<MyTrade[]>([]);
+  const [allSymbols, setAllSymbols] = useState(false);
+
+  const load = useCallback(() => {
+    api.openOrders().then(setOpen).catch(() => setOpen([]));
+    api.orderHistory().then(setHistory).catch(() => setHistory([]));
+    api.myTrades().then(setTrades).catch(() => setTrades([]));
+  }, []);
   usePoll(load, 2500);
   useEffect(() => {
     const h = () => load();
@@ -524,24 +544,72 @@ function OpenOrders({ symbol }: { symbol: string }) {
     try { await api.cancelOrder(id); load(); window.dispatchEvent(new CustomEvent("book-changed")); } catch { /* ignore */ }
   }
 
-  const rows = orders.filter((o) => o.symbol === symbol);
+  const bySym = <T extends { symbol: string }>(rows: T[]) => allSymbols ? rows : rows.filter((r) => r.symbol === symbol);
+  const openRows = bySym(open);
+  const histRows = bySym(history);
+  const tradeRows = bySym(trades);
 
   return (
     <>
-      <div className="tp-head"><span className="tp-title">Open orders ({rows.length})</span></div>
-      <div className="oo-table">
-        <div className="oo-h"><span>Side</span><span className="num">Price</span><span className="num">Amount</span><span className="num">Filled</span><span></span></div>
-        {rows.length === 0 && <p className="tp-empty">no open orders</p>}
-        {rows.map((o) => (
-          <div className="oo-r" key={o.id}>
-            <span className={o.side === "BUY" ? "bid" : "ask"}>{o.side} {o.type}</span>
-            <span className="num">{o.price ? Number(o.price).toFixed(2) : "mkt"}</span>
-            <span className="num">{trimAmount(o.quantity)}</span>
-            <span className="num dim">{trimAmount(o.filled_quantity)}</span>
-            <span className="num"><button className="cancel" onClick={() => cancel(o.id)}>✕</button></span>
-          </div>
-        ))}
+      <div className="oo-tabs">
+        <button className={tab === "open" ? "on" : ""} onClick={() => setTab("open")}>Open Orders ({openRows.length})</button>
+        <button className={tab === "history" ? "on" : ""} onClick={() => setTab("history")}>Order History</button>
+        <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trade History</button>
+        <label className="oo-allsym">
+          <input type="checkbox" checked={allSymbols} onChange={(e) => setAllSymbols(e.target.checked)} /> all pairs
+        </label>
       </div>
+
+      {tab === "open" && (
+        <div className="oo-table">
+          <div className="oo-h5"><span>Pair</span><span>Side</span><span className="num">Price</span><span className="num">Amount</span><span className="num">Filled</span><span></span></div>
+          {openRows.length === 0 && <p className="tp-empty">No open orders. Market orders fill instantly — see Trade History.</p>}
+          {openRows.map((o) => (
+            <div className="oo-r5" key={o.id}>
+              <span className="mono">{o.symbol}</span>
+              <span className={o.side === "BUY" ? "bid" : "ask"}>{o.side} {o.type}</span>
+              <span className="num">{o.price ? Number(o.price).toFixed(2) : "mkt"}</span>
+              <span className="num">{trimAmount(o.quantity)}</span>
+              <span className="num dim">{trimAmount(o.filled_quantity)}</span>
+              <span className="num"><button className="cancel" onClick={() => cancel(o.id)}>Cancel</button></span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "history" && (
+        <div className="oo-table">
+          <div className="oo-h5"><span>Pair</span><span>Side</span><span className="num">Price</span><span className="num">Amount</span><span className="num">Filled</span><span>Status</span></div>
+          {histRows.length === 0 && <p className="tp-empty">no orders yet</p>}
+          {histRows.map((o) => (
+            <div className="oo-r5" key={o.id}>
+              <span className="mono">{o.symbol}</span>
+              <span className={o.side === "BUY" ? "bid" : "ask"}>{o.side} {o.type}</span>
+              <span className="num">{o.price ? Number(o.price).toFixed(2) : "mkt"}</span>
+              <span className="num">{trimAmount(o.quantity)}</span>
+              <span className="num dim">{trimAmount(o.filled_quantity)}</span>
+              <span className={`status-${o.status.toLowerCase()}`}>{o.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "trades" && (
+        <div className="oo-table">
+          <div className="oo-h5"><span>Pair</span><span>Side</span><span className="num">Price</span><span className="num">Amount</span><span>Role</span><span className="num">Time</span></div>
+          {tradeRows.length === 0 && <p className="tp-empty">no trades yet</p>}
+          {tradeRows.map((t) => (
+            <div className="oo-r5" key={t.id}>
+              <span className="mono">{t.symbol}</span>
+              <span className={t.side === "BUY" ? "bid" : "ask"}>{t.side}</span>
+              <span className="num">{Number(t.price).toFixed(2)}</span>
+              <span className="num">{trimAmount(t.quantity)}</span>
+              <span className="dim">{t.role}</span>
+              <span className="num dim">{new Date(t.created_at).toLocaleTimeString("en-GB")}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

@@ -208,3 +208,16 @@
 .book-box { display: flex; flex-direction: column; }
 .book-box .ob-bids { flex: 1; }
 .tp.fill { display: flex; flex-direction: column; min-height: 20rem; }
+
+/* orders panel tabs (bottom) */
+.oo-tabs { display: flex; align-items: center; gap: 1.25rem; padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--line); }
+.oo-tabs button { background: none; border: none; color: #848e9c; font: inherit; font-size: 0.8rem; cursor: pointer; padding: 0.15rem 0; border-bottom: 2px solid transparent; }
+.oo-tabs button.on { color: #eaecef; border-bottom-color: #f0b90b; font-weight: 600; }
+.oo-allsym { margin-left: auto; font-size: 0.72rem; color: #848e9c; display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.oo-h5, .oo-r5 { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.76rem; align-items: center; }
+.oo-h5 { font-size: 0.64rem; text-transform: uppercase; color: #848e9c; border-bottom: 1px solid var(--line); }
+.oo-r5 { border-bottom: 1px solid rgba(148,163,184,0.06); font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.oo-r5 .cancel { padding: 0.15rem 0.5rem; border: 1px solid var(--line); border-radius: 4px; }
+.status-filled { color: var(--bid); }
+.status-canceled, .status-rejected { color: #848e9c; }
+.status-new, .status-partially_filled { color: #f0b90b; }
