@@ -129,6 +129,11 @@
 .of-tab-note { margin-left: auto; font-size: 0.66rem; color: #6b7280; }
 .of-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; padding: 0.4rem 0.9rem 0.9rem; }
 @media (max-width: 34rem) { .of-cols { grid-template-columns: 1fr; } }
+.of-oco { display: flex; flex-direction: column; padding: 0.4rem 0.9rem 0.9rem; }
+.of-side-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-top: 0.4rem; }
+.of-side-toggle button { padding: 0.4rem; border: 1px solid var(--line); border-radius: 6px; background: none; color: #848e9c; font: inherit; font-size: 0.82rem; cursor: pointer; }
+.of-side-toggle button.buy.on { background: rgba(14,203,129,0.15); border-color: #0ecb81; color: #0ecb81; }
+.of-side-toggle button.sell.on { background: rgba(246,70,93,0.15); border-color: #f6465d; color: #f6465d; }
 .of-col { display: flex; flex-direction: column; }
 .of-field { margin-top: 0.6rem; }
 .of-field label { display: block; font-size: 0.66rem; color: #848e9c; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }

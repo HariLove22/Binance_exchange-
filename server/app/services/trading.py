@@ -205,7 +205,37 @@ async def _activate(db: AsyncSession, order: Order, market: Market) -> list[Trad
     else:
         order.status = OrderStatus.PARTIALLY_FILLED if filled_qty > 0 else OrderStatus.NEW
 
+    # OCO: any fill cancels the sibling leg. Both the taker (if it filled) and every maker it hit
+    # may be one leg of an OCO pair. Siblings are pending stops — never in the book being matched —
+    # so canceling them here is safe.
+    touched = [f.maker for f in fills]
+    if filled_qty > 0:
+        touched.append(order)
+    for touched_order in touched:
+        await _cancel_oco_siblings(db, touched_order)
+
     return trades
+
+
+async def _cancel_oco_siblings(db: AsyncSession, order: Order) -> None:
+    """Cancel the other still-live legs in this order's OCO group, releasing their locked funds.
+
+    A no-op for a standalone order. Idempotent: a sibling already in a terminal state is skipped.
+    """
+    if order.oco_group_id is None:
+        return
+    siblings = (
+        await db.execute(
+            select(Order).where(
+                Order.oco_group_id == order.oco_group_id,
+                Order.id != order.id,
+                Order.status.in_(CANCELLABLE_STATUSES),
+            ).with_for_update()
+        )
+    ).scalars().all()
+    for sibling in siblings:
+        await _release_lock(db, sibling)
+        sibling.status = OrderStatus.CANCELED
 
 
 async def place_stop_order(
@@ -253,10 +283,73 @@ async def place_stop_order(
     return order
 
 
+@dataclass(frozen=True)
+class PlacedOCO:
+    limit_leg: Order
+    stop_leg: Order
+
+
+async def place_oco(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    market: Market,
+    side: OrderSide,
+    quantity: Decimal,
+    limit_price: Decimal,
+    stop_price: Decimal,
+    stop_limit_price: Decimal,
+    reference_price: Decimal,
+) -> PlacedOCO:
+    """Place a one-cancels-other pair: a take-profit LIMIT and a stop-loss STOP_LIMIT.
+
+    The two prices must bracket the current price — for a SELL the limit sits above (take profit on
+    a rise) and the stop below (cut losses on a fall); a BUY is mirrored. That bracketing is what
+    keeps the limit leg resting (not crossing immediately) and the stop leg pending. Only the limit
+    leg reserves funds while both rest; when either leg activates, the other is canceled, so the
+    reservation is never doubled.
+    """
+    if not market.enabled:
+        raise TradingError("market is not open for trading")
+    if side is OrderSide.SELL:
+        if not (limit_price > reference_price > stop_price):
+            raise TradingError("SELL OCO needs the limit above and the stop below the current price")
+    else:
+        if not (limit_price < reference_price < stop_price):
+            raise TradingError("BUY OCO needs the limit below and the stop above the current price")
+
+    # Leg 1 — the take-profit limit. It rests (validation guarantees it does not cross).
+    _validate(market, side, OrderType.LIMIT, limit_price, quantity)
+    limit_leg = Order(
+        user_id=user_id, market_id=market.id, side=side, type=OrderType.LIMIT, price=limit_price,
+        quantity=quantity, filled_quantity=Decimal(0), status=OrderStatus.NEW, locked_remaining=Decimal(0),
+    )
+    db.add(limit_leg)
+    await db.flush()
+    trades = await _activate(db, limit_leg, market)
+    if trades:
+        # Should be unreachable given the bracket check, but never leave a half-built OCO.
+        raise TradingError("OCO limit leg would fill immediately; adjust the prices")
+
+    # Leg 2 — the stop-loss. Pending until the stop price is crossed.
+    stop_leg = await place_stop_order(
+        db, user_id=user_id, market=market, side=side, order_type=OrderType.STOP_LIMIT,
+        quantity=quantity, trigger_price=stop_price, reference_price=reference_price, price=stop_limit_price,
+    )
+
+    # Link the pair. The limit leg's id names the group — self-identifying and stable.
+    limit_leg.oco_group_id = limit_leg.id
+    stop_leg.oco_group_id = limit_leg.id
+    return PlacedOCO(limit_leg=limit_leg, stop_leg=stop_leg)
+
+
 async def fire_stop(db: AsyncSession, order: Order, market: Market) -> list[Trade]:
     """Trigger has been hit: turn the pending stop into an active order and match it."""
     if order.status is not OrderStatus.TRIGGER_PENDING:
         return []
+    # If this stop is one leg of an OCO, cancel the resting limit leg FIRST. That releases the funds
+    # the limit leg reserved so this stop can lock them — the two legs never hold funds at once.
+    await _cancel_oco_siblings(db, order)
     try:
         return await _activate(db, order, market)
     except TradingError:
@@ -414,4 +507,6 @@ async def cancel_order(db: AsyncSession, *, user_id: int, order_id: int) -> Orde
 
     await _release_lock(db, order)
     order.status = OrderStatus.CANCELED
+    # Canceling one leg of an OCO cancels the whole pair, matching Binance.
+    await _cancel_oco_siblings(db, order)
     return order

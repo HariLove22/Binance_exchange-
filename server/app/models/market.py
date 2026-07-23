@@ -124,6 +124,12 @@ class Order(TimestampMixin, Base):
     # set below the market is a downside stop-loss and one above is an upside take-profit/breakout.
     trigger_price: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     trigger_above: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # OCO (one-cancels-other) linkage. The two legs of an OCO share a group id; when either leg
+    # takes a fill or a stop leg fires, the other leg in the group is canceled. NULL for a plain
+    # standalone order. It is the order's own id on the first leg, so a group is self-identifying.
+    oco_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     filled_quantity: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal(0))
 
     status: Mapped[OrderStatus] = mapped_column(
@@ -150,6 +156,7 @@ class Order(TimestampMixin, Base):
         # Finding the resting book for a symbol is the hot query on every order.
         Index("ix_orders_book", "market_id", "status", "side", "price", "id"),
         Index("ix_orders_user", "user_id", "id"),
+        Index("ix_orders_oco", "oco_group_id"),
     )
 
     @property

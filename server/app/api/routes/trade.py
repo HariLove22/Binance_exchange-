@@ -115,6 +115,49 @@ async def place_order(
     return _order_response(order, market.symbol)
 
 
+class OCORequest(BaseModel):
+    symbol: str
+    side: OrderSide
+    quantity: str
+    limit_price: str      # take-profit leg
+    stop_price: str       # trigger for the stop-loss leg
+    stop_limit_price: str  # the stop-loss leg's limit once triggered
+
+
+@router.post("/oco", response_model=list[OrderResponse], status_code=status.HTTP_201_CREATED)
+async def place_oco(
+    body: OCORequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Place a one-cancels-other pair (take-profit limit + stop-loss stop). When one leg activates,
+    the other is canceled automatically."""
+    market = await _market(db, body.symbol)
+    try:
+        quantity = Decimal(body.quantity)
+        limit_price = Decimal(body.limit_price)
+        stop_price = Decimal(body.stop_price)
+        stop_limit_price = Decimal(body.stop_limit_price)
+    except InvalidOperation:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "bad number") from None
+
+    reference = await marketmaker.fetch_reference_price(market.symbol)
+    if reference is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no reference price for this market")
+
+    try:
+        placed = await trading.place_oco(
+            db, user_id=user.id, market=market, side=body.side, quantity=quantity,
+            limit_price=limit_price, stop_price=stop_price, stop_limit_price=stop_limit_price,
+            reference_price=reference,
+        )
+    except TradingError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    await db.commit()
+    pubsub.publish(pubsub.market_channel(market.symbol))
+    return [_order_response(placed.limit_leg, market.symbol), _order_response(placed.stop_leg, market.symbol)]
+
+
 @router.delete("/order/{order_id}", response_model=OrderResponse)
 async def cancel_order(
     order_id: int,

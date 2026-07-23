@@ -305,6 +305,14 @@ export const api = {
     price?: string | null;
     trigger_price?: string | null;
   }) => request<OrderRow>("/trade/order", { method: "POST", body: JSON.stringify(body) }),
+  placeOco: (body: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    quantity: string;
+    limit_price: string;
+    stop_price: string;
+    stop_limit_price: string;
+  }) => request<OrderRow[]>("/trade/oco", { method: "POST", body: JSON.stringify(body) }),
   cancelOrder: (id: number) => request<OrderRow>(`/trade/order/${id}`, { method: "DELETE" }),
   openOrders: () => request<OrderRow[]>("/trade/orders"),
   orderHistory: () => request<OrderRow[]>("/trade/orders?include_history=true"),
