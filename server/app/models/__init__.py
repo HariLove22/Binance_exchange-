@@ -23,12 +23,14 @@ from app.models.ledger import (
     TransactionKind,
 )
 from app.models.market import (
+    CANCELLABLE_STATUSES,
     Market,
     OPEN_STATUSES,
     Order,
     OrderSide,
     OrderStatus,
     OrderType,
+    STOP_TYPES,
     Trade,
 )
 from app.models.user import User, UserRole
@@ -54,6 +56,7 @@ __all__ = [
     "Deposit",
     "DepositAddress",
     "DepositStatus",
+    "CANCELLABLE_STATUSES",
     "LedgerEntry",
     "LedgerTransaction",
     "Market",
@@ -62,6 +65,7 @@ __all__ = [
     "OrderSide",
     "OrderStatus",
     "OrderType",
+    "STOP_TYPES",
     "Trade",
     "TransactionKind",
     "User",

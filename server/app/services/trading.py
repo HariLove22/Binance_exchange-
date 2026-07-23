@@ -27,7 +27,9 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    CANCELLABLE_STATUSES,
     OPEN_STATUSES,
+    STOP_TYPES,
     Market,
     Order,
     OrderSide,
@@ -134,60 +136,56 @@ async def place_order(
 ) -> PlacedOrder:
     if not market.enabled:
         raise TradingError("market is not open for trading")
+    if order_type in STOP_TYPES:
+        raise TradingError("use place_stop_order for stop orders")
     _validate(market, side, order_type, price, quantity)
 
-    # Serialize everything on this symbol. Two orders on the same market cannot interleave and
-    # spend the same resting liquidity twice.
+    order = Order(
+        user_id=user_id, market_id=market.id, side=side, type=order_type, price=price,
+        quantity=quantity, filled_quantity=Decimal(0), status=OrderStatus.NEW, locked_remaining=Decimal(0),
+    )
+    db.add(order)
+    await db.flush()
+    trades = await _activate(db, order, market)
+    return PlacedOrder(order=order, trades=trades)
+
+
+async def _activate(db: AsyncSession, order: Order, market: Market) -> list[Trade]:
+    """Lock funds and match an existing order, then set its terminal/resting status.
+
+    Shared by `place_order` and stop-order firing. A stop order fires by having its type
+    (STOP_LIMIT / STOP_MARKET) treated as its resting equivalent (LIMIT / MARKET) here.
+    """
+    limit_like = order.type in {OrderType.LIMIT, OrderType.STOP_LIMIT}
+    side, quantity, price = order.side, order.quantity, order.price
+
+    # Serialize everything on this symbol so two orders cannot spend the same resting liquidity.
     await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": market.id})
 
     book = await _resting_book(db, market.id, side)
-    fills = _dry_run(side, price, quantity, book)
+    fills = _dry_run(side, price if limit_like else None, quantity, book)
 
     filled_qty = sum((f.quantity for f in fills), Decimal(0))
     fill_cost = sum((f.price * f.quantity for f in fills), Decimal(0))
     residual = quantity - filled_qty
 
-    # What the taker must lock. Trades settle at maker prices, so a taker locks exactly the fill
-    # cost — no over-lock. A LIMIT residual additionally locks at the limit price to rest.
+    # Trades settle at maker prices, so a taker locks exactly the fill cost. A limit residual also
+    # locks at the limit price to rest.
     if side is OrderSide.BUY:
         locked_asset_id = market.quote_asset_id
-        lock_amount = fill_cost + (price * residual if order_type is OrderType.LIMIT else Decimal(0))
+        lock_amount = fill_cost + (price * residual if limit_like else Decimal(0))
     else:
         locked_asset_id = market.base_asset_id
-        # A sell reserves base: everything that fills, plus the residual that rests (LIMIT only).
-        lock_amount = filled_qty + (residual if order_type is OrderType.LIMIT else Decimal(0))
+        lock_amount = filled_qty + (residual if limit_like else Decimal(0))
 
     if lock_amount <= 0:
-        # A market order with nothing to fill (empty book). Reject rather than rest.
         raise TradingError("no liquidity available to fill this order")
 
-    # Create the order first so its id can key the fund lock. The lock still happens before any
-    # fill is produced — "lock before match" — which is the invariant that matters; the empty row
-    # existing for a few statements before its funds are locked changes nothing, because matching
-    # has not run and no trade can reference it yet.
-    order = Order(
-        user_id=user_id,
-        market_id=market.id,
-        side=side,
-        type=order_type,
-        price=price,
-        quantity=quantity,
-        filled_quantity=Decimal(0),
-        status=OrderStatus.NEW,
-        locked_asset_id=locked_asset_id,
-        locked_remaining=Decimal(0),
-    )
-    db.add(order)
-    await db.flush()
-
+    order.locked_asset_id = locked_asset_id
     try:
         await ledger.lock(
-            db,
-            user_id=user_id,
-            asset_id=locked_asset_id,
-            amount=lock_amount,
-            idempotency_key=f"order-lock:{order.id}",
-            reference=f"order={order.id}",
+            db, user_id=order.user_id, asset_id=locked_asset_id, amount=lock_amount,
+            idempotency_key=f"order-lock:{order.id}", reference=f"order={order.id}",
         )
     except InsufficientFunds as exc:
         raise TradingError(str(exc)) from exc
@@ -200,15 +198,126 @@ async def place_order(
     order.filled_quantity = filled_qty
     if order.remaining == 0:
         order.status = OrderStatus.FILLED
-    elif order_type is OrderType.MARKET:
-        # No residual rests for a market order — release whatever is still locked (there should be
-        # none, since a market taker locks only the fill cost) and finalise.
+    elif not limit_like:
+        # A market order rests nothing — release any leftover lock and finalise.
         await _release_lock(db, order)
         order.status = OrderStatus.FILLED if filled_qty == quantity else OrderStatus.CANCELED
     else:
         order.status = OrderStatus.PARTIALLY_FILLED if filled_qty > 0 else OrderStatus.NEW
 
-    return PlacedOrder(order=order, trades=trades)
+    return trades
+
+
+async def place_stop_order(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    market: Market,
+    side: OrderSide,
+    order_type: OrderType,
+    quantity: Decimal,
+    trigger_price: Decimal,
+    reference_price: Decimal,
+    price: Decimal | None = None,
+) -> Order:
+    """Place a conditional (stop) order. It holds no funds and does not match until its trigger.
+
+    The trigger direction is inferred from where the trigger sits relative to the current price: a
+    trigger above fires when the price rises to it (an upside take-profit / breakout), one below
+    fires when the price falls to it (a downside stop-loss). Funds are locked only when it fires,
+    through the normal path.
+    """
+    if not market.enabled:
+        raise TradingError("market is not open for trading")
+    if order_type not in STOP_TYPES:
+        raise TradingError("not a stop order type")
+    if quantity <= 0 or not _is_multiple(quantity, market.qty_step):
+        raise TradingError(f"quantity must be a positive multiple of {market.qty_step}")
+    if trigger_price <= 0 or not _is_multiple(trigger_price, market.price_tick):
+        raise TradingError(f"trigger price must be a multiple of {market.price_tick}")
+    if order_type is OrderType.STOP_LIMIT:
+        if price is None or price <= 0 or not _is_multiple(price, market.price_tick):
+            raise TradingError("stop-limit needs a valid limit price")
+        if price * quantity < market.min_notional:
+            raise TradingError(f"order value below minimum of {market.min_notional}")
+
+    order = Order(
+        user_id=user_id, market_id=market.id, side=side, type=order_type,
+        price=price if order_type is OrderType.STOP_LIMIT else None,
+        quantity=quantity, filled_quantity=Decimal(0), status=OrderStatus.TRIGGER_PENDING,
+        trigger_price=trigger_price, trigger_above=trigger_price > reference_price,
+        locked_remaining=Decimal(0),
+    )
+    db.add(order)
+    await db.flush()
+    return order
+
+
+async def fire_stop(db: AsyncSession, order: Order, market: Market) -> list[Trade]:
+    """Trigger has been hit: turn the pending stop into an active order and match it."""
+    if order.status is not OrderStatus.TRIGGER_PENDING:
+        return []
+    try:
+        return await _activate(db, order, market)
+    except TradingError:
+        # Could not fund or fill it (e.g. the user spent the funds, or an empty book). A stop that
+        # cannot execute is rejected, not left hanging.
+        order.status = OrderStatus.REJECTED
+        return []
+
+
+async def check_triggers(db: AsyncSession, market: Market, reference_price: Decimal) -> list[int]:
+    """Fire every pending stop on this market whose trigger the reference price has crossed."""
+    pending = (
+        await db.execute(
+            select(Order).where(
+                Order.market_id == market.id, Order.status == OrderStatus.TRIGGER_PENDING
+            ).with_for_update()
+        )
+    ).scalars().all()
+
+    fired: list[int] = []
+    for order in pending:
+        hit = (
+            reference_price >= order.trigger_price if order.trigger_above
+            else reference_price <= order.trigger_price
+        )
+        if hit:
+            await fire_stop(db, order, market)
+            fired.append(order.id)
+    return fired
+
+
+async def markets_with_pending_stops(db: AsyncSession) -> list[Market]:
+    """Every market that currently has at least one un-triggered stop. The monitor only needs to
+    price these — fetching a reference for a market with no pending stops is wasted work."""
+    return list(
+        (
+            await db.execute(
+                select(Market)
+                .join(Order, Order.market_id == Market.id)
+                .where(Order.status == OrderStatus.TRIGGER_PENDING)
+                .distinct()
+            )
+        ).scalars().all()
+    )
+
+
+async def sweep_triggers(db: AsyncSession, price_of) -> dict[str, list[int]]:
+    """Check every market with pending stops against its live price and fire what has crossed.
+
+    `price_of(symbol) -> Decimal | None` supplies the reference price (Binance feed in production).
+    Returns symbol -> fired order ids. The caller owns the commit.
+    """
+    fired: dict[str, list[int]] = {}
+    for market in await markets_with_pending_stops(db):
+        reference = await price_of(market.symbol)
+        if reference is None:
+            continue
+        hit = await check_triggers(db, market, reference)
+        if hit:
+            fired[market.symbol] = hit
+    return fired
 
 
 async def _execute_fill(db: AsyncSession, market: Market, *, taker: Order, taker_side: OrderSide, fill: _Fill) -> Trade:
@@ -297,7 +406,7 @@ async def cancel_order(db: AsyncSession, *, user_id: int, order_id: int) -> Orde
     ).scalar_one_or_none()
     if order is None or order.user_id != user_id:
         raise TradingError("order not found")
-    if order.status not in OPEN_STATUSES:
+    if order.status not in CANCELLABLE_STATUSES:
         raise TradingError(f"cannot cancel an order in status {order.status.value}")
 
     # Serialize with matching on this symbol so a cancel and a fill cannot race.

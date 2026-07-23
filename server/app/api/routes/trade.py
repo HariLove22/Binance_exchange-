@@ -16,8 +16,10 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.models import (
     Asset,
+    CANCELLABLE_STATUSES,
     Market,
     OPEN_STATUSES,
+    STOP_TYPES,
     Order,
     OrderSide,
     OrderStatus,
@@ -43,6 +45,8 @@ class OrderRequest(BaseModel):
     type: OrderType
     quantity: str
     price: str | None = None
+    # Stop (STOP_LIMIT / STOP_MARKET) only: the level that arms the order.
+    trigger_price: str | None = None
 
 
 class OrderResponse(BaseModel):
@@ -51,6 +55,7 @@ class OrderResponse(BaseModel):
     side: str
     type: str
     price: str | None
+    trigger_price: str | None
     quantity: str
     filled_quantity: str
     status: str
@@ -60,6 +65,7 @@ def _order_response(order: Order, symbol: str) -> OrderResponse:
     return OrderResponse(
         id=order.id, symbol=symbol, side=order.side.value, type=order.type.value,
         price=f"{order.price.normalize():f}" if order.price is not None else None,
+        trigger_price=f"{order.trigger_price.normalize():f}" if order.trigger_price is not None else None,
         quantity=f"{order.quantity.normalize():f}", filled_quantity=f"{order.filled_quantity.normalize():f}",
         status=order.status.value,
     )
@@ -82,19 +88,31 @@ async def place_order(
     try:
         quantity = Decimal(body.quantity)
         price = Decimal(body.price) if body.price is not None else None
+        trigger_price = Decimal(body.trigger_price) if body.trigger_price is not None else None
     except InvalidOperation:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "bad number") from None
 
     try:
-        placed = await trading.place_order(
-            db, user_id=user.id, market=market, side=body.side,
-            order_type=body.type, quantity=quantity, price=price,
-        )
+        if body.type in STOP_TYPES:
+            if trigger_price is None:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "stop order needs a trigger_price")
+            reference = await marketmaker.fetch_reference_price(market.symbol)
+            if reference is None:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "no reference price to arm the stop")
+            order = await trading.place_stop_order(
+                db, user_id=user.id, market=market, side=body.side, order_type=body.type,
+                quantity=quantity, trigger_price=trigger_price, reference_price=reference, price=price,
+            )
+        else:
+            order = (await trading.place_order(
+                db, user_id=user.id, market=market, side=body.side,
+                order_type=body.type, quantity=quantity, price=price,
+            )).order
     except TradingError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
     pubsub.publish(pubsub.market_channel(market.symbol))  # wake live subscribers
-    return _order_response(placed.order, market.symbol)
+    return _order_response(order, market.symbol)
 
 
 @router.delete("/order/{order_id}", response_model=OrderResponse)
@@ -121,7 +139,8 @@ async def open_orders(
 ):
     q = select(Order, Market.symbol).join(Market, Market.id == Order.market_id).where(Order.user_id == user.id)
     if not include_history:
-        q = q.where(Order.status.in_(OPEN_STATUSES))
+        # Open = resting book orders and un-triggered stops (both are still live and cancellable).
+        q = q.where(Order.status.in_(CANCELLABLE_STATUSES))
     q = q.order_by(Order.id.desc()).limit(100)
     return [_order_response(o, sym) for o, sym in (await db.execute(q)).all()]
 
@@ -213,3 +232,20 @@ async def refresh_market_maker(
     for sym in result:
         pubsub.publish(pubsub.market_channel(sym))
     return result
+
+
+@router.post("/dev/check-triggers")
+async def check_triggers(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, list[int]]:
+    """Run one stop-order sweep against live prices and fire what has crossed. Dev only.
+
+    The background monitor does this continuously; this lets a test drive it on demand.
+    """
+    _dev_only()
+    fired = await trading.sweep_triggers(db, marketmaker.fetch_reference_price)
+    await db.commit()
+    for sym in fired:
+        pubsub.publish(pubsub.market_channel(sym))
+    return fired

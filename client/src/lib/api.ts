@@ -203,6 +203,7 @@ export interface OrderRow {
   side: string;
   type: string;
   price: string | null;
+  trigger_price?: string | null;
   quantity: string;
   filled_quantity: string;
   status: string;
@@ -299,9 +300,10 @@ export const api = {
   placeOrder: (body: {
     symbol: string;
     side: "BUY" | "SELL";
-    type: "LIMIT" | "MARKET";
+    type: "LIMIT" | "MARKET" | "STOP_LIMIT" | "STOP_MARKET";
     quantity: string;
     price?: string | null;
+    trigger_price?: string | null;
   }) => request<OrderRow>("/trade/order", { method: "POST", body: JSON.stringify(body) }),
   cancelOrder: (id: number) => request<OrderRow>(`/trade/order/${id}`, { method: "DELETE" }),
   openOrders: () => request<OrderRow[]>("/trade/orders"),

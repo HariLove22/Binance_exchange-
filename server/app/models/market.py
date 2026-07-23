@@ -39,6 +39,14 @@ class OrderSide(str, enum.Enum):
 class OrderType(str, enum.Enum):
     LIMIT = "LIMIT"
     MARKET = "MARKET"
+    # Conditional orders. They rest OUTSIDE the book (no matching) until the reference price crosses
+    # the trigger, then they become a real LIMIT / MARKET order and match. Stop-loss and take-profit
+    # are the same mechanism — the difference is only which side of the current price the trigger is.
+    STOP_LIMIT = "STOP_LIMIT"
+    STOP_MARKET = "STOP_MARKET"
+
+
+STOP_TYPES = frozenset({OrderType.STOP_LIMIT, OrderType.STOP_MARKET})
 
 
 class OrderStatus(str, enum.Enum):
@@ -53,9 +61,14 @@ class OrderStatus(str, enum.Enum):
     FILLED = "FILLED"
     CANCELED = "CANCELED"
     REJECTED = "REJECTED"
+    # A stop order waiting for its trigger. Holds no locked funds and is not in the book; when the
+    # trigger fires it becomes NEW and goes through the normal lock+match path.
+    TRIGGER_PENDING = "TRIGGER_PENDING"
 
 
 OPEN_STATUSES = frozenset({OrderStatus.NEW, OrderStatus.PARTIALLY_FILLED})
+# Cancellable states: resting book orders and un-triggered stops.
+CANCELLABLE_STATUSES = OPEN_STATUSES | {OrderStatus.TRIGGER_PENDING}
 
 
 class Market(TimestampMixin, Base):
@@ -101,9 +114,16 @@ class Order(TimestampMixin, Base):
     side: Mapped[OrderSide] = mapped_column(str_enum(OrderSide, "order_side"), nullable=False)
     type: Mapped[OrderType] = mapped_column(str_enum(OrderType, "order_type"), nullable=False)
 
-    # NULL for MARKET orders. For LIMIT, the worst acceptable price.
+    # NULL for MARKET orders. For LIMIT (and STOP_LIMIT once triggered), the worst acceptable price.
     price: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     quantity: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+
+    # Stop orders only. `trigger_price` is the level that arms the order; `trigger_above` says which
+    # way the price must move to fire — True: fire when the reference price rises to/through the
+    # trigger, False: when it falls to/through it. Inferred from the price at placement, so a stop
+    # set below the market is a downside stop-loss and one above is an upside take-profit/breakout.
+    trigger_price: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
+    trigger_above: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     filled_quantity: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal(0))
 
     status: Mapped[OrderStatus] = mapped_column(
@@ -119,7 +139,14 @@ class Order(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_orders_quantity_positive"),
         CheckConstraint("filled_quantity >= 0 AND filled_quantity <= quantity", name="ck_orders_filled_range"),
-        CheckConstraint("(type = 'MARKET') OR (price IS NOT NULL AND price > 0)", name="ck_orders_limit_has_price"),
+        CheckConstraint(
+            "(type IN ('MARKET', 'STOP_MARKET')) OR (price IS NOT NULL AND price > 0)",
+            name="ck_orders_limit_has_price",
+        ),
+        CheckConstraint(
+            "(type IN ('STOP_LIMIT', 'STOP_MARKET')) = (trigger_price IS NOT NULL)",
+            name="ck_orders_stop_has_trigger",
+        ),
         # Finding the resting book for a symbol is the hot query on every order.
         Index("ix_orders_book", "market_id", "status", "side", "price", "id"),
         Index("ix_orders_user", "user_id", "id"),

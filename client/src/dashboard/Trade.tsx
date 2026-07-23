@@ -360,9 +360,11 @@ function OrderForm({
   livePrice: number | null;
   clickedPrice: string | null;
 }) {
-  const [type, setType] = useState<"LIMIT" | "MARKET">("LIMIT");
+  const [type, setType] = useState<"LIMIT" | "MARKET" | "STOP_LIMIT">("LIMIT");
   // One shared price for both sides (Binance shares the price row). Defaults to live, click-fills.
   const [price, setPrice] = useState("");
+  // Stop trigger, shared like price. Only used when type is STOP_LIMIT.
+  const [trigger, setTrigger] = useState("");
   const [note, setNote] = useState<string | null>(null);
 
   const base = market?.base ?? symbol.replace(/USDT$/, "");
@@ -373,26 +375,32 @@ function OrderForm({
 
   const availOf = (a: string) => Number(balances.find((b) => b.asset === a)?.available ?? "0");
 
+  const TABS = [["LIMIT", "Limit"], ["MARKET", "Market"], ["STOP_LIMIT", "Stop-Limit"]] as const;
+
   return (
     <>
       <div className="of-tabs">
-        {(["LIMIT", "MARKET"] as const).map((t) => (
-          <button key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{t === "LIMIT" ? "Limit" : "Market"}</button>
+        {TABS.map(([t, label]) => (
+          <button key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{label}</button>
         ))}
-        <span className="of-tab-note">no manual entry — price from the book, size from the slider</span>
+        <span className="of-tab-note">
+          {type === "STOP_LIMIT"
+            ? "arms at the trigger, then places your limit order"
+            : "no manual entry — price from the book, size from the slider"}
+        </span>
       </div>
 
       {/* Buy (green, left) and Sell (red, right) side by side, like Binance. */}
       <div className="of-cols">
         <SideForm
           side="BUY" type={type} symbol={symbol} base={base} quote={quote}
-          market={market} price={price} setPrice={setPrice} livePrice={livePrice}
-          available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
+          market={market} price={price} setPrice={setPrice} trigger={trigger} setTrigger={setTrigger}
+          livePrice={livePrice} available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
         />
         <SideForm
           side="SELL" type={type} symbol={symbol} base={base} quote={quote}
-          market={market} price={price} setPrice={setPrice} livePrice={livePrice}
-          available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
+          market={market} price={price} setPrice={setPrice} trigger={trigger} setTrigger={setTrigger}
+          livePrice={livePrice} available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
         />
       </div>
       {note && <p className="of-note">{note}</p>}
@@ -401,16 +409,18 @@ function OrderForm({
 }
 
 function SideForm({
-  side, type, symbol, base, quote, market, price, setPrice, livePrice, available, baseAvailable, onNote,
+  side, type, symbol, base, quote, market, price, setPrice, trigger, setTrigger, livePrice, available, baseAvailable, onNote,
 }: {
   side: "BUY" | "SELL";
-  type: "LIMIT" | "MARKET";
+  type: "LIMIT" | "MARKET" | "STOP_LIMIT";
   symbol: string;
   base: string;
   quote: string;
   market?: MarketInfo;
   price: string;
   setPrice: (p: string) => void;
+  trigger: string;
+  setTrigger: (t: string) => void;
   livePrice: number | null;
   available: number; // quote balance
   baseAvailable: number; // base balance
@@ -419,8 +429,11 @@ function SideForm({
   const [pct, setPct] = useState(0);
   const [busy, setBusy] = useState(false);
   const step = Number(market?.qty_step ?? "0.0001");
+  const isStop = type === "STOP_LIMIT";
+  // A stop-limit and a limit both rest at `price`; a market has no price.
+  const hasLimitPrice = type === "LIMIT" || isStop;
 
-  const refPrice = type === "LIMIT" && price ? Number(price) : livePrice ?? 0;
+  const refPrice = hasLimitPrice && price ? Number(price) : livePrice ?? 0;
   const maxQty = side === "BUY" ? (refPrice > 0 ? available / refPrice : 0) : baseAvailable;
   const qty = maxQty > 0 ? Math.floor((maxQty * (pct / 100)) / step) * step : 0;
   const qtyStr = qty > 0 ? String(Number(qty.toFixed(8))) : "";
@@ -429,11 +442,19 @@ function SideForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (qty <= 0) { onNote("choose an amount with the slider"); return; }
+    if (isStop && !trigger) { onNote("set a trigger price for the stop"); return; }
     setBusy(true);
     onNote("");
     try {
-      const o = await api.placeOrder({ symbol, side, type, quantity: qtyStr, price: type === "LIMIT" ? price : null });
-      onNote(`${side} ${o.status} — filled ${trimAmount(o.filled_quantity)}/${trimAmount(o.quantity)} ${base}`);
+      const o = await api.placeOrder({
+        symbol, side, type, quantity: qtyStr,
+        price: hasLimitPrice ? price : null,
+        trigger_price: isStop ? trigger : null,
+      });
+      const done = o.status === "TRIGGER_PENDING"
+        ? `${side} stop armed @ ${trimAmount(o.trigger_price ?? trigger)} — waiting for trigger`
+        : `${side} ${o.status} — filled ${trimAmount(o.filled_quantity)}/${trimAmount(o.quantity)} ${base}`;
+      onNote(done);
       setPct(0);
       window.dispatchEvent(new CustomEvent("orders-changed"));
       window.dispatchEvent(new CustomEvent("book-changed"));
@@ -446,8 +467,17 @@ function SideForm({
 
   return (
     <form className="of-col" onSubmit={submit}>
+      {isStop && (
+        <div className="of-field">
+          <label>Trigger</label>
+          <div className="of-input">
+            <input value={trigger} onChange={(e) => setTrigger(e.target.value)} inputMode="decimal" placeholder="0" />
+            <span className="of-unit">{quote}</span>
+          </div>
+        </div>
+      )}
       <div className="of-field">
-        <label>Price</label>
+        <label>{isStop ? "Limit" : "Price"}</label>
         {type === "MARKET" ? (
           <div className="of-market-px">Market</div>
         ) : (
@@ -669,7 +699,11 @@ function OpenOrders({ symbol, balances }: { symbol: string; balances: Balance[] 
             <div className="oo-r5" key={o.id}>
               <span className="mono">{o.symbol}</span>
               <span className={o.side === "BUY" ? "bid" : "ask"}>{o.side} {o.type}</span>
-              <span className="num">{o.price ? Number(o.price).toFixed(2) : "mkt"}</span>
+              <span className="num">
+                {o.status === "TRIGGER_PENDING" && o.trigger_price
+                  ? `⊳ ${Number(o.trigger_price).toFixed(2)}`
+                  : o.price ? Number(o.price).toFixed(2) : "mkt"}
+              </span>
               <span className="num">{trimAmount(o.quantity)}</span>
               <span className="num dim">{trimAmount(o.filled_quantity)}</span>
               <span className="num"><button className="cancel" onClick={() => cancel(o.id)}>Cancel</button></span>
