@@ -11,7 +11,7 @@ import {
   type TradeTick,
   type UniverseRow,
 } from "../lib/api";
-import { useTicker } from "../lib/useLive";
+import { useTicker, useTickers } from "../lib/useLive";
 import { TradeChart } from "./TradeChart";
 import "./trade.css";
 
@@ -137,7 +137,7 @@ export function Trade() {
 
         {/* ── bottom: open orders (full width) ── */}
         <section className="g-orders tp">
-          {tradeable ? <OpenOrders symbol={symbol} /> : (
+          {tradeable ? <OpenOrders symbol={symbol} balances={balances} /> : (
             <>
               <div className="tp-head"><span className="tp-title">Open orders</span></div>
               <p className="tp-empty">—</p>
@@ -511,6 +511,103 @@ function RecentTrades({ symbol }: { symbol: string }) {
 
 /* ------------------------------------------------------------ open orders */
 
+/* ----------------------------------------------------------------- positions */
+
+const QUOTE_ASSETS = new Set(["USDT", "USDC"]);
+
+interface Position {
+  asset: string;
+  symbol: string; // {asset}USDT
+  quantity: number;
+  avgEntry: number; // in USDT — average cost of what you still hold
+}
+
+/**
+ * Turn holdings into positions with an average entry price, computed from the user's fills by the
+ * average-cost method: a buy adds to quantity and cost; a sell removes quantity and a proportional
+ * slice of cost. What remains is the average price of what is still held. Spot has no leverage, so
+ * this is not a margin position — it is your holding, shown with a cost basis so P&L is meaningful.
+ */
+function computePositions(balances: Balance[], trades: MyTrade[]): Position[] {
+  // Oldest first, so the running average is built in order.
+  const chrono = [...trades].reverse();
+  const cost: Record<string, { qty: number; cost: number }> = {};
+
+  for (const t of chrono) {
+    const asset = t.symbol.replace(/USDT$/, "");
+    if (!t.symbol.endsWith("USDT")) continue;
+    const q = Number(t.quantity);
+    const p = Number(t.price);
+    const c = (cost[asset] ??= { qty: 0, cost: 0 });
+    if (t.side === "BUY") {
+      c.qty += q;
+      c.cost += q * p;
+    } else {
+      const avg = c.qty > 0 ? c.cost / c.qty : p;
+      c.qty = Math.max(0, c.qty - q);
+      c.cost = Math.max(0, c.cost - q * avg);
+    }
+  }
+
+  const out: Position[] = [];
+  for (const b of balances) {
+    if (QUOTE_ASSETS.has(b.asset)) continue;
+    const qty = Number(b.total);
+    if (qty <= 0) continue;
+    const c = cost[b.asset];
+    const avgEntry = c && c.qty > 0 ? c.cost / c.qty : 0;
+    out.push({ asset: b.asset, symbol: `${b.asset}USDT`, quantity: qty, avgEntry });
+  }
+  return out;
+}
+
+function PositionsTab({ positions, onClosed }: { positions: Position[]; onClosed: () => void }) {
+  const tickers = useTickers(positions.map((p) => p.symbol));
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function close(p: Position) {
+    // Closing a spot position is just a market sell of the whole holding.
+    setBusy(p.symbol);
+    try {
+      await api.placeOrder({ symbol: p.symbol, side: "SELL", type: "MARKET", quantity: String(p.quantity) });
+      window.dispatchEvent(new CustomEvent("orders-changed"));
+      window.dispatchEvent(new CustomEvent("book-changed"));
+      onClosed();
+    } catch { /* ignore */ } finally { setBusy(null); }
+  }
+
+  return (
+    <div className="oo-table">
+      <div className="pos-h"><span>Asset</span><span className="num">Amount</span><span className="num">Avg entry</span><span className="num">Mark</span><span className="num">Value</span><span className="num">Unrealized PnL</span><span></span></div>
+      {positions.length === 0 && <p className="tp-empty">No open positions. Buy an asset and it appears here with live P&L.</p>}
+      {positions.map((p) => {
+        const mark = tickers[p.symbol]?.price ?? 0;
+        const value = mark * p.quantity;
+        const pnl = p.avgEntry > 0 && mark > 0 ? (mark - p.avgEntry) * p.quantity : 0;
+        const pnlPct = p.avgEntry > 0 ? ((mark - p.avgEntry) / p.avgEntry) * 100 : 0;
+        const up = pnl >= 0;
+        return (
+          <div className="pos-r" key={p.asset}>
+            <span className="mono">{p.asset}</span>
+            <span className="num">{trimAmount(String(p.quantity))}</span>
+            <span className="num">{p.avgEntry > 0 ? p.avgEntry.toFixed(p.avgEntry < 1 ? 5 : 2) : "—"}</span>
+            <span className="num mono">{mark > 0 ? mark.toFixed(mark < 1 ? 5 : 2) : "…"}</span>
+            <span className="num">{value > 0 ? value.toFixed(2) : "—"}</span>
+            <span className={`num ${up ? "bid" : "ask"}`}>
+              {mark > 0 && p.avgEntry > 0 ? `${up ? "+" : ""}${pnl.toFixed(2)} (${up ? "+" : ""}${pnlPct.toFixed(2)}%)` : "—"}
+            </span>
+            <span className="num">
+              <button className="pos-close" onClick={() => close(p)} disabled={busy === p.symbol}>
+                {busy === p.symbol ? "…" : "Close"}
+              </button>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * The bottom panel, tabbed like Binance: Open Orders / Order History / Trade History.
  *
@@ -519,10 +616,10 @@ function RecentTrades({ symbol }: { symbol: string }) {
  * History (the order) and Trade History (the fills). This tabbed panel is what makes an executed
  * trade visible. Spot has no "positions" — after a buy you simply hold the asset, shown in Assets.
  */
-type OrdersTab = "open" | "history" | "trades";
+type OrdersTab = "positions" | "open" | "history" | "trades";
 
-function OpenOrders({ symbol }: { symbol: string }) {
-  const [tab, setTab] = useState<OrdersTab>("open");
+function OpenOrders({ symbol, balances }: { symbol: string; balances: Balance[] }) {
+  const [tab, setTab] = useState<OrdersTab>("positions");
   const [open, setOpen] = useState<OrderRow[]>([]);
   const [history, setHistory] = useState<OrderRow[]>([]);
   const [trades, setTrades] = useState<MyTrade[]>([]);
@@ -549,9 +646,13 @@ function OpenOrders({ symbol }: { symbol: string }) {
   const histRows = bySym(history);
   const tradeRows = bySym(trades);
 
+  // Holdings become "positions": non-quote assets you hold, with an average entry from your fills.
+  const positions = computePositions(balances, trades);
+
   return (
     <>
       <div className="oo-tabs">
+        <button className={tab === "positions" ? "on" : ""} onClick={() => setTab("positions")}>Positions ({positions.length})</button>
         <button className={tab === "open" ? "on" : ""} onClick={() => setTab("open")}>Open Orders ({openRows.length})</button>
         <button className={tab === "history" ? "on" : ""} onClick={() => setTab("history")}>Order History</button>
         <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trade History</button>
@@ -559,6 +660,8 @@ function OpenOrders({ symbol }: { symbol: string }) {
           <input type="checkbox" checked={allSymbols} onChange={(e) => setAllSymbols(e.target.checked)} /> all pairs
         </label>
       </div>
+
+      {tab === "positions" && <PositionsTab positions={positions} onClosed={load} />}
 
       {tab === "open" && (
         <div className="oo-table">

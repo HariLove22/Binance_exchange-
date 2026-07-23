@@ -221,3 +221,11 @@
 .status-filled { color: var(--bid); }
 .status-canceled, .status-rejected { color: #848e9c; }
 .status-new, .status-partially_filled { color: #f0b90b; }
+
+/* positions tab */
+.pos-h, .pos-r { display: grid; grid-template-columns: 1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.4fr 0.8fr; gap: 0.5rem; padding: 0.45rem 0.8rem; font-size: 0.77rem; align-items: center; }
+.pos-h { font-size: 0.64rem; text-transform: uppercase; color: #848e9c; border-bottom: 1px solid var(--line); }
+.pos-r { border-bottom: 1px solid rgba(148,163,184,0.06); font-variant-numeric: tabular-nums; }
+.pos-close { padding: 0.25rem 0.7rem; border: 1px solid var(--ask); border-radius: 5px; background: none; color: var(--ask); font: inherit; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
+.pos-close:hover:not(:disabled) { background: rgba(246,70,93,0.12); }
+.pos-close:disabled { opacity: 0.5; cursor: not-allowed; }
