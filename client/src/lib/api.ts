@@ -129,9 +129,53 @@ export interface FaucetResponse {
   available: string;
 }
 
+export interface OrderBookEntry {
+  order_id: number;
+  price: string;
+  quantity: string;
+  created_at: string;
+}
+export interface OrderBookResponse {
+  pair: string;
+  bids: OrderBookEntry[]; // price DESC — best (highest) buyer first
+  asks: OrderBookEntry[]; // price ASC  — best (lowest) seller first
+  best_bid: string | null;
+  best_ask: string | null;
+  spread: string | null;
+}
+
+export interface PlaceOrderBody {
+  side: "BUY" | "SELL";
+  price: string;
+  quantity: string;
+  pair?: string;
+}
+export interface FillOut {
+  maker_order_id: number;
+  price: string; // the maker's price
+  quantity: string;
+}
+export interface OrderOut {
+  order_id: number;
+  pair: string;
+  side: string;
+  price: string;
+  quantity: string;
+  filled_quantity: string;
+  status: string;
+  created_at: string;
+  fills: FillOut[];
+}
+
 export const api = {
   health: () => request<HealthResponse>("/health"),
   dbHealth: () => request<DbHealthResponse>("/health/db"),
+
+  orderbook: (pair = "BTC/USDT") =>
+    request<OrderBookResponse>(`/market/orderbook?pair=${encodeURIComponent(pair)}`),
+
+  placeOrder: (body: PlaceOrderBody) =>
+    request<OrderOut>("/orders", { method: "POST", body: JSON.stringify(body) }),
 
   balances: () => request<BalancesResponse>("/wallet/balances"),
   faucet: (asset: string, amount: string) =>

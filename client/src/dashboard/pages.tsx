@@ -93,7 +93,9 @@ export function Overview({ user }: { user: AuthUser }) {
           <p>Buy and sell crypto on the order book.</p>
           <div className="step-cta">
             {funded ? (
-              <button className="btn-outline-d">Trade (coming next)</button>
+              <button className="btn-gold" onClick={() => navigate("/dashboard/orders")}>
+                Go to order book
+              </button>
             ) : (
               <span className="step-pending">◷ Pending</span>
             )}

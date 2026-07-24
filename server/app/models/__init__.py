@@ -2,7 +2,9 @@
 Alembic autogenerate and create_all see the full schema from one place.
 """
 
+from app.models.order import Order
+from app.models.trade import Trade
 from app.models.user import User
 from app.models.wallet import Account, LedgerEntry, Transaction
 
-__all__ = ["User", "Account", "Transaction", "LedgerEntry"]
+__all__ = ["User", "Account", "Transaction", "LedgerEntry", "Order", "Trade"]

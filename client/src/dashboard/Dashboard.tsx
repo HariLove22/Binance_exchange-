@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 import { navigate } from "../router";
 import { Overview, Placeholder } from "./pages";
 import { Assets } from "./Assets";
+import { Orders } from "./Orders";
 import {
   IDeposit,
   IGear,
@@ -113,6 +114,8 @@ export function Dashboard({ path }: { path: string }) {
         <main className="dash-main">
           {seg === "" ? (
             <Overview user={user} />
+          ) : seg === "orders" ? (
+            <Orders />
           ) : seg === "assets" ? (
             <Assets />
           ) : (

@@ -35,3 +35,11 @@ def get_asset(symbol: str) -> Asset:
     if asset is None:
         raise UnknownAsset(f"unknown asset: {symbol}")
     return asset
+
+
+def split_pair(pair: str) -> tuple[Asset, Asset]:
+    """"BTC/USDT" -> (BTC, USDT). Quantities are in the base asset, prices in the quote."""
+    base, sep, quote = pair.partition("/")
+    if not sep:
+        raise UnknownAsset(f"malformed pair: {pair}")
+    return get_asset(base), get_asset(quote)

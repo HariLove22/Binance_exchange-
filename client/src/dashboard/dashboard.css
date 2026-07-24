@@ -555,6 +555,418 @@
   font-size: 0.78rem;
 }
 
+/* ---------- trade page / order book ---------- */
+.pair-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gold-2);
+}
+.trade-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+/* ---------- order form ---------- */
+.of {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 24rem;
+}
+.of-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.of-tab {
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.of-tab.buy.on {
+  background: rgba(14, 203, 129, 0.15);
+  border-color: var(--up);
+  color: var(--up);
+}
+.of-tab.sell.on {
+  background: rgba(246, 70, 93, 0.15);
+  border-color: var(--down);
+  color: var(--down);
+}
+.of-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.of-field > span {
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+.of-input {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 0.75rem;
+}
+.of-input:focus-within {
+  border-color: var(--gold);
+}
+.of-input input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-family: ui-monospace, Menlo, monospace;
+  padding: 0.65rem 0;
+}
+.of-input em {
+  font-style: normal;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  padding-left: 0.5rem;
+}
+.of-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 0.2rem;
+  font-size: 0.86rem;
+  color: var(--text-faint);
+}
+.of-total strong {
+  color: var(--text);
+  font-family: ui-monospace, Menlo, monospace;
+}
+.of-submit {
+  padding: 0.8rem;
+  border: none;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  color: #06120c;
+}
+.of-submit.buy {
+  background: var(--up);
+}
+.of-submit.sell {
+  background: var(--down);
+  color: #1a0509;
+}
+.of-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.of-msg {
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+.of-msg.err {
+  color: var(--down);
+}
+.of-msg.ok {
+  color: var(--up);
+}
+.of-msg.hint {
+  color: var(--text-faint);
+}
+
+.of-receipt {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 0.83rem;
+}
+.of-receipt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+.of-status {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--text-dim);
+}
+.of-status.filled {
+  background: rgba(14, 203, 129, 0.18);
+  color: var(--up);
+}
+.of-status.partially_filled {
+  background: rgba(240, 185, 11, 0.18);
+  color: var(--gold-2);
+}
+.of-receipt-line {
+  color: var(--text-dim);
+}
+.of-receipt-line.dim {
+  color: var(--text-faint);
+}
+.of-receipt-line.with-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.of-amount {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--text);
+  /* Never let the settled total wrap mid-number — a broken figure is unreadable. */
+  white-space: nowrap;
+}
+.of-amount em {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 0.76rem;
+  color: var(--text-faint);
+  margin-right: 0.35rem;
+}
+.of-fills {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  /* Two shared columns so every amount lines up on the right, whatever the quantity's
+     width. Each li re-uses them via subgrid, which keeps the list semantics that
+     `display: contents` would strip. */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 0.2rem;
+  column-gap: 0.75rem;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.79rem;
+  color: var(--up);
+}
+.of-fills li {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+}
+.of-fill-amt {
+  text-align: right;
+  /* Dimmer than the price so the fill itself stays the headline. */
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.ob-row.clickable {
+  cursor: pointer;
+}
+
+.ob {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 0;
+  font-variant-numeric: tabular-nums;
+}
+.ob-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.ob-head h2 {
+  font-size: 0.98rem;
+  margin: 0;
+}
+.ob-pair {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+.ob-refresh {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.ob-refresh:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+/* side filter: both / buy only / sell only */
+.ob-filter {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.6rem 1rem 0;
+}
+.ob-filter-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+  opacity: 0.5;
+}
+.ob-filter-btn:hover {
+  opacity: 1;
+  background: var(--surface-2);
+}
+.ob-filter-btn.on {
+  opacity: 1;
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+/* tooltip */
+.ob-filter-btn::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 5;
+}
+.ob-filter-btn:hover::after,
+.ob-filter-btn:focus-visible::after {
+  opacity: 1;
+}
+
+.ob-cols {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem 0.45rem;
+  font-size: 0.74rem;
+  color: var(--text-faint);
+}
+.ob-cols .r {
+  text-align: right;
+}
+
+.ob-side {
+  display: flex;
+  flex-direction: column;
+}
+.ob-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.24rem 1rem;
+  font-size: 0.82rem;
+  font-family: ui-monospace, Menlo, monospace;
+  cursor: default;
+}
+.ob-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+/* Depth bar: grows from the right, sits behind the numbers. */
+.ob-bar {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  opacity: 0.13;
+  pointer-events: none;
+}
+.ob-row.ask .ob-bar {
+  background: var(--down);
+}
+.ob-row.bid .ob-bar {
+  background: var(--up);
+}
+.ob-row.ask .ob-price {
+  color: var(--down);
+}
+.ob-row.bid .ob-price {
+  color: var(--up);
+}
+.ob-price {
+  position: relative;
+}
+.ob-qty,
+.ob-cum {
+  position: relative;
+  text-align: right;
+  color: var(--text-dim);
+}
+.ob-cum {
+  color: var(--text-faint);
+}
+
+.ob-spread {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin: 0.35rem 0;
+}
+.ob-last {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--up);
+  font-family: ui-monospace, Menlo, monospace;
+}
+.ob-spread-label {
+  font-size: 0.76rem;
+  color: var(--text-faint);
+}
+
+.ob-msg {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+.ob-msg.err {
+  color: var(--down);
+}
+
+@media (max-width: 900px) {
+  .trade-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- generic placeholder page ---------- */
 .placeholder {
   display: grid;

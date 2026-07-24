@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.routes import auth, health, wallet
+from app.api.routes import auth, health, market, orders, wallet
 from app.core.config import settings
 
 app = FastAPI(
@@ -42,6 +42,8 @@ async def database_error_handler(request: Request, exc: SQLAlchemyError) -> JSON
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(wallet.router, prefix=settings.api_v1_prefix)
+app.include_router(market.router, prefix=settings.api_v1_prefix)
+app.include_router(orders.router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/")
