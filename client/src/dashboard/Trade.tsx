@@ -1,0 +1,858 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  api,
+  ApiError,
+  trimAmount,
+  type Balance,
+  type MarketInfo,
+  type OrderBook,
+  type MyTrade,
+  type OrderRow,
+  type TradeTick,
+  type UniverseRow,
+} from "../lib/api";
+import { useTicker, useTickers } from "../lib/useLive";
+import { useMarketWs } from "../lib/marketWs";
+import { TradeChart } from "./TradeChart";
+import "./trade.css";
+
+const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
+
+/**
+ * Spot trading terminal, laid out like Binance: order book and our trades on the left, the chart
+ * and open orders in the centre, the order form on the right.
+ *
+ * Nobody types a price by hand. For a market order there is no price field at all — it fills at
+ * the live best bid/ask. For a limit order the price is pre-filled with the live price and a click
+ * on any order-book row sets it. Amount comes from a slider over the account's available balance.
+ * That is how a real terminal works, and what makes "trade from the selected account" concrete:
+ * the form only ever offers what the account actually holds.
+ */
+export function Trade() {
+  const [markets, setMarkets] = useState<MarketInfo[]>([]);
+  const [symbol, setSymbol] = useState("ETHUSDT");
+  const [interval, setInterval] = useState("1m");
+  const [balances, setBalances] = useState<Balance[]>([]);
+  const [clickedPrice, setClickedPrice] = useState<string | null>(null);
+
+  const loadBalances = useCallback(() => {
+    api.balances().then(setBalances).catch(() => setBalances([]));
+  }, []);
+  const loadMarkets = useCallback(() => {
+    return api.marketSymbols().then(setMarkets).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.marketSymbols().then((m) => {
+      setMarkets(m);
+      if (m.length && !m.find((x) => x.symbol === "ETHUSDT")) setSymbol(m[0].symbol);
+    }).catch(() => {});
+    loadBalances();
+  }, [loadBalances]);
+
+  useEffect(() => {
+    const h = () => loadBalances();
+    window.addEventListener("orders-changed", h);
+    return () => window.removeEventListener("orders-changed", h);
+  }, [loadBalances]);
+
+  const market = markets.find((m) => m.symbol === symbol);
+  const tradeable = market !== undefined; // only pairs we run a market for can be traded here
+  const ticker = useTicker(symbol);
+  const up = (ticker?.changePercent ?? 0) >= 0;
+
+  // Live order book + trades over our WebSocket (only for pairs we run a market for).
+  const { book, trades } = useMarketWs(tradeable ? symbol : null);
+
+  return (
+    <div className="trade">
+      <div className="term-grid">
+        {/* ── ticker bar (full width) ── */}
+        <div className="g-ticker tk-bar">
+          <div className="tk-symbol">
+            <span className="tk-name">{symbol.replace(/USDT$/, "")}<span className="tk-quote">/USDT</span></span>
+            {!tradeable && <span className="tk-viewonly">view only</span>}
+          </div>
+          {ticker ? (
+            <>
+              <span className={`tk-price ${up ? "bid" : "ask"}`}>{fmtPx(ticker.price)}</span>
+              <div className="tk-stats">
+                <span className={`tk-chg ${up ? "bid" : "ask"}`}>{up ? "+" : ""}{ticker.changePercent.toFixed(2)}%</span>
+                <span className="tk-s"><i>24h High</i>{fmtPx(ticker.high)}</span>
+                <span className="tk-s"><i>24h Low</i>{fmtPx(ticker.low)}</span>
+                <span className="tk-s"><i>24h Vol</i>{(ticker.quoteVolume / 1e6).toFixed(1)}M</span>
+                <span className="tk-live">● live</span>
+              </div>
+            </>
+          ) : (
+            <span className="tk-loading">connecting to live feed…</span>
+          )}
+          <div className="tk-spacer" />
+          <SeedLiquidity />
+        </div>
+
+        {/* ── left: order book + our trades ── */}
+        <aside className="g-left">
+          {tradeable ? (
+            <>
+              <OrderBookPanel book={book} onPick={setClickedPrice} live={ticker?.price ?? null} />
+              <RecentTrades symbol={symbol} trades={trades} />
+            </>
+          ) : (
+            <div className="tp fill">
+              <div className="tp-head"><span className="tp-title">Order book</span></div>
+              <p className="tp-empty">Not traded on this exchange — view only.</p>
+            </div>
+          )}
+        </aside>
+
+        {/* ── center top: chart ── */}
+        <section className="g-chart tp">
+          <div className="tp-head">
+            <span className="tp-title">{symbol}</span>
+            <div className="ivals">
+              {INTERVALS.map((i) => (
+                <button key={i} className={interval === i ? "on" : ""} onClick={() => setInterval(i)}>{i}</button>
+              ))}
+            </div>
+          </div>
+          <TradeChart symbol={symbol} interval={interval} />
+        </section>
+
+        {/* ── center bottom: order form ── */}
+        <section className="g-form tp">
+          {tradeable ? (
+            <OrderForm
+              market={market}
+              symbol={symbol}
+              balances={balances}
+              livePrice={ticker?.price ?? null}
+              clickedPrice={clickedPrice}
+            />
+          ) : (
+            <ListForTrading symbol={symbol} onListed={loadMarkets} />
+          )}
+        </section>
+
+        {/* ── right: full market universe ── */}
+        <aside className="g-market">
+          <MarketList current={symbol} onPick={setSymbol} />
+        </aside>
+
+        {/* ── bottom: open orders (full width) ── */}
+        <section className="g-orders tp">
+          {tradeable ? <OpenOrders symbol={symbol} balances={balances} /> : (
+            <>
+              <div className="tp-head"><span className="tp-title">Open orders</span></div>
+              <p className="tp-empty">—</p>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------- market list */
+
+function fmtPx(p: number): string {
+  if (p >= 1000) return p.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (p >= 1) return p.toFixed(2);
+  if (p >= 0.01) return p.toFixed(4);
+  return p.toPrecision(4);
+}
+
+/**
+ * The full Binance market universe, all segments, from /market/all. Pairs we list for trading are
+ * highlighted and come first; the rest are view-only. Prices refresh on a short poll (the whole
+ * universe is thousands of rows — too many for individual WebSocket subscriptions, so the snapshot
+ * is polled and the *selected* pair alone gets the live WS ticker in the header).
+ */
+function MarketList({ current, onPick }: { current: string; onPick: (s: string) => void }) {
+  const [segments, setSegments] = useState<string[]>(["USDT"]);
+  const [seg, setSeg] = useState("USDT");
+  const [rows, setRows] = useState<UniverseRow[]>([]);
+  const [q, setQ] = useState("");
+
+  const load = useCallback(() => {
+    api.marketUniverse(q ? undefined : seg, q || undefined)
+      .then((u) => { setRows(u.markets); if (u.segments.length) setSegments(u.segments); })
+      .catch(() => setRows([]));
+  }, [seg, q]);
+
+  useEffect(() => {
+    load();
+    const id = window.setInterval(load, 6000); // refresh prices
+    return () => window.clearInterval(id);
+  }, [load]);
+
+  return (
+    <div className="tp mkt-box">
+      <div className="mkt-search">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search all markets" />
+      </div>
+      <div className="mkt-tabs">
+        {segments.map((s) => (
+          <span key={s} className={!q && seg === s ? "on" : ""} onClick={() => { setQ(""); setSeg(s); }}>{s}</span>
+        ))}
+      </div>
+      <div className="mkt-cols"><span>Pair</span><span className="num">Price</span><span className="num">24h</span></div>
+      <div className="mkt-list">
+        {rows.length === 0 && <p className="tp-empty">loading markets…</p>}
+        {rows.map((m) => {
+          const up = m.change_percent >= 0;
+          return (
+            <button
+              key={m.symbol}
+              className={`mkt-row ${m.symbol === current ? "on" : ""} ${m.tradeable ? "tradeable" : ""}`}
+              onClick={() => onPick(m.symbol)}
+              title={m.tradeable ? "Tradeable here" : "View only — not listed for trading"}
+            >
+              <span className="mkt-name">
+                {m.tradeable && <span className="mkt-dot" />}
+                {m.base}<span className="mkt-quote">/{m.quote}</span>
+              </span>
+              <span className="num mono">{fmtPx(m.price)}</span>
+              <span className={`num ${up ? "bid" : "ask"}`}>{up ? "+" : ""}{m.change_percent.toFixed(2)}%</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ListForTrading({ symbol, onListed }: { symbol: string; onListed: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function list() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.listMarket(symbol);
+      await onListed(); // markets refresh → this pair becomes tradeable
+      window.dispatchEvent(new CustomEvent("book-changed"));
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="viewonly-form">
+      <p><b>{symbol}</b> is not listed for trading yet.</p>
+      <p className="viewonly-sub">
+        List it as a synthetic market — settled in USDT, quoted from the live price. (Synthetic
+        assets can be traded but not withdrawn; only USDT is custodial.)
+      </p>
+      <button className="of-submit buy" style={{ maxWidth: "16rem", margin: "0.5rem auto 0" }} onClick={list} disabled={busy}>
+        {busy ? "listing…" : `List ${symbol} for trading`}
+      </button>
+      {err && <p className="of-note" style={{ color: "#f6465d" }}>{err}</p>}
+    </div>
+  );
+}
+
+function SeedLiquidity() {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      className="seed-btn"
+      disabled={busy}
+      title="Dev: fund the market maker and re-quote around the live price"
+      onClick={async () => {
+        setBusy(true);
+        try { await api.refreshMarketMaker(); } catch { /* ignore */ }
+        finally { setBusy(false); window.dispatchEvent(new CustomEvent("book-changed")); }
+      }}
+    >
+      {busy ? "seeding…" : "Seed liquidity"}
+    </button>
+  );
+}
+
+/* ---------------------------------------------------------------- poll hook */
+
+function usePoll(fn: () => void, ms: number) {
+  const saved = useRef(fn);
+  saved.current = fn;
+  useEffect(() => {
+    saved.current();
+    const id = window.setInterval(() => saved.current(), ms);
+    const onChange = () => saved.current();
+    window.addEventListener("book-changed", onChange);
+    return () => { window.clearInterval(id); window.removeEventListener("book-changed", onChange); };
+  }, [ms]);
+}
+
+/* ------------------------------------------------------------------- book */
+
+function OrderBookPanel({
+  book, onPick, live,
+}: {
+  book: OrderBook | null;
+  onPick: (price: string) => void;
+  live: number | null;
+}) {
+  const maxTotal = Math.max(
+    ...(book?.asks ?? []).map((_, i, arr) => arr.slice(0, i + 1).reduce((s, l) => s + Number(l.quantity), 0)),
+    ...(book?.bids ?? []).map((_, i, arr) => arr.slice(0, i + 1).reduce((s, l) => s + Number(l.quantity), 0)),
+    1,
+  );
+  const cum = (arr: { quantity: string }[], i: number) => arr.slice(0, i + 1).reduce((s, l) => s + Number(l.quantity), 0);
+
+  const empty = book && book.asks.length === 0 && book.bids.length === 0;
+
+  return (
+    <div className="tp book-box">
+      <div className="tp-head"><span className="tp-title">Order book</span><span className="tp-sub">ours</span></div>
+      <div className="ob-cols"><span>Price(USDT)</span><span className="num">Amount</span><span className="num">Total</span></div>
+
+      {empty && <p className="tp-empty">no liquidity — press “Seed liquidity”</p>}
+
+      <div className="ob-asks">
+        {[...(book?.asks ?? [])].slice(0, 16).reverse().map((l, ri, rev) => {
+          const i = rev.length - 1 - ri;
+          const c = cum(book!.asks, i);
+          return (
+            <button className="ob-row ask" key={`a${l.price}`} onClick={() => onPick(l.price)} title="Click to set price">
+              <span className="bar ask" style={{ width: `${(c / maxTotal) * 100}%` }} />
+              <span className="px ask">{Number(l.price).toFixed(2)}</span>
+              <span className="num">{trimAmount(l.quantity)}</span>
+              <span className="num dim">{c.toFixed(3)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="ob-mid">
+        {live ? <span className={`ob-mid-px`}>{live.toFixed(2)}</span> : <span className="ob-mid-px">—</span>}
+        <span className="ob-mid-lbl">live price</span>
+      </div>
+
+      <div className="ob-bids">
+        {(book?.bids ?? []).slice(0, 16).map((l, i) => {
+          const c = cum(book!.bids, i);
+          return (
+            <button className="ob-row bid" key={`b${l.price}`} onClick={() => onPick(l.price)} title="Click to set price">
+              <span className="bar bid" style={{ width: `${(c / maxTotal) * 100}%` }} />
+              <span className="px bid">{Number(l.price).toFixed(2)}</span>
+              <span className="num">{trimAmount(l.quantity)}</span>
+              <span className="num dim">{c.toFixed(3)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------- form */
+
+function OrderForm({
+  market, symbol, balances, livePrice, clickedPrice,
+}: {
+  market?: MarketInfo;
+  symbol: string;
+  balances: Balance[];
+  livePrice: number | null;
+  clickedPrice: string | null;
+}) {
+  const [type, setType] = useState<"LIMIT" | "MARKET" | "STOP_LIMIT" | "OCO">("LIMIT");
+  // One shared price for both sides (Binance shares the price row). Defaults to live, click-fills.
+  const [price, setPrice] = useState("");
+  // Stop trigger, shared like price. Only used when type is STOP_LIMIT.
+  const [trigger, setTrigger] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+
+  const base = market?.base ?? symbol.replace(/USDT$/, "");
+  const quote = market?.quote ?? "USDT";
+
+  useEffect(() => { if (clickedPrice) setPrice(clickedPrice); }, [clickedPrice]);
+  useEffect(() => { setPrice((p) => (p === "" && livePrice ? livePrice.toFixed(2) : p)); }, [livePrice]);
+
+  const availOf = (a: string) => Number(balances.find((b) => b.asset === a)?.available ?? "0");
+
+  const TABS = [["LIMIT", "Limit"], ["MARKET", "Market"], ["STOP_LIMIT", "Stop-Limit"], ["OCO", "OCO"]] as const;
+  const noteFor: Record<string, string> = {
+    STOP_LIMIT: "arms at the trigger, then places your limit order",
+    OCO: "take-profit + stop-loss together — one fills, the other cancels",
+  };
+
+  return (
+    <>
+      <div className="of-tabs">
+        {TABS.map(([t, label]) => (
+          <button key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{label}</button>
+        ))}
+        <span className="of-tab-note">
+          {noteFor[type] ?? "no manual entry — price from the book, size from the slider"}
+        </span>
+      </div>
+
+      {type === "OCO" ? (
+        <OcoForm
+          symbol={symbol} base={base} quote={quote} market={market} livePrice={livePrice}
+          quoteAvailable={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
+        />
+      ) : (
+        /* Buy (green, left) and Sell (red, right) side by side, like Binance. */
+        <div className="of-cols">
+          <SideForm
+            side="BUY" type={type} symbol={symbol} base={base} quote={quote}
+            market={market} price={price} setPrice={setPrice} trigger={trigger} setTrigger={setTrigger}
+            livePrice={livePrice} available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
+          />
+          <SideForm
+            side="SELL" type={type} symbol={symbol} base={base} quote={quote}
+            market={market} price={price} setPrice={setPrice} trigger={trigger} setTrigger={setTrigger}
+            livePrice={livePrice} available={availOf(quote)} baseAvailable={availOf(base)} onNote={setNote}
+          />
+        </div>
+      )}
+      {note && <p className="of-note">{note}</p>}
+    </>
+  );
+}
+
+function OcoForm({
+  symbol, base, quote, market, livePrice, quoteAvailable, baseAvailable, onNote,
+}: {
+  symbol: string;
+  base: string;
+  quote: string;
+  market?: MarketInfo;
+  livePrice: number | null;
+  quoteAvailable: number;
+  baseAvailable: number;
+  onNote: (n: string) => void;
+}) {
+  const [side, setSide] = useState<"BUY" | "SELL">("SELL");
+  const [limit, setLimit] = useState("");     // take-profit leg
+  const [stop, setStop] = useState("");       // stop trigger
+  const [stopLimit, setStopLimit] = useState(""); // stop-loss leg's limit
+  const [pct, setPct] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const step = Number(market?.qty_step ?? "0.0001");
+
+  // Seed sensible bracket prices around the live price: SELL → +2% / -2%, BUY mirrored.
+  useEffect(() => {
+    if (!livePrice) return;
+    const up = (livePrice * 1.02).toFixed(2), down = (livePrice * 0.98).toFixed(2);
+    setLimit((v) => v || (side === "SELL" ? up : down));
+    setStop((v) => v || (side === "SELL" ? down : up));
+    setStopLimit((v) => v || (side === "SELL" ? (livePrice * 0.979).toFixed(2) : (livePrice * 1.021).toFixed(2)));
+  }, [livePrice, side]);
+
+  const limitPx = Number(limit) || 0;
+  const maxQty = side === "SELL" ? baseAvailable : (limitPx > 0 ? quoteAvailable / limitPx : 0);
+  const qty = maxQty > 0 ? Math.floor((maxQty * (pct / 100)) / step) * step : 0;
+  const qtyStr = qty > 0 ? String(Number(qty.toFixed(8))) : "";
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (qty <= 0) { onNote("choose an amount with the slider"); return; }
+    if (!limit || !stop || !stopLimit) { onNote("set limit, stop and stop-limit prices"); return; }
+    setBusy(true);
+    onNote("");
+    try {
+      const rows = await api.placeOco({
+        symbol, side, quantity: qtyStr, limit_price: limit, stop_price: stop, stop_limit_price: stopLimit,
+      });
+      onNote(`OCO placed — limit @ ${trimAmount(rows[0].price ?? limit)}, stop @ ${trimAmount(stop)}`);
+      setPct(0);
+      window.dispatchEvent(new CustomEvent("orders-changed"));
+      window.dispatchEvent(new CustomEvent("book-changed"));
+    } catch (err) {
+      onNote(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const avbl = side === "SELL" ? `${trimAmount(baseAvailable.toString())} ${base}` : `${quoteAvailable.toFixed(2)} ${quote}`;
+
+  return (
+    <form className="of-oco" onSubmit={submit}>
+      <div className="of-side-toggle">
+        <button type="button" className={side === "BUY" ? "buy on" : "buy"} onClick={() => setSide("BUY")}>Buy</button>
+        <button type="button" className={side === "SELL" ? "sell on" : "sell"} onClick={() => setSide("SELL")}>Sell</button>
+      </div>
+
+      <div className="of-field">
+        <label>Limit (take-profit)</label>
+        <div className="of-input"><input value={limit} onChange={(e) => setLimit(e.target.value)} inputMode="decimal" /><span className="of-unit">{quote}</span></div>
+      </div>
+      <div className="of-field">
+        <label>Stop (trigger)</label>
+        <div className="of-input"><input value={stop} onChange={(e) => setStop(e.target.value)} inputMode="decimal" /><span className="of-unit">{quote}</span></div>
+      </div>
+      <div className="of-field">
+        <label>Stop-limit</label>
+        <div className="of-input"><input value={stopLimit} onChange={(e) => setStopLimit(e.target.value)} inputMode="decimal" /><span className="of-unit">{quote}</span></div>
+      </div>
+      <div className="of-field">
+        <label>Amount</label>
+        <div className="of-input readonly"><input value={qtyStr} readOnly placeholder="0" /><span className="of-unit">{base}</span></div>
+      </div>
+
+      <div className="of-slider">
+        <input type="range" min={0} max={100} step={1} value={pct}
+               onChange={(e) => setPct(Number(e.target.value))} className={side.toLowerCase()} />
+        <div className="of-pcts">
+          {[0, 25, 50, 75, 100].map((p) => (
+            <button type="button" key={p} className={pct === p ? "on" : ""} onClick={() => setPct(p)}>{p}%</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="of-row"><span>Avbl</span><span className="mono">{avbl}</span></div>
+      <button className={`of-submit ${side.toLowerCase()}`} disabled={busy}>
+        {busy ? "…" : `Place OCO ${side === "BUY" ? "Buy" : "Sell"}`}
+      </button>
+    </form>
+  );
+}
+
+function SideForm({
+  side, type, symbol, base, quote, market, price, setPrice, trigger, setTrigger, livePrice, available, baseAvailable, onNote,
+}: {
+  side: "BUY" | "SELL";
+  type: "LIMIT" | "MARKET" | "STOP_LIMIT";
+  symbol: string;
+  base: string;
+  quote: string;
+  market?: MarketInfo;
+  price: string;
+  setPrice: (p: string) => void;
+  trigger: string;
+  setTrigger: (t: string) => void;
+  livePrice: number | null;
+  available: number; // quote balance
+  baseAvailable: number; // base balance
+  onNote: (n: string) => void;
+}) {
+  const [pct, setPct] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const step = Number(market?.qty_step ?? "0.0001");
+  const isStop = type === "STOP_LIMIT";
+  // A stop-limit and a limit both rest at `price`; a market has no price.
+  const hasLimitPrice = type === "LIMIT" || isStop;
+
+  const refPrice = hasLimitPrice && price ? Number(price) : livePrice ?? 0;
+  const maxQty = side === "BUY" ? (refPrice > 0 ? available / refPrice : 0) : baseAvailable;
+  const qty = maxQty > 0 ? Math.floor((maxQty * (pct / 100)) / step) * step : 0;
+  const qtyStr = qty > 0 ? String(Number(qty.toFixed(8))) : "";
+  const total = refPrice > 0 && qty > 0 ? refPrice * qty : 0;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (qty <= 0) { onNote("choose an amount with the slider"); return; }
+    if (isStop && !trigger) { onNote("set a trigger price for the stop"); return; }
+    setBusy(true);
+    onNote("");
+    try {
+      const o = await api.placeOrder({
+        symbol, side, type, quantity: qtyStr,
+        price: hasLimitPrice ? price : null,
+        trigger_price: isStop ? trigger : null,
+      });
+      const done = o.status === "TRIGGER_PENDING"
+        ? `${side} stop armed @ ${trimAmount(o.trigger_price ?? trigger)} — waiting for trigger`
+        : `${side} ${o.status} — filled ${trimAmount(o.filled_quantity)}/${trimAmount(o.quantity)} ${base}`;
+      onNote(done);
+      setPct(0);
+      window.dispatchEvent(new CustomEvent("orders-changed"));
+      window.dispatchEvent(new CustomEvent("book-changed"));
+    } catch (err) {
+      onNote(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="of-col" onSubmit={submit}>
+      {isStop && (
+        <div className="of-field">
+          <label>Trigger</label>
+          <div className="of-input">
+            <input value={trigger} onChange={(e) => setTrigger(e.target.value)} inputMode="decimal" placeholder="0" />
+            <span className="of-unit">{quote}</span>
+          </div>
+        </div>
+      )}
+      <div className="of-field">
+        <label>{isStop ? "Limit" : "Price"}</label>
+        {type === "MARKET" ? (
+          <div className="of-market-px">Market</div>
+        ) : (
+          <div className="of-input">
+            <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" />
+            <span className="of-unit">{quote}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="of-field">
+        <label>Amount</label>
+        <div className="of-input readonly">
+          <input value={qtyStr} readOnly placeholder="0" />
+          <span className="of-unit">{base}</span>
+        </div>
+      </div>
+
+      <div className="of-slider">
+        <input type="range" min={0} max={100} step={1} value={pct}
+               onChange={(e) => setPct(Number(e.target.value))} className={side.toLowerCase()} />
+        <div className="of-pcts">
+          {[0, 25, 50, 75, 100].map((p) => (
+            <button type="button" key={p} className={pct === p ? "on" : ""} onClick={() => setPct(p)}>{p}%</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="of-row"><span>Avbl</span><span className="mono">{side === "BUY" ? `${available.toFixed(2)} ${quote}` : `${trimAmount(baseAvailable.toString())} ${base}`}</span></div>
+      <div className="of-row"><span>Total</span><span className="mono">{total > 0 ? `${total.toFixed(2)} ${quote}` : `Min ${trimAmount(market?.min_notional ?? "5")} ${quote}`}</span></div>
+
+      <button className={`of-submit ${side.toLowerCase()}`} disabled={busy}>
+        {busy ? "…" : `${side === "BUY" ? "Buy" : "Sell"} ${base}`}
+      </button>
+    </form>
+  );
+}
+
+/* ---------------------------------------------------------------- trades */
+
+function RecentTrades({ symbol, trades }: { symbol: string; trades: TradeTick[] }) {
+  return (
+    <div className="tp trades-box">
+      <div className="tp-head"><span className="tp-title">Market trades</span><span className="tp-sub">ours · live</span></div>
+      <div className="mt-cols"><span>Price(USDT)</span><span className="num">Amount({symbol.replace(/USDT$/, "")})</span><span className="num">Time</span></div>
+      <div className="mt-list">
+        {trades.length === 0 && <p className="tp-empty">no trades yet</p>}
+        {trades.map((t) => (
+          <div className="mt-row" key={t.id}>
+            <span className={t.taker_side === "BUY" ? "px bid" : "px ask"}>{Number(t.price).toFixed(2)}</span>
+            <span className="num">{trimAmount(t.quantity)}</span>
+            <span className="num dim">{new Date(t.created_at).toLocaleTimeString("en-GB")}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ open orders */
+
+/* ----------------------------------------------------------------- positions */
+
+const QUOTE_ASSETS = new Set(["USDT", "USDC"]);
+
+interface Position {
+  asset: string;
+  symbol: string; // {asset}USDT
+  quantity: number;
+  avgEntry: number; // in USDT — average cost of what you still hold
+}
+
+/**
+ * Turn holdings into positions with an average entry price, computed from the user's fills by the
+ * average-cost method: a buy adds to quantity and cost; a sell removes quantity and a proportional
+ * slice of cost. What remains is the average price of what is still held. Spot has no leverage, so
+ * this is not a margin position — it is your holding, shown with a cost basis so P&L is meaningful.
+ */
+function computePositions(balances: Balance[], trades: MyTrade[]): Position[] {
+  // Oldest first, so the running average is built in order.
+  const chrono = [...trades].reverse();
+  const cost: Record<string, { qty: number; cost: number }> = {};
+
+  for (const t of chrono) {
+    const asset = t.symbol.replace(/USDT$/, "");
+    if (!t.symbol.endsWith("USDT")) continue;
+    const q = Number(t.quantity);
+    const p = Number(t.price);
+    const c = (cost[asset] ??= { qty: 0, cost: 0 });
+    if (t.side === "BUY") {
+      c.qty += q;
+      c.cost += q * p;
+    } else {
+      const avg = c.qty > 0 ? c.cost / c.qty : p;
+      c.qty = Math.max(0, c.qty - q);
+      c.cost = Math.max(0, c.cost - q * avg);
+    }
+  }
+
+  const out: Position[] = [];
+  for (const b of balances) {
+    if (QUOTE_ASSETS.has(b.asset)) continue;
+    const qty = Number(b.total);
+    if (qty <= 0) continue;
+    const c = cost[b.asset];
+    const avgEntry = c && c.qty > 0 ? c.cost / c.qty : 0;
+    out.push({ asset: b.asset, symbol: `${b.asset}USDT`, quantity: qty, avgEntry });
+  }
+  return out;
+}
+
+function PositionsTab({ positions, onClosed }: { positions: Position[]; onClosed: () => void }) {
+  const tickers = useTickers(positions.map((p) => p.symbol));
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function close(p: Position) {
+    // Closing a spot position is just a market sell of the whole holding.
+    setBusy(p.symbol);
+    try {
+      await api.placeOrder({ symbol: p.symbol, side: "SELL", type: "MARKET", quantity: String(p.quantity) });
+      window.dispatchEvent(new CustomEvent("orders-changed"));
+      window.dispatchEvent(new CustomEvent("book-changed"));
+      onClosed();
+    } catch { /* ignore */ } finally { setBusy(null); }
+  }
+
+  return (
+    <div className="oo-table">
+      <div className="pos-h"><span>Asset</span><span className="num">Amount</span><span className="num">Avg entry</span><span className="num">Mark</span><span className="num">Value</span><span className="num">Unrealized PnL</span><span></span></div>
+      {positions.length === 0 && <p className="tp-empty">No holdings yet. Buy an asset and it appears here with live P&L. Spot — you own the asset; there are no leveraged positions.</p>}
+      {positions.map((p) => {
+        const mark = tickers[p.symbol]?.price ?? 0;
+        const value = mark * p.quantity;
+        const pnl = p.avgEntry > 0 && mark > 0 ? (mark - p.avgEntry) * p.quantity : 0;
+        const pnlPct = p.avgEntry > 0 ? ((mark - p.avgEntry) / p.avgEntry) * 100 : 0;
+        const up = pnl >= 0;
+        return (
+          <div className="pos-r" key={p.asset}>
+            <span className="mono">{p.asset}</span>
+            <span className="num">{trimAmount(String(p.quantity))}</span>
+            <span className="num">{p.avgEntry > 0 ? p.avgEntry.toFixed(p.avgEntry < 1 ? 5 : 2) : "—"}</span>
+            <span className="num mono">{mark > 0 ? mark.toFixed(mark < 1 ? 5 : 2) : "…"}</span>
+            <span className="num">{value > 0 ? value.toFixed(2) : "—"}</span>
+            <span className={`num ${up ? "bid" : "ask"}`}>
+              {mark > 0 && p.avgEntry > 0 ? `${up ? "+" : ""}${pnl.toFixed(2)} (${up ? "+" : ""}${pnlPct.toFixed(2)}%)` : "—"}
+            </span>
+            <span className="num">
+              <button className="pos-close" onClick={() => close(p)} disabled={busy === p.symbol}>
+                {busy === p.symbol ? "…" : "Close"}
+              </button>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The bottom panel, tabbed like Binance: Open Orders / Order History / Trade History.
+ *
+ * A MARKET order fills instantly, so it never rests as an "open order" — it goes straight to
+ * FILLED. That is why a market buy does not appear under Open Orders; it appears under Order
+ * History (the order) and Trade History (the fills). This tabbed panel is what makes an executed
+ * trade visible. Spot has no "positions" — after a buy you simply hold the asset, shown in Assets.
+ */
+type OrdersTab = "positions" | "open" | "history" | "trades";
+
+function OpenOrders({ symbol, balances }: { symbol: string; balances: Balance[] }) {
+  const [tab, setTab] = useState<OrdersTab>("positions");
+  const [open, setOpen] = useState<OrderRow[]>([]);
+  const [history, setHistory] = useState<OrderRow[]>([]);
+  const [trades, setTrades] = useState<MyTrade[]>([]);
+  const [allSymbols, setAllSymbols] = useState(false);
+
+  const load = useCallback(() => {
+    api.openOrders().then(setOpen).catch(() => setOpen([]));
+    api.orderHistory().then(setHistory).catch(() => setHistory([]));
+    api.myTrades().then(setTrades).catch(() => setTrades([]));
+  }, []);
+  usePoll(load, 2500);
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener("orders-changed", h);
+    return () => window.removeEventListener("orders-changed", h);
+  }, [load]);
+
+  async function cancel(id: number) {
+    try { await api.cancelOrder(id); load(); window.dispatchEvent(new CustomEvent("book-changed")); } catch { /* ignore */ }
+  }
+
+  const bySym = <T extends { symbol: string }>(rows: T[]) => allSymbols ? rows : rows.filter((r) => r.symbol === symbol);
+  const openRows = bySym(open);
+  const histRows = bySym(history);
+  const tradeRows = bySym(trades);
+
+  // Holdings become "positions": non-quote assets you hold, with an average entry from your fills.
+  const positions = computePositions(balances, trades);
+
+  return (
+    <>
+      <div className="oo-tabs">
+        <button className={tab === "positions" ? "on" : ""} onClick={() => setTab("positions")}>Holdings ({positions.length})</button>
+        <button className={tab === "open" ? "on" : ""} onClick={() => setTab("open")}>Open Orders ({openRows.length})</button>
+        <button className={tab === "history" ? "on" : ""} onClick={() => setTab("history")}>Order History</button>
+        <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trade History</button>
+        <label className="oo-allsym">
+          <input type="checkbox" checked={allSymbols} onChange={(e) => setAllSymbols(e.target.checked)} /> all pairs
+        </label>
+      </div>
+
+      {tab === "positions" && <PositionsTab positions={positions} onClosed={load} />}
+
+      {tab === "open" && (
+        <div className="oo-table">
+          <div className="oo-h5"><span>Pair</span><span>Side</span><span className="num">Price</span><span className="num">Amount</span><span className="num">Filled</span><span></span></div>
+          {openRows.length === 0 && <p className="tp-empty">No open orders. Market orders fill instantly — see Trade History.</p>}
+          {openRows.map((o) => (
+            <div className="oo-r5" key={o.id}>
+              <span className="mono">{o.symbol}</span>
+              <span className={o.side === "BUY" ? "bid" : "ask"}>{o.side} {o.type}</span>
+              <span className="num">
+                {o.status === "TRIGGER_PENDING" && o.trigger_price
+                  ? `⊳ ${Number(o.trigger_price).toFixed(2)}`
+                  : o.price ? Number(o.price).toFixed(2) : "mkt"}
+              </span>
+              <span className="num">{trimAmount(o.quantity)}</span>
+              <span className="num dim">{trimAmount(o.filled_quantity)}</span>
+              <span className="num"><button className="cancel" onClick={() => cancel(o.id)}>Cancel</button></span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "history" && (
+        <div className="oo-table">
+          <div className="oo-h5"><span>Pair</span><span>Side</span><span className="num">Price</span><span className="num">Amount</span><span className="num">Filled</span><span>Status</span></div>
+          {histRows.length === 0 && <p className="tp-empty">no orders yet</p>}
+          {histRows.map((o) => (
+            <div className="oo-r5" key={o.id}>
+              <span className="mono">{o.symbol}</span>
+              <span className={o.side === "BUY" ? "bid" : "ask"}>{o.side} {o.type}</span>
+              <span className="num">{o.price ? Number(o.price).toFixed(2) : "mkt"}</span>
+              <span className="num">{trimAmount(o.quantity)}</span>
+              <span className="num dim">{trimAmount(o.filled_quantity)}</span>
+              <span className={`status-${o.status.toLowerCase()}`}>{o.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "trades" && (
+        <div className="oo-table">
+          <div className="oo-h5"><span>Pair</span><span>Side</span><span className="num">Price</span><span className="num">Amount</span><span>Role</span><span className="num">Time</span></div>
+          {tradeRows.length === 0 && <p className="tp-empty">no trades yet</p>}
+          {tradeRows.map((t) => (
+            <div className="oo-r5" key={t.id}>
+              <span className="mono">{t.symbol}</span>
+              <span className={t.side === "BUY" ? "bid" : "ask"}>{t.side}</span>
+              <span className="num">{Number(t.price).toFixed(2)}</span>
+              <span className="num">{trimAmount(t.quantity)}</span>
+              <span className="dim">{t.role}</span>
+              <span className="num dim">{new Date(t.created_at).toLocaleTimeString("en-GB")}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

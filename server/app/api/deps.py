@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.security import TokenError, decode_access_token
-from app.models.user import User
+from app.models.user import User, UserRole
 
 _bearer = HTTPBearer(auto_error=False)
 _WWW_AUTH = {"WWW-Authenticate": "Bearer"}
@@ -37,4 +37,16 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User no longer exists", headers=_WWW_AUTH)
 
+    return user
+
+
+async def admin_user(user: User = Depends(get_current_user)) -> User:
+    """Gate for admin-only routes. 403, not 404: the routes are in the public OpenAPI schema
+    anyway, and a wrong status makes a real permission problem look like a typo during an incident.
+
+    Role is never settable through any endpoint — an admin is made by an operator running SQL, so
+    privilege escalation stays entirely off the request path.
+    """
+    if user.role is not UserRole.ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
     return user

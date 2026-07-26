@@ -10,7 +10,7 @@ export function useBalances() {
     setError("");
     try {
       const res = await api.balances();
-      setBalances(res.balances);
+      setBalances(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load balances");
     } finally {

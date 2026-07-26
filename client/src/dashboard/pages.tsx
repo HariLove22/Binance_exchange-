@@ -1,7 +1,37 @@
-import type { AuthUser } from "../lib/api";
-import { ISpark } from "./icons";
+import { useEffect, useState } from "react";
+import { api, type AuthUser, type Balance } from "../lib/api";
+import { useTickers } from "../lib/useLive";
 import { navigate } from "../router";
-import { isNonZero, useBalances } from "./useBalances";
+
+// Assets valued at ~1 USDT without needing a live feed.
+const STABLE = new Set(["USDT", "USDC"]);
+
+/** Live portfolio value + 24h PnL in USDT, priced from the live Binance feed. */
+function usePortfolio(balances: Balance[] | null) {
+  // Value every non-stable holding via its USDT pair.
+  const symbols = (balances ?? [])
+    .filter((b) => !STABLE.has(b.asset) && Number(b.total) > 0)
+    .map((b) => `${b.asset}USDT`);
+  const tickers = useTickers(symbols);
+
+  let value = 0;
+  let pnl24h = 0;
+  for (const b of balances ?? []) {
+    const total = Number(b.total);
+    if (total <= 0) continue;
+    if (STABLE.has(b.asset)) {
+      value += total;
+      continue;
+    }
+    const t = tickers[`${b.asset}USDT`];
+    if (!t) continue;
+    const worth = total * t.price;
+    value += worth;
+    // Today's PnL: how much this holding's value moved over 24h, from its live change%.
+    pnl24h += worth - worth / (1 + t.changePercent / 100);
+  }
+  return { value, pnl24h, priced: symbols.every((s) => tickers[s]) };
+}
 
 function initial(user: AuthUser): string {
   return (user.full_name?.trim()?.[0] ?? user.email[0] ?? "U").toUpperCase();
@@ -17,9 +47,17 @@ function handle(user: AuthUser): string {
 }
 
 export function Overview({ user }: { user: AuthUser }) {
-  const { balances, loading } = useBalances();
-  const btc = balances.find((b) => b.asset === "BTC");
-  const funded = balances.some((b) => isNonZero(b.total));
+  const [balances, setBalances] = useState<Balance[] | null>(null);
+
+  useEffect(() => {
+    // Best-effort: the overview still renders if this fails; the Assets page surfaces errors.
+    api.balances().then(setBalances).catch(() => setBalances([]));
+  }, []);
+
+  const assetCount = balances?.filter((b) => b.total !== "0" && Number(b.available) + Number(b.locked) > 0).length ?? 0;
+  const funded = assetCount > 0;
+  const { value, pnl24h } = usePortfolio(balances);
+  const pnlUp = pnl24h >= 0;
 
   return (
     <div>
@@ -72,64 +110,54 @@ export function Overview({ user }: { user: AuthUser }) {
           </div>
         </div>
 
-        <div className={`step-card ${funded ? "" : "active"}`}>
+        <div className="step-card active">
           <span className="step-num">2</span>
-          <h3>{funded ? "Funds Added" : "Complete a Deposit to Start Your Trading Journey"}</h3>
-          <p>
-            {funded
-              ? "Your account is funded. You're ready to place your first order."
-              : "Add funds to your account to begin trading crypto on Novex."}
-          </p>
+          <h3>Complete a Deposit to Start Your Trading Journey</h3>
+          <p>Add funds to your account to begin trading crypto on Novex.</p>
           <div className="step-cta">
-            <button className="btn-gold" onClick={() => navigate("/dashboard/assets")}>
-              {funded ? "View assets" : "Deposit"}
-            </button>
+            <button className="btn-gold">Deposit</button>
           </div>
         </div>
 
-        <div className={`step-card ${funded ? "active" : ""}`}>
+        <div className="step-card">
           <span className="step-num">3</span>
           <h3>Trade</h3>
-          <p>Buy and sell crypto on the order book.</p>
+          <p>Buy and sell crypto once your deposit lands.</p>
           <div className="step-cta">
-            {funded ? (
-              <button className="btn-gold" onClick={() => navigate("/dashboard/orders")}>
-                Go to order book
-              </button>
-            ) : (
-              <span className="step-pending">◷ Pending</span>
-            )}
+            <span className="step-pending">◷ Pending</span>
           </div>
         </div>
       </div>
 
-      {/* balances — real numbers from the ledger */}
+      {/* balance — real, from the ledger, valued live from the Binance feed. */}
       <div className="balance-card">
         <div>
-          <div className="balance-label">BTC Balance</div>
+          <div className="balance-label">Est. Total Value ⓘ</div>
           <div className="balance-value">
-            {loading ? "…" : (btc?.total ?? "0.00000000")}
-            <span className="unit">BTC</span>
+            {balances === null ? "…" : value.toFixed(2)}
+            <span className="unit">USDT</span>
           </div>
           <div className="balance-sub">
-            {/* An "Est. Total Value" across assets needs a price feed — that arrives with trading. */}
-            {loading
-              ? " "
-              : balances.filter((b) => isNonZero(b.total) && b.asset !== "BTC").length > 0
-                ? balances
-                    .filter((b) => isNonZero(b.total) && b.asset !== "BTC")
-                    .map((b) => `${b.total} ${b.asset}`)
-                    .join(" · ")
-                : "No other holdings yet"}
+            {funded ? (
+              <>
+                Today's PnL{" "}
+                <span style={{ color: pnlUp ? "#0ecb81" : "#f6465d" }}>
+                  {pnlUp ? "+" : ""}{pnl24h.toFixed(2)} USDT
+                </span>{" "}
+                · live
+              </>
+            ) : (
+              "No funds yet — an admin can credit test funds"
+            )}
           </div>
         </div>
         <div className="balance-actions">
-          <button className="chip-ai">
-            <ISpark className="ic" style={{ width: 16, height: 16 }} /> How's the market today?
+          <button className="btn-gold" onClick={() => navigate("/dashboard/trade")}>
+            Trade
           </button>
-          <button className="btn-gold" onClick={() => navigate("/dashboard/assets")}>Deposit</button>
-          <button className="btn-outline-d">Withdraw</button>
-          <button className="btn-outline-d">Cash In</button>
+          <button className="btn-outline-d" onClick={() => navigate("/dashboard/assets")}>
+            Assets
+          </button>
         </div>
       </div>
     </div>

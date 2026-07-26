@@ -1,10 +1,75 @@
-"""SQLAlchemy models. Importing them here registers every table on Base.metadata so
-Alembic autogenerate and create_all see the full schema from one place.
+"""SQLAlchemy models.
+
+Every model module must be imported here. Alembic's autogenerate only sees what is attached to
+`Base.metadata` at import time, and a model it cannot see is one it will happily emit a
+`DROP TABLE` for. `alembic/env.py` imports this package for exactly that reason.
 """
 
-from app.models.order import Order
-from app.models.trade import Trade
-from app.models.user import User
-from app.models.wallet import Account, LedgerEntry, Transaction
+from app.models.asset import (
+    AddressModel,
+    Asset,
+    AssetKind,
+    AssetNetwork,
+    Chain,
+    ChainFamily,
+)
+from app.models.ledger import (
+    NEGATIVE_ALLOWED,
+    USER_ACCOUNT_TYPES,
+    Account,
+    AccountType,
+    LedgerEntry,
+    LedgerTransaction,
+    TransactionKind,
+)
+from app.models.market import (
+    CANCELLABLE_STATUSES,
+    Market,
+    OPEN_STATUSES,
+    Order,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    STOP_TYPES,
+    Trade,
+)
+from app.models.user import User, UserRole
+from app.models.wallet import (
+    Deposit,
+    DepositAddress,
+    DepositStatus,
+    Withdrawal,
+    WithdrawalStatus,
+)
 
-__all__ = ["User", "Account", "Transaction", "LedgerEntry", "Order", "Trade"]
+__all__ = [
+    "NEGATIVE_ALLOWED",
+    "USER_ACCOUNT_TYPES",
+    "Account",
+    "AccountType",
+    "AddressModel",
+    "Asset",
+    "AssetKind",
+    "AssetNetwork",
+    "Chain",
+    "ChainFamily",
+    "Deposit",
+    "DepositAddress",
+    "DepositStatus",
+    "CANCELLABLE_STATUSES",
+    "LedgerEntry",
+    "LedgerTransaction",
+    "Market",
+    "OPEN_STATUSES",
+    "Order",
+    "OrderSide",
+    "OrderStatus",
+    "OrderType",
+    "STOP_TYPES",
+    "Trade",
+    "TransactionKind",
+    "User",
+    "UserRole",
+    "Withdrawal",
+    "WithdrawalStatus",
+]

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, type OrderOut } from "../lib/api";
+import { api, ApiError, type OrderRow } from "../lib/api";
 import {
   isPositive,
   multiply,
@@ -40,7 +40,7 @@ export function OrderForm({
   const [quantity, setQuantity] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<OrderOut | null>(null);
+  const [result, setResult] = useState<OrderRow | null>(null);
 
   useEffect(() => {
     if (presetPrice) setPrice(sanitizeAmount(presetPrice));
@@ -60,7 +60,14 @@ export function OrderForm({
 
     setBusy(true);
     try {
-      const res = await api.placeOrder({ side, price, quantity, pair });
+      // The order book / matching engine speaks in symbols ("BTCUSDT"); the form in pairs.
+      const res = await api.placeOrder({
+        symbol: pair.replace("/", "").toUpperCase(),
+        side,
+        type: "LIMIT",
+        quantity,
+        price,
+      });
       setResult(res);
       setQuantity("");
       onPlaced?.();
@@ -150,7 +157,7 @@ export function OrderForm({
  * costs less than 3 x 50,300. The form's "Total" is the limit-price estimate; the number
  * here is what actually moved.
  */
-function Receipt({ order }: { order: OrderOut }) {
+function Receipt({ order }: { order: OrderRow }) {
   // order.side, not the form's `side` state — the tab may have been toggled since this
   // order was placed, and the receipt must describe the order it belongs to.
   const spent = order.side === "BUY";
@@ -159,7 +166,7 @@ function Receipt({ order }: { order: OrderOut }) {
   return (
     <div className="of-receipt">
       <div className="of-receipt-head">
-        <strong>#{order.order_id}</strong>
+        <strong>#{order.id}</strong>
         <span className={`of-status ${order.status.toLowerCase()}`}>{order.status}</span>
       </div>
 

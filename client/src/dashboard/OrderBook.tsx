@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type OrderBookEntry, type OrderBookResponse } from "../lib/api";
+import { api, ApiError, type DepthLevel, type OrderBook as OrderBookData } from "../lib/api";
 import { fromUnits, scaleOf, toUnits, trimZeros, withThousands } from "../lib/amount";
 
 type Row = {
-  order_id: number;
   price: string;
   quantity: string;
   cumulative: string; // running total of quantity, from the best price outwards
@@ -15,7 +14,7 @@ type Row = {
  * `side` arrives best-price-first, so the cumulative total grows away from the spread —
  * which is exactly what a taker would eat through if they kept walking the book.
  */
-function buildRows(side: OrderBookEntry[]): Row[] {
+function buildRows(side: DepthLevel[]): Row[] {
   if (side.length === 0) return [];
   const qScale = scaleOf(side[0].quantity);
 
@@ -27,13 +26,26 @@ function buildRows(side: OrderBookEntry[]): Row[] {
 
   const max = running; // the last cumulative is the largest
   return withTotals.map(({ entry, cum }) => ({
-    order_id: entry.order_id,
     price: entry.price,
     quantity: entry.quantity,
     cumulative: fromUnits(cum, qScale),
     // Number() only for a pixel width — never for money.
     depth: max > 0n ? Number((cum * 10000n) / max) / 100 : 0,
   }));
+}
+
+/** best ask − best bid, as a fixed-decimal string. Both sides arrive best-first. */
+function spreadOf(book: OrderBookData | null): string | null {
+  const ask = book?.asks[0]?.price;
+  const bid = book?.bids[0]?.price;
+  if (!ask || !bid) return null;
+  const s = Math.max(scaleOf(ask), scaleOf(bid));
+  return fromUnits(toUnits(ask, s) - toUnits(bid, s), s);
+}
+
+/** "BTC/USDT" -> "BTCUSDT": the form/page speak in pairs, the market API in symbols. */
+function toSymbol(pair: string): string {
+  return pair.replace("/", "").toUpperCase();
 }
 
 function priceText(p: string): string {
@@ -78,7 +90,7 @@ export function OrderBook({
   refreshToken?: number;
   onPriceClick?: (price: string) => void;
 }) {
-  const [book, setBook] = useState<OrderBookResponse | null>(null);
+  const [book, setBook] = useState<OrderBookData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("both");
@@ -86,7 +98,7 @@ export function OrderBook({
   const load = useCallback(async () => {
     setError("");
     try {
-      setBook(await api.orderbook(pair));
+      setBook(await api.orderBook(toSymbol(pair)));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not load the order book");
     } finally {
@@ -104,12 +116,14 @@ export function OrderBook({
   // Asks come back best(lowest)-first. Displayed reversed so the best ask sits at the bottom,
   // right against the spread — the standard exchange layout.
   const asks = buildRows(book?.asks ?? []).reverse();
+  const bestAsk = book?.asks[0]?.price ?? null;
+  const spread = spreadOf(book);
 
   return (
     <div className="ob">
       <div className="ob-head">
         <h2>Order Book</h2>
-        <span className="ob-pair">{book?.pair ?? pair}</span>
+        <span className="ob-pair">{book?.symbol ?? toSymbol(pair)}</span>
         <button className="ob-refresh" onClick={() => void load()} title="Reload">
           ⟳
         </button>
@@ -151,7 +165,7 @@ export function OrderBook({
               asks.map((r) => (
                 <div
                   className={`ob-row ask ${onPriceClick ? "clickable" : ""}`}
-                  key={r.order_id}
+                  key={r.price}
                   onClick={() => onPriceClick?.(r.price)}
                 >
                   <span className="ob-bar" style={{ width: `${r.depth}%` }} aria-hidden />
@@ -166,9 +180,9 @@ export function OrderBook({
 
           {/* Kept visible in every view — the last price is the reference point for both sides. */}
           <div className="ob-spread">
-            <span className="ob-last">{book?.best_ask ? priceText(book.best_ask) : "—"}</span>
+            <span className="ob-last">{bestAsk ? priceText(bestAsk) : "—"}</span>
             <span className="ob-spread-label">
-              Spread {book?.spread ? priceText(book.spread) : "—"}
+              Spread {spread ? priceText(spread) : "—"}
             </span>
           </div>
 
@@ -180,7 +194,7 @@ export function OrderBook({
               bids.map((r) => (
                 <div
                   className={`ob-row bid ${onPriceClick ? "clickable" : ""}`}
-                  key={r.order_id}
+                  key={r.price}
                   onClick={() => onPriceClick?.(r.price)}
                 >
                   <span className="ob-bar" style={{ width: `${r.depth}%` }} aria-hidden />
