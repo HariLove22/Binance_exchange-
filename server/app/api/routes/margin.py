@@ -27,7 +27,7 @@ from app.models import (
     OrderType,
     User,
 )
-from app.services import margin, pubsub
+from app.services import ledger, margin, pubsub
 from app.services.margin import MarginError
 from app.services.pricing import usd_price_of
 
@@ -118,6 +118,12 @@ class LoanRow(BaseModel):
     hourly_rate: str
 
 
+class MarginBalanceRow(BaseModel):
+    asset: str
+    available: str
+    locked: str
+
+
 class AccountResponse(BaseModel):
     id: int
     mode: str
@@ -132,12 +138,14 @@ class AccountResponse(BaseModel):
     margin_level: str | None
     health: str
     loans: list[LoanRow]
+    balances: list[MarginBalanceRow]
 
 
 async def _account_response(db: AsyncSession, account) -> AccountResponse:
     state = await margin.account_state(db, account, usd_price_of)
     loans = await margin.open_loans(db, account)
     symbols = {a.id: a.symbol for a in (await db.execute(select(Asset))).scalars().all()}
+    wallet_balances = await ledger.balances(db, account.user_id, wallet=account.wallet)
     return AccountResponse(
         id=account.id, mode=account.mode.value, symbol=account.symbol, tier=account.tier.value,
         max_leverage=_n(account.max_leverage), wallet=account.wallet,
@@ -150,6 +158,8 @@ async def _account_response(db: AsyncSession, account) -> AccountResponse:
                     accrued_interest=_n(ln.accrued_interest), owed=_n(ln.owed), hourly_rate=_n(ln.hourly_rate))
             for ln in loans
         ],
+        balances=[MarginBalanceRow(asset=b.symbol, available=_n(b.available), locked=_n(b.locked))
+                  for b in wallet_balances],
     )
 
 

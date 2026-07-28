@@ -418,6 +418,12 @@ export interface DemoAccount {
   holdings: DemoHoldingRow[];
 }
 
+export interface MarginBalanceRow {
+  asset: string;
+  available: string;
+  locked: string;
+}
+
 export interface MarginAccount {
   id: number;
   mode: string;
@@ -432,6 +438,7 @@ export interface MarginAccount {
   margin_level: string | null;
   health: string;
   loans: MarginLoanRow[];
+  balances: MarginBalanceRow[];
 }
 
 export interface P2PDispute {

@@ -5,7 +5,7 @@ import { Overview, Placeholder } from "./pages";
 import { Assets } from "./Assets";
 import { Trade } from "./Trade";
 import { P2P } from "./P2P";
-import { Margin } from "./Margin";
+import { MarginTrade } from "./MarginTrade";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
 import {
@@ -144,8 +144,8 @@ export function Dashboard({ path }: { path: string }) {
       </header>
 
       {/* The trading terminal takes the full width — hide the sidebar there, like Binance. */}
-      <div className={`dash-body ${seg === "trade" ? "full" : ""}`}>
-        {seg !== "trade" && (
+      <div className={`dash-body ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
+        {seg !== "trade" && seg !== "margin" && (
           <aside className="dash-side">
             {NAV.map((n) => {
               const Icon = n.icon;
@@ -163,7 +163,7 @@ export function Dashboard({ path }: { path: string }) {
           </aside>
         )}
 
-        <main className={`dash-main ${seg === "trade" ? "full" : ""}`}>
+        <main className={`dash-main ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
           {seg === "" ? (
             <Overview user={user} />
           ) : seg === "trade" ? (
@@ -171,7 +171,7 @@ export function Dashboard({ path }: { path: string }) {
           ) : seg === "p2p" ? (
             <P2P />
           ) : seg === "margin" ? (
-            <Margin />
+            <MarginTrade />
           ) : seg === "assets" ? (
             <Assets />
           ) : seg === "account" ? (
