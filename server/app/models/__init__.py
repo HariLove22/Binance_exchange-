@@ -16,11 +16,22 @@ from app.models.asset import (
 from app.models.ledger import (
     NEGATIVE_ALLOWED,
     USER_ACCOUNT_TYPES,
+    WALLET_MARGIN,
+    WALLET_SPOT,
     Account,
     AccountType,
     LedgerEntry,
     LedgerTransaction,
     TransactionKind,
+    isolated_wallet,
+)
+from app.models.margin import (
+    MarginAccount,
+    MarginAccountStatus,
+    MarginLoan,
+    MarginLoanStatus,
+    MarginMode,
+    MarginTier,
 )
 from app.models.market import (
     CANCELLABLE_STATUSES,
@@ -53,6 +64,9 @@ from app.models.wallet import (
 __all__ = [
     "NEGATIVE_ALLOWED",
     "USER_ACCOUNT_TYPES",
+    "WALLET_MARGIN",
+    "WALLET_SPOT",
+    "isolated_wallet",
     "Account",
     "AccountType",
     "AddressModel",
@@ -67,6 +81,12 @@ __all__ = [
     "CANCELLABLE_STATUSES",
     "LedgerEntry",
     "LedgerTransaction",
+    "MarginAccount",
+    "MarginAccountStatus",
+    "MarginLoan",
+    "MarginLoanStatus",
+    "MarginMode",
+    "MarginTier",
     "Market",
     "OPEN_STATUSES",
     "Order",

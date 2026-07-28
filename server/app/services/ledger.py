@@ -22,6 +22,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    NEGATIVE_ALLOWED,
+    WALLET_SPOT,
     Account,
     AccountType,
     Asset,
@@ -56,23 +58,30 @@ async def get_or_create_account(
     asset_id: int,
     account_type: AccountType,
     user_id: int | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> Account:
     """Fetch an account, creating it on first use.
 
     Lazy rather than pre-seeded: pre-creating every user × asset × type is tens of thousands of
     empty rows per user, all migrated whenever an asset is listed. The INSERT can lose a race, so
     a unique violation is handled by re-reading — checking first *is* the race.
+
+    `wallet` selects the sub-wallet (SPOT by default, MARGIN / MARGIN:{symbol} for margin). Spot and
+    margin balances of the same asset are different accounts.
     """
     stmt = select(Account).where(
         Account.asset_id == asset_id,
         Account.account_type == account_type,
+        Account.wallet == wallet,
         Account.user_id == user_id if user_id is not None else Account.user_id.is_(None),
     )
     account = (await db.execute(stmt)).scalar_one_or_none()
     if account is not None:
         return account
 
-    account = Account(user_id=user_id, asset_id=asset_id, account_type=account_type, balance=Decimal(0))
+    account = Account(
+        user_id=user_id, asset_id=asset_id, account_type=account_type, wallet=wallet, balance=Decimal(0)
+    )
     db.add(account)
     try:
         # Savepoint so a unique violation does not poison the caller's outer transaction.
@@ -138,10 +147,7 @@ async def post(
             )
         )
         m.account.balance = m.account.balance + m.amount
-        if m.account.balance < 0 and m.account.account_type not in {
-            AccountType.EXTERNAL,
-            AccountType.TDS_PAYABLE,
-        }:
+        if m.account.balance < 0 and m.account.account_type not in NEGATIVE_ALLOWED:
             raise LedgerError(
                 f"account {m.account.id} ({m.account.account_type.value}) would go negative"
             )
@@ -420,6 +426,110 @@ async def p2p_release_escrow(
         db,
         idempotency_key=idempotency_key,
         kind=TransactionKind.TRADE,
+        reference=reference,
+        movements=movements,
+    )
+
+
+async def transfer_wallet(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    from_wallet: str,
+    to_wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move a user's AVAILABLE funds from one sub-wallet to another (e.g. spot -> margin collateral).
+
+    Same asset, same user, both AVAILABLE — so it balances to zero. This is how collateral enters and
+    leaves a margin account without ever leaving the user's ownership.
+    """
+    if amount <= 0:
+        raise LedgerError("transfer amount must be positive")
+    if from_wallet == to_wallet:
+        raise LedgerError("source and destination wallets are the same")
+
+    src = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=from_wallet)
+    dst = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=to_wallet)
+    if src.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, src.balance)
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.MARGIN_TRANSFER,
+        reference=reference,
+        movements=[Movement(src, -amount), Movement(dst, amount)],
+    )
+
+
+async def margin_borrow(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Lend a margin borrower funds: their MARGIN AVAILABLE += amount, the pool goes negative.
+
+    The MARGIN_BORROWED pool is the exchange's lent-out liability in this asset; its magnitude is the
+    outstanding principal. Balances to zero — nothing is minted, the pool simply owes it out.
+    """
+    if amount <= 0:
+        raise LedgerError("borrow amount must be positive")
+
+    borrower = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    pool = await get_or_create_account(db, asset_id, AccountType.MARGIN_BORROWED)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.MARGIN_BORROW,
+        reference=reference,
+        movements=[Movement(pool, -amount), Movement(borrower, amount)],
+    )
+
+
+async def margin_repay(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    principal: Decimal,
+    interest: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Repay a margin loan: principal returns to the pool, interest becomes fee income.
+
+    MARGIN AVAILABLE -= principal+interest ; pool += principal ; FEE_INCOME += interest. Balances to
+    zero: the principal the pool lent comes back, and the interest is what the exchange earned.
+    """
+    if principal < 0 or interest < 0 or principal + interest <= 0:
+        raise LedgerError("bad repay amounts")
+
+    borrower = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    total = principal + interest
+    if borrower.balance < total:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), total, borrower.balance)
+
+    pool = await get_or_create_account(db, asset_id, AccountType.MARGIN_BORROWED)
+    movements = [Movement(borrower, -total), Movement(pool, principal)]
+    if interest > 0:
+        movements.append(Movement(await get_or_create_account(db, asset_id, AccountType.FEE_INCOME), interest))
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.MARGIN_INTEREST if interest > 0 else TransactionKind.MARGIN_BORROW,
         reference=reference,
         movements=movements,
     )
