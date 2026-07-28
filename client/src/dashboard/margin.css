@@ -1,0 +1,54 @@
+.mgn { max-width: 1000px; margin: 0 auto; padding: 1rem 1.2rem 2rem; color: #eaecef; }
+.mgn-head h1 { font-size: 1.4rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+.mgn-tag { font-size: 0.7rem; background: rgba(240,185,11,0.15); color: #f0b90b; padding: 0.15rem 0.5rem; border-radius: 4px; }
+.mgn-sub { color: #848e9c; font-size: 0.85rem; margin: 0.3rem 0 1rem; }
+.mgn-err { color: #f6465d; font-size: 0.85rem; }
+.mgn-note { color: #0ecb81; font-size: 0.85rem; }
+
+.mgn-open { border: 1px dashed #2b3139; border-radius: 10px; padding: 1.2rem; text-align: center; }
+.mgn-openform { display: flex; gap: 0.8rem; align-items: flex-end; justify-content: center; flex-wrap: wrap; margin-top: 0.8rem; }
+.mgn-openform label, .mgn-row select, .mgn-row input { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: #848e9c; }
+
+.mgn-health { background: #16191e; border: 1px solid #2b3139; border-radius: 12px; padding: 1.1rem; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+.mgn-level { display: flex; flex-direction: column; align-items: center; padding: 0.6rem 1.2rem; border-radius: 10px; min-width: 130px; }
+.mgn-level.good { background: rgba(14,203,129,0.1); }
+.mgn-level.warn { background: rgba(240,185,11,0.12); }
+.mgn-level.bad { background: rgba(246,70,93,0.14); }
+.mgn-level-label { font-size: 0.68rem; color: #848e9c; text-transform: uppercase; letter-spacing: 0.04em; }
+.mgn-level-val { font-size: 1.9rem; font-weight: 700; font-family: ui-monospace, monospace; }
+.mgn-level.good .mgn-level-val { color: #0ecb81; }
+.mgn-level.warn .mgn-level-val { color: #f0b90b; }
+.mgn-level.bad .mgn-level-val { color: #f6465d; }
+.mgn-level-tag { font-size: 0.7rem; text-transform: capitalize; color: #b7bdc6; }
+.mgn-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.8rem; flex: 1; }
+.mgn-stat { display: flex; flex-direction: column; gap: 0.2rem; }
+.mgn-stat span { font-size: 0.68rem; color: #848e9c; text-transform: uppercase; letter-spacing: 0.03em; }
+.mgn-stat b { font-size: 1rem; font-family: ui-monospace, monospace; }
+
+.mgn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 680px) { .mgn-grid { grid-template-columns: 1fr; } }
+.mgn-card { background: #16191e; border: 1px solid #2b3139; border-radius: 12px; padding: 1rem; }
+.mgn-card h3 { margin: 0 0 0.7rem; font-size: 1rem; }
+.mgn-hint, .mgn-check { font-size: 0.78rem; color: #848e9c; }
+.mgn-seg { display: inline-flex; background: #0d1117; border: 1px solid #2b3139; border-radius: 8px; padding: 3px; margin-bottom: 0.7rem; }
+.mgn-seg.sm { margin-bottom: 0; }
+.mgn-seg button { background: none; border: none; color: #848e9c; font: inherit; font-size: 0.8rem; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; }
+.mgn-seg button.on { background: #2b3139; color: #eaecef; }
+.mgn-seg button.buy.on { background: #0ecb81; color: #06121a; }
+.mgn-seg button.sell.on { background: #f6465d; color: #fff; }
+.mgn-row { display: flex; gap: 0.6rem; margin-bottom: 0.7rem; flex-wrap: wrap; align-items: center; }
+.mgn-row select, .mgn-row input { background: #0d1117; border: 1px solid #2b3139; border-radius: 6px; color: #eaecef; font: inherit; font-size: 0.85rem; padding: 0.5rem 0.6rem; flex: 1; min-width: 90px; }
+.mgn-check { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.7rem; }
+.mgn-check input { width: auto; }
+.mgn-primary { width: 100%; background: #f0b90b; color: #1e2026; border: none; border-radius: 8px; padding: 0.6rem; font-weight: 600; cursor: pointer; }
+.mgn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.mgn-primary.buy { background: #0ecb81; color: #06121a; }
+.mgn-primary.sell { background: #f6465d; color: #fff; }
+.mgn-order { margin-bottom: 1rem; }
+
+.mgn-loans { background: #16191e; border: 1px solid #2b3139; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+.mgn-loans h3 { margin: 0 0 0.6rem; font-size: 1rem; }
+.mgn-loan { display: flex; align-items: center; gap: 0.8rem; padding: 0.5rem 0; border-bottom: 1px solid #1c2127; }
+.mono { font-family: ui-monospace, monospace; }
+.dim { color: #848e9c; font-size: 0.8rem; flex: 1; }
+.mgn-mini { background: #2b3139; border: none; color: #eaecef; border-radius: 6px; padding: 0.35rem 0.8rem; font: inherit; font-size: 0.78rem; cursor: pointer; }

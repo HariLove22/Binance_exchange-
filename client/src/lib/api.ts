@@ -363,7 +363,46 @@ export const api = {
   p2pResolve: (id: number, inFavorOfBuyer: boolean) =>
     request<P2POrder>(`/p2p/orders/${id}/resolve`, { method: "POST", body: JSON.stringify({ in_favor_of_buyer: inFavorOfBuyer }) }),
   p2pDisputes: () => request<P2PDispute[]>("/p2p/admin/disputes"),
+
+  // margin
+  marginOpen: (body: { mode?: "CROSS" | "ISOLATED"; symbol?: string | null; tier?: "CLASSIC" | "PRO"; leverage?: string | null }) =>
+    request<MarginAccount>("/margin/account", { method: "POST", body: JSON.stringify(body) }),
+  marginAccount: (mode: "CROSS" | "ISOLATED" = "CROSS", symbol?: string) =>
+    request<MarginAccount>(`/margin/account?mode=${mode}${symbol ? `&symbol=${symbol}` : ""}`),
+  marginTransfer: (body: { mode?: string; symbol?: string | null; asset: string; amount: string; deposit: boolean }) =>
+    request<MarginAccount>("/margin/transfer", { method: "POST", body: JSON.stringify(body) }),
+  marginBorrow: (body: { mode?: string; symbol?: string | null; asset: string; amount: string }) =>
+    request<MarginAccount>("/margin/borrow", { method: "POST", body: JSON.stringify(body) }),
+  marginRepay: (body: { loan_id: number; amount: string }) =>
+    request<MarginAccount>("/margin/repay", { method: "POST", body: JSON.stringify(body) }),
+  marginOrder: (body: { mode?: string; symbol: string; side: "BUY" | "SELL"; type?: "LIMIT" | "MARKET"; quantity: string; price?: string | null; auto_borrow?: boolean }) =>
+    request<{ id: number; status: string; filled_quantity: string; quantity: string; wallet: string }>("/margin/order", { method: "POST", body: JSON.stringify(body) }),
 };
+
+export interface MarginLoanRow {
+  id: number;
+  asset: string;
+  principal: string;
+  accrued_interest: string;
+  owed: string;
+  hourly_rate: string;
+}
+
+export interface MarginAccount {
+  id: number;
+  mode: string;
+  symbol: string | null;
+  tier: string;
+  max_leverage: string;
+  wallet: string;
+  gross_usd: string;
+  debt_usd: string;
+  equity_usd: string;
+  max_borrow_usd: string;
+  margin_level: string | null;
+  health: string;
+  loans: MarginLoanRow[];
+}
 
 export interface P2PDispute {
   id: number;
