@@ -25,9 +25,11 @@ from app.core.security import (
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    ChangePasswordRequest,
     LoginRequest,
     MessageResponse,
     RegisterRequest,
+    UpdateProfileRequest,
     UserOut,
 )
 
@@ -98,6 +100,36 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> AuthR
 async def me(current: User = Depends(get_current_user)) -> UserOut:
     """Return the logged-in user. The client calls this on load to validate a stored token."""
     return UserOut.model_validate(current)
+
+
+@router.patch("/profile", response_model=UserOut)
+async def update_profile(
+    body: UpdateProfileRequest,
+    current: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserOut:
+    """Update the current user's editable profile fields. Email and role are not editable here."""
+    current.full_name = body.full_name
+    await db.commit()
+    await db.refresh(current)
+    return UserOut.model_validate(current)
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    current: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MessageResponse:
+    """Change the password after re-verifying the current one. Existing tokens stay valid — this is
+    a self-service change, not a compromise response."""
+    if not verify_password(body.current_password, current.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
+    if verify_password(body.new_password, current.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "New password must differ from the current one")
+    current.password_hash = hash_password(body.new_password)
+    await db.commit()
+    return MessageResponse(message="Password updated")
 
 
 # --- Email verification (wired, but disabled via settings.email_enabled) ----------------

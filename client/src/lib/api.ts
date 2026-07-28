@@ -245,6 +245,10 @@ export const api = {
   login: (body: LoginBody) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request<AuthUser>("/auth/me"),
+  updateProfile: (body: { full_name: string }) =>
+    request<AuthUser>("/auth/profile", { method: "PATCH", body: JSON.stringify(body) }),
+  changePassword: (body: { current_password: string; new_password: string }) =>
+    request<{ message: string }>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
 
   balances: () => request<Balance[]>("/wallet/balances"),
   networks: (asset?: string) =>
