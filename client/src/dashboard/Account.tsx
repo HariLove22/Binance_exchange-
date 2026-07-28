@@ -13,6 +13,7 @@ const DEMO_COINS = ["BTC", "ETH", "BNB", "SOL", "XRP"];
 export function Account() {
   const [ov, setOv] = useState<AccountOverview | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -25,14 +26,18 @@ export function Account() {
 
   return (
     <div className="accs">
+      {adding && <AddAccountModal ov={ov} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
       <div className="accs-head">
         <div>
           <h1>Accounts</h1>
           <p className="accs-sub">Your trading accounts and their estimated value.</p>
         </div>
-        <div className="accs-total">
-          <span>Estimated total (real)</span>
-          <b>${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b>
+        <div className="accs-head-right">
+          <button className="accs-add" onClick={() => setAdding(true)}>+ Add account</button>
+          <div className="accs-total">
+            <span>Estimated total (real)</span>
+            <b>${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b>
+          </div>
         </div>
       </div>
 
@@ -80,6 +85,132 @@ export function Account() {
 
         {/* Demo */}
         <DemoCard exists={ov?.demo.exists ?? false} totalUsd={ov?.demo.total_usd} onChange={load} />
+      </div>
+    </div>
+  );
+}
+
+type AcctOption = {
+  key: string; title: string; icon: string; iconClass: string;
+  leverage: string; minDeposit: string; interest: string; collateral: string; fees: string; note: string;
+  kind: "cross-classic" | "cross-pro" | "isolated" | "demo";
+};
+
+const ACCOUNT_OPTIONS: AcctOption[] = [
+  {
+    key: "cross-classic", title: "Cross Margin — Classic", icon: "⇄", iconClass: "margin",
+    leverage: "Up to 3x", minDeposit: "$10 equivalent", interest: "≈0.30% / day (accrued hourly)",
+    collateral: "Any supported asset · shared pool", fees: "0.10% maker / taker",
+    note: "One margin level across all pairs. Best for getting started.", kind: "cross-classic",
+  },
+  {
+    key: "cross-pro", title: "Cross Margin — Pro", icon: "⚡", iconClass: "pro",
+    leverage: "Up to 20x", minDeposit: "$100 equivalent", interest: "≈0.30% / day (accrued hourly)",
+    collateral: "Any supported asset · shared pool", fees: "0.10% maker / taker",
+    note: "Higher leverage for experienced traders. You choose the leverage.", kind: "cross-pro",
+  },
+  {
+    key: "isolated", title: "Isolated Margin", icon: "◫", iconClass: "iso",
+    leverage: "Up to 10x (per pair)", minDeposit: "$10 equivalent", interest: "≈0.30% / day (accrued hourly)",
+    collateral: "Ring-fenced to one pair", fees: "0.10% maker / taker",
+    note: "Losses are limited to a single pair's collateral. Pick a pair.", kind: "isolated",
+  },
+  {
+    key: "demo", title: "Demo Trading", icon: "🎮", iconClass: "demo",
+    leverage: "N/A (spot practice)", minDeposit: "Free · $10,000 virtual", interest: "None",
+    collateral: "Virtual funds only", fees: "0.10% simulated",
+    note: "Risk-free paper trading at live prices. Nothing real is ever touched.", kind: "demo",
+  },
+];
+
+const ISO_PAIRS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
+
+function AddAccountModal({ ov, onClose, onDone }: { ov: AccountOverview | null; onClose: () => void; onDone: () => void }) {
+  const [picked, setPicked] = useState<AcctOption | null>(null);
+  const [leverage, setLeverage] = useState("5");
+  const [pair, setPair] = useState(ISO_PAIRS[0]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const crossOpen = ov?.margin.open ?? false;
+  const demoExists = ov?.demo.exists ?? false;
+
+  function disabledReason(o: AcctOption): string | null {
+    if ((o.kind === "cross-classic" || o.kind === "cross-pro") && crossOpen) return "Cross account already open";
+    if (o.kind === "demo" && demoExists) return "Demo account already created";
+    return null;
+  }
+
+  async function create(o: AcctOption) {
+    setBusy(true); setErr(null);
+    try {
+      if (o.kind === "demo") await api.demoCreate();
+      else if (o.kind === "cross-classic") await api.marginOpen({ mode: "CROSS", tier: "CLASSIC", leverage: "3" });
+      else if (o.kind === "cross-pro") await api.marginOpen({ mode: "CROSS", tier: "PRO", leverage });
+      else await api.marginOpen({ mode: "ISOLATED", symbol: pair, tier: "PRO", leverage });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="aa-modal" onClick={onClose}>
+      <div className="aa-box" onClick={(e) => e.stopPropagation()}>
+        <div className="aa-head">
+          <h2>Add a trading account</h2>
+          <button className="aa-x" onClick={onClose}>✕</button>
+        </div>
+        <p className="aa-sub">Choose an account type. Each has its own leverage, funding, and risk profile.</p>
+
+        <div className="aa-grid">
+          {ACCOUNT_OPTIONS.map((o) => {
+            const reason = disabledReason(o);
+            const active = picked?.key === o.key;
+            return (
+              <div key={o.key} className={`aa-card ${active ? "active" : ""} ${reason ? "disabled" : ""}`}
+                   onClick={() => !reason && setPicked(o)}>
+                <div className="aa-card-top">
+                  <span className={`acc-icon ${o.iconClass}`}>{o.icon}</span>
+                  <h3>{o.title}</h3>
+                </div>
+                <ul className="aa-details">
+                  <li><span>Leverage</span><b>{o.leverage}</b></li>
+                  <li><span>Min deposit</span><b>{o.minDeposit}</b></li>
+                  <li><span>Interest</span><b>{o.interest}</b></li>
+                  <li><span>Collateral</span><b>{o.collateral}</b></li>
+                  <li><span>Trading fee</span><b>{o.fees}</b></li>
+                </ul>
+                <p className="aa-note">{o.note}</p>
+                {reason && <div className="aa-reason">{reason}</div>}
+              </div>
+            );
+          })}
+        </div>
+
+        {picked && !disabledReason(picked) && (
+          <div className="aa-config">
+            {picked.kind === "cross-pro" && (
+              <label>Leverage (1–20x)
+                <input value={leverage} onChange={(e) => setLeverage(e.target.value)} inputMode="decimal" />
+              </label>
+            )}
+            {picked.kind === "isolated" && (
+              <>
+                <label>Pair
+                  <select value={pair} onChange={(e) => setPair(e.target.value)}>{ISO_PAIRS.map((p) => <option key={p}>{p}</option>)}</select>
+                </label>
+                <label>Leverage (1–10x)
+                  <input value={leverage} onChange={(e) => setLeverage(e.target.value)} inputMode="decimal" />
+                </label>
+              </>
+            )}
+            {err && <p className="accs-err">{err}</p>}
+            <button className="acc-btn primary aa-create" disabled={busy} onClick={() => create(picked)}>
+              {busy ? "…" : `Create ${picked.title}`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
