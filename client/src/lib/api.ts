@@ -334,7 +334,60 @@ export const api = {
     request<ConvertQuote>("/wallet/convert/quote", { method: "POST", body: JSON.stringify(body) }),
   convertExecute: (body: { from_asset: string; to_asset: string; from_amount: string }) =>
     request<ConvertQuote>("/wallet/convert/execute", { method: "POST", body: JSON.stringify(body) }),
+
+  // P2P
+  p2pAds: (q: { asset?: string; fiat?: string; side?: "BUY" | "SELL" } = {}) => {
+    const p = new URLSearchParams();
+    if (q.asset) p.set("asset", q.asset);
+    if (q.fiat) p.set("fiat", q.fiat);
+    if (q.side) p.set("side", q.side);
+    const qs = p.toString();
+    return request<P2PAd[]>(`/p2p/ads${qs ? `?${qs}` : ""}`);
+  },
+  p2pPostAd: (body: {
+    side: "BUY" | "SELL"; asset: string; fiat: string; price: string;
+    min_fiat: string; max_fiat: string; total_qty: string; payment_methods: string; terms?: string | null;
+  }) => request<P2PAd>("/p2p/ads", { method: "POST", body: JSON.stringify(body) }),
+  p2pCloseAd: (id: number) => request<P2PAd>(`/p2p/ads/${id}/close`, { method: "POST" }),
+  p2pOpenOrder: (body: { ad_id: number; fiat_amount: string; payment_method: string }) =>
+    request<P2POrder>("/p2p/orders", { method: "POST", body: JSON.stringify(body) }),
+  p2pMyOrders: (openOnly = false) => request<P2POrder[]>(`/p2p/orders${openOnly ? "?open_only=true" : ""}`),
+  p2pMarkPaid: (id: number) => request<P2POrder>(`/p2p/orders/${id}/paid`, { method: "POST" }),
+  p2pRelease: (id: number) => request<P2POrder>(`/p2p/orders/${id}/release`, { method: "POST" }),
+  p2pCancel: (id: number) => request<P2POrder>(`/p2p/orders/${id}/cancel`, { method: "POST" }),
+  p2pDispute: (id: number) => request<P2POrder>(`/p2p/orders/${id}/dispute`, { method: "POST" }),
+  p2pResolve: (id: number, inFavorOfBuyer: boolean) =>
+    request<P2POrder>(`/p2p/orders/${id}/resolve`, { method: "POST", body: JSON.stringify({ in_favor_of_buyer: inFavorOfBuyer }) }),
 };
+
+export interface P2PAd {
+  id: number;
+  maker_id: number;
+  side: "BUY" | "SELL";
+  asset: string;
+  fiat: string;
+  price: string;
+  min_fiat: string;
+  max_fiat: string;
+  available_qty: string;
+  payment_methods: string[];
+  terms: string | null;
+  status: string;
+}
+
+export interface P2POrder {
+  id: number;
+  ad_id: number;
+  side_for_me: "BUY" | "SELL";
+  counterparty_id: number;
+  asset: string;
+  fiat: string;
+  price: string;
+  crypto_amount: string;
+  fiat_amount: string;
+  payment_method: string;
+  status: string;
+}
 
 export interface ConvertQuote {
   from_asset: string;

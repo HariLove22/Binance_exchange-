@@ -384,6 +384,47 @@ async def settle_trade(
     )
 
 
+async def p2p_release_escrow(
+    db: AsyncSession,
+    *,
+    seller_id: int,
+    buyer_id: int,
+    asset_id: int,
+    amount: Decimal,
+    fee: Decimal = Decimal(0),
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Release P2P escrow: the seller's LOCKED crypto goes to the buyer's AVAILABLE.
+
+    The fiat leg settles off-platform between the two people, so only the crypto moves on our books.
+    An optional platform fee is skimmed to FEE_INCOME. Balances to zero in the crypto asset:
+    seller.LOCKED -= amount ; buyer.AVAILABLE += amount - fee ; FEE_INCOME += fee.
+    """
+    if amount <= 0:
+        raise LedgerError("release amount must be positive")
+    if fee < 0 or fee >= amount:
+        raise LedgerError("fee must be non-negative and less than the amount")
+
+    seller_locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, seller_id)
+    buyer_avail = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, buyer_id)
+    if seller_locked.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, seller_locked.balance)
+
+    movements = [Movement(seller_locked, -amount), Movement(buyer_avail, amount - fee)]
+    if fee > 0:
+        movements.append(Movement(await get_or_create_account(db, asset_id, AccountType.FEE_INCOME), fee))
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.TRADE,
+        reference=reference,
+        movements=movements,
+    )
+
+
 @dataclass(frozen=True)
 class Balance:
     asset_id: int

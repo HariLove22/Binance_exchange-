@@ -33,6 +33,14 @@ from app.models.market import (
     STOP_TYPES,
     Trade,
 )
+from app.models.p2p import (
+    P2P_OPEN_STATUSES,
+    P2PAd,
+    P2PAdStatus,
+    P2POrder,
+    P2POrderStatus,
+    P2PSide,
+)
 from app.models.user import User, UserRole
 from app.models.wallet import (
     Deposit,
@@ -65,6 +73,12 @@ __all__ = [
     "OrderSide",
     "OrderStatus",
     "OrderType",
+    "P2P_OPEN_STATUSES",
+    "P2PAd",
+    "P2PAdStatus",
+    "P2POrder",
+    "P2POrderStatus",
+    "P2PSide",
     "STOP_TYPES",
     "Trade",
     "TransactionKind",
