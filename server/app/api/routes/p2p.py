@@ -187,14 +187,16 @@ async def close_ad(ad_id: int, user: User = Depends(get_current_user), db: Async
 
 # --- orders ---------------------------------------------------------------------------------------
 
-async def _order_action(db, action, user_id: int, **kwargs) -> OrderResponse:
+async def _order_action(db, action, viewer_id: int, **kwargs) -> OrderResponse:
+    # `viewer_id` is only who to render the response for; the service's own user_id/taker_id/admin
+    # arrives via kwargs. Keep this param name distinct from those so they never collide.
     try:
         order = await action(db, **kwargs)
     except P2PError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     asset = await db.get(Asset, order.asset_id)
     await db.commit()
-    return _order_response(order, asset.symbol, user_id)
+    return _order_response(order, asset.symbol, viewer_id)
 
 
 @router.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
