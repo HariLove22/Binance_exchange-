@@ -30,6 +30,7 @@ from app.models import (
     CANCELLABLE_STATUSES,
     OPEN_STATUSES,
     STOP_TYPES,
+    WALLET_SPOT,
     Market,
     Order,
     OrderSide,
@@ -133,6 +134,7 @@ async def place_order(
     order_type: OrderType,
     quantity: Decimal,
     price: Decimal | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> PlacedOrder:
     if not market.enabled:
         raise TradingError("market is not open for trading")
@@ -143,6 +145,7 @@ async def place_order(
     order = Order(
         user_id=user_id, market_id=market.id, side=side, type=order_type, price=price,
         quantity=quantity, filled_quantity=Decimal(0), status=OrderStatus.NEW, locked_remaining=Decimal(0),
+        wallet=wallet,
     )
     db.add(order)
     await db.flush()
@@ -185,7 +188,7 @@ async def _activate(db: AsyncSession, order: Order, market: Market) -> list[Trad
     try:
         await ledger.lock(
             db, user_id=order.user_id, asset_id=locked_asset_id, amount=lock_amount,
-            idempotency_key=f"order-lock:{order.id}", reference=f"order={order.id}",
+            idempotency_key=f"order-lock:{order.id}", reference=f"order={order.id}", wallet=order.wallet,
         )
     except InsufficientFunds as exc:
         raise TradingError(str(exc)) from exc
@@ -450,6 +453,8 @@ async def _execute_fill(db: AsyncSession, market: Market, *, taker: Order, taker
         quantity=qty,
         buyer_fee=buyer_fee,
         seller_fee=seller_fee,
+        buyer_wallet=buyer.wallet,
+        seller_wallet=seller.wallet,
         idempotency_key=f"trade:{trade.id}",
         reference=f"trade={trade.id}",
     )
@@ -489,6 +494,7 @@ async def _release_lock(db: AsyncSession, order: Order) -> None:
         asset_id=order.locked_asset_id,
         amount=order.locked_remaining,
         idempotency_key=f"order-unlock:{order.id}",
+        wallet=order.wallet,
     )
     order.locked_remaining = Decimal(0)
 

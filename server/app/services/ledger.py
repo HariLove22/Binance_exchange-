@@ -194,19 +194,20 @@ async def lock(
     amount: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
-    """Reserve funds against an open order: AVAILABLE -> LOCKED.
+    """Reserve funds against an open order: AVAILABLE -> LOCKED, within one sub-wallet.
 
     Must happen before the order reaches the matching engine, never after. The engine has no
     database and cannot check balances, so an unfunded order reaching it produces a trade the
     ledger cannot settle — after the counterparty has been told they filled. The funds stay the
-    user's; they are just not spendable twice.
+    user's; they are just not spendable twice. `wallet` keeps a margin order's lock off spot funds.
     """
     if amount <= 0:
         raise LedgerError("lock amount must be positive")
 
-    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
-    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id, wallet=wallet)
     if available.balance < amount:
         asset = await db.get(Asset, asset_id)
         raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, available.balance)
@@ -228,13 +229,14 @@ async def unlock(
     amount: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
-    """Release a reservation on cancel or expiry: LOCKED -> AVAILABLE."""
+    """Release a reservation on cancel or expiry: LOCKED -> AVAILABLE, within one sub-wallet."""
     if amount <= 0:
         raise LedgerError("unlock amount must be positive")
 
-    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
-    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id, wallet=wallet)
     if locked.balance < amount:
         asset = await db.get(Asset, asset_id)
         raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, locked.balance)
@@ -353,6 +355,8 @@ async def settle_trade(
     seller_fee: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    buyer_wallet: str = WALLET_SPOT,
+    seller_wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
     """Settle one fill: the buyer gets base, the seller gets quote, each pays a fee on what they
     receive. Both sides' funds are already LOCKED (buyer's quote, seller's base).
@@ -361,14 +365,15 @@ async def settle_trade(
         base  (seller.LOCKED -> buyer.AVAILABLE, minus buyer's fee to FEE_INCOME)
 
     Sums to zero in each asset independently. Fees are taken from the received side, exactly as
-    Binance does — the buyer pays their fee in base, the seller in quote.
+    Binance does — the buyer pays their fee in base, the seller in quote. Each side settles in its
+    own wallet, so a margin taker and a spot maker fill against each other cleanly.
     """
     quote_amount = price * quantity
 
-    buyer_quote_locked = await get_or_create_account(db, quote_asset_id, AccountType.LOCKED, buyer_id)
-    seller_quote_avail = await get_or_create_account(db, quote_asset_id, AccountType.AVAILABLE, seller_id)
-    seller_base_locked = await get_or_create_account(db, base_asset_id, AccountType.LOCKED, seller_id)
-    buyer_base_avail = await get_or_create_account(db, base_asset_id, AccountType.AVAILABLE, buyer_id)
+    buyer_quote_locked = await get_or_create_account(db, quote_asset_id, AccountType.LOCKED, buyer_id, wallet=buyer_wallet)
+    seller_quote_avail = await get_or_create_account(db, quote_asset_id, AccountType.AVAILABLE, seller_id, wallet=seller_wallet)
+    seller_base_locked = await get_or_create_account(db, base_asset_id, AccountType.LOCKED, seller_id, wallet=seller_wallet)
+    buyer_base_avail = await get_or_create_account(db, base_asset_id, AccountType.AVAILABLE, buyer_id, wallet=buyer_wallet)
 
     movements = [
         Movement(buyer_quote_locked, -quote_amount),

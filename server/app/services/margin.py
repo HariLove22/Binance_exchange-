@@ -25,15 +25,18 @@ from app.models import (
     Account,
     AccountType,
     Asset,
+    Market,
     MarginAccount,
     MarginAccountStatus,
     MarginLoan,
     MarginLoanStatus,
     MarginMode,
     MarginTier,
+    OrderSide,
+    OrderType,
     WALLET_SPOT,
 )
-from app.services import ledger
+from app.services import ledger, trading
 from app.services.ledger import InsufficientFunds, LedgerError
 
 PriceOf = Callable[[str], Awaitable[Decimal | None]]
@@ -309,3 +312,69 @@ async def repay(
     if loan.owed == 0:
         loan.status = MarginLoanStatus.REPAID
     return loan
+
+
+# --- margin trading -------------------------------------------------------------------------------
+
+async def _price_in_quote(base_symbol: str, quote_symbol: str, price_of: PriceOf) -> Decimal | None:
+    """Convert a base asset's USD price into units of the quote asset (usually ~1 for USDT)."""
+    base_usd = await price_of(base_symbol)
+    quote_usd = await price_of(quote_symbol)
+    if base_usd is None or quote_usd is None or quote_usd == 0:
+        return None
+    return base_usd / quote_usd
+
+
+async def place_margin_order(
+    db: AsyncSession,
+    *,
+    account: MarginAccount,
+    market: Market,
+    side: OrderSide,
+    order_type: OrderType,
+    quantity: Decimal,
+    price: Decimal | None,
+    price_of: PriceOf,
+    now: datetime,
+    auto_borrow: bool = True,
+) -> trading.PlacedOrder:
+    """Place an order that trades from this margin account's wallet.
+
+    With `auto_borrow`, any shortfall in the funds the order needs is borrowed first (within the
+    leverage limit): a buy borrows quote, a sell borrows base — so a sell you can't cover becomes a
+    short. The order then locks and settles entirely in the margin wallet, never touching spot.
+    """
+    if account.status is not MarginAccountStatus.ACTIVE:
+        raise MarginError("margin account is not active")
+    if account.mode is MarginMode.ISOLATED and account.symbol != market.symbol:
+        raise MarginError("this isolated account does not trade that pair")
+
+    base = await db.get(Asset, market.base_asset_id)
+    quote = await db.get(Asset, market.quote_asset_id)
+
+    # What the order will need locked, and in which asset.
+    if side is OrderSide.BUY:
+        need_asset_id, need_symbol = market.quote_asset_id, quote.symbol
+        px = price if (order_type is OrderType.LIMIT and price) else await _price_in_quote(base.symbol, quote.symbol, price_of)
+        if px is None:
+            raise MarginError("no price to size the borrow")
+        required = px * quantity
+    else:
+        need_asset_id, need_symbol = market.base_asset_id, base.symbol
+        required = quantity
+
+    if auto_borrow:
+        avail = (await ledger.get_or_create_account(
+            db, need_asset_id, AccountType.AVAILABLE, account.user_id, wallet=account.wallet
+        )).balance
+        if avail < required:
+            await borrow(db, account=account, asset_id=need_asset_id, amount=required - avail,
+                         price_of=price_of, now=now)
+
+    try:
+        return await trading.place_order(
+            db, user_id=account.user_id, market=market, side=side, order_type=order_type,
+            quantity=quantity, price=price, wallet=account.wallet,
+        )
+    except trading.TradingError as exc:
+        raise MarginError(str(exc)) from exc
