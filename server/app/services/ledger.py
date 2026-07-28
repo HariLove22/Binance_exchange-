@@ -540,6 +540,35 @@ async def margin_repay(
     )
 
 
+async def collect_fee(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    kind: TransactionKind = TransactionKind.FEE,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Take a fee from a user's AVAILABLE (in `wallet`) into FEE_INCOME. Used for liquidation fees."""
+    if amount <= 0:
+        raise LedgerError("fee amount must be positive")
+    src = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    if src.balance < amount:
+        amount = src.balance  # never take more than is there; the insurance fund covers any shortfall
+    if amount <= 0:
+        return None
+    fee_income = await get_or_create_account(db, asset_id, AccountType.FEE_INCOME)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=kind,
+        reference=reference,
+        movements=[Movement(src, -amount), Movement(fee_income, amount)],
+    )
+
+
 @dataclass(frozen=True)
 class Balance:
     asset_id: int

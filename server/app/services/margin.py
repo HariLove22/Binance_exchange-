@@ -15,7 +15,7 @@ tests stay deterministic. Health/liquidation build on `account_state` in a later
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from typing import Awaitable, Callable
 
 from sqlalchemy import select
@@ -378,3 +378,110 @@ async def place_margin_order(
         )
     except trading.TradingError as exc:
         raise MarginError(str(exc)) from exc
+
+
+# --- health & liquidation -------------------------------------------------------------------------
+
+# Margin level (gross assets / debt) thresholds, mirroring Binance's cross-margin bands.
+MARGIN_CALL_LEVEL = Decimal("1.3")   # warn the user to add margin or reduce
+LIQUIDATION_LEVEL = Decimal("1.1")   # force-close at or below this
+LIQUIDATION_FEE_RATE = Decimal("0.02")  # 2% of debt repaid, to the insurance fund
+
+
+def health_status(margin_level: Decimal | None) -> str:
+    if margin_level is None:
+        return "safe"  # no debt
+    if margin_level <= LIQUIDATION_LEVEL:
+        return "liquidatable"
+    if margin_level <= MARGIN_CALL_LEVEL:
+        return "margin_call"
+    return "safe"
+
+
+async def _margin_available(db: AsyncSession, account: MarginAccount, asset_id: int) -> Decimal:
+    return (await ledger.get_or_create_account(
+        db, asset_id, AccountType.AVAILABLE, account.user_id, wallet=account.wallet
+    )).balance
+
+
+async def liquidate(
+    db: AsyncSession,
+    *,
+    account: MarginAccount,
+    market: Market,
+    price_of: PriceOf,
+    now: datetime,
+    fee_rate: Decimal = LIQUIDATION_FEE_RATE,
+) -> bool:
+    """Force-close an underwater account on `market` and repay its loans. No-op if it is healthy.
+
+    Interest is accrued first so the check sees the true debt. The position is flattened with a
+    margin market order — a long sells its base, a short buys the base back — and the freed funds
+    repay the loans. A liquidation fee on the repaid debt goes to the insurance fund (FEE_INCOME).
+    Returns True if it liquidated.
+    """
+    await accrue_interest(db, now=now)
+    state = await account_state(db, account, price_of)
+    if health_status(state.margin_level) != "liquidatable":
+        return False
+
+    loans = await open_loans(db, account)
+    quote_loan = next((ln for ln in loans if ln.asset_id == market.quote_asset_id), None)
+    base_loan = next((ln for ln in loans if ln.asset_id == market.base_asset_id), None)
+
+    if quote_loan is not None:
+        # Long: owes quote, holds base. Sell all the base held to raise quote.
+        base_held = await _margin_available(db, account, market.base_asset_id)
+        if base_held > 0:
+            await place_margin_order(
+                db, account=account, market=market, side=OrderSide.SELL, order_type=OrderType.MARKET,
+                quantity=_floor(base_held, market.qty_step), price=None, price_of=price_of, now=now,
+                auto_borrow=False,
+            )
+    if base_loan is not None:
+        # Short: owes base, holds quote. Buy the base back to cover.
+        await place_margin_order(
+            db, account=account, market=market, side=OrderSide.BUY, order_type=OrderType.MARKET,
+            quantity=_floor(base_loan.owed, market.qty_step), price=None, price_of=price_of, now=now,
+            auto_borrow=False,
+        )
+
+    # Repay what we can, then skim the liquidation fee off the remaining margin balance.
+    repaid_value = Decimal(0)
+    for loan in await open_loans(db, account):
+        avail = await _margin_available(db, account, loan.asset_id)
+        pay = min(avail, loan.owed)
+        if pay > 0:
+            await repay(db, account=account, loan=loan, amount=pay)
+            px = await price_of((await db.get(Asset, loan.asset_id)).symbol) or Decimal(0)
+            repaid_value += pay * px
+
+    fee = repaid_value * fee_rate
+    if fee > 0:
+        px = await price_of((await db.get(Asset, market.quote_asset_id)).symbol) or Decimal(1)
+        fee_in_quote = _floor(fee / px, market.qty_step) if px else Decimal(0)
+        if fee_in_quote > 0:
+            await ledger.collect_fee(
+                db, user_id=account.user_id, asset_id=market.quote_asset_id, amount=fee_in_quote,
+                wallet=account.wallet, kind=ledger.TransactionKind.FEE,
+                idempotency_key=f"liq-fee:{account.id}:{now.isoformat()}",
+                reference=f"liquidation margin-account={account.id}",
+            )
+    return True
+
+
+def _floor(value: Decimal, step: Decimal) -> Decimal:
+    return (value / step).to_integral_value(rounding=ROUND_DOWN) * step
+
+
+async def liquidatable_accounts(db: AsyncSession, account_price_of) -> list[MarginAccount]:
+    """Every active account whose margin level has fallen to the liquidation band."""
+    accounts = (
+        await db.execute(select(MarginAccount).where(MarginAccount.status == MarginAccountStatus.ACTIVE))
+    ).scalars().all()
+    out: list[MarginAccount] = []
+    for account in accounts:
+        state = await account_state(db, account, account_price_of)
+        if health_status(state.margin_level) == "liquidatable":
+            out.append(account)
+    return out
