@@ -340,3 +340,14 @@ async def my_orders(db: AsyncSession, *, user_id: int, open_only: bool = False) 
     if open_only:
         q = q.where(P2POrder.status.in_(P2P_OPEN_STATUSES))
     return list((await db.execute(q.order_by(P2POrder.id.desc()).limit(100))).scalars().all())
+
+
+async def list_disputes(db: AsyncSession) -> list[P2POrder]:
+    """Every order currently under dispute, oldest first — the admin queue works front to back."""
+    return list(
+        (
+            await db.execute(
+                select(P2POrder).where(P2POrder.status == P2POrderStatus.DISPUTED).order_by(P2POrder.id.asc())
+            )
+        ).scalars().all()
+    )

@@ -248,3 +248,39 @@ async def resolve(
         db, p2p.resolve_dispute, admin.id, admin=admin, order_id=order_id,
         in_favor_of_buyer=body.in_favor_of_buyer,
     )
+
+
+# --- admin -----------------------------------------------------------------------------------------
+
+class DisputeRow(BaseModel):
+    id: int
+    asset: str
+    crypto_amount: str
+    fiat: str
+    fiat_amount: str
+    price: str
+    payment_method: str
+    seller_id: int
+    seller_email: str
+    buyer_id: int
+    buyer_email: str
+
+
+@router.get("/admin/disputes", response_model=list[DisputeRow], dependencies=[Depends(admin_user)])
+async def admin_disputes(db: AsyncSession = Depends(get_db)):
+    """Every P2P order under dispute, with both parties, for an operator to resolve."""
+    orders = await p2p.list_disputes(db)
+    if not orders:
+        return []
+    symbols = {a.id: a.symbol for a in (await db.execute(select(Asset))).scalars().all()}
+    uids = {o.seller_id for o in orders} | {o.buyer_id for o in orders}
+    emails = dict((await db.execute(select(User.id, User.email).where(User.id.in_(uids)))).all())
+    return [
+        DisputeRow(
+            id=o.id, asset=symbols.get(o.asset_id, "?"), crypto_amount=_n(o.crypto_amount),
+            fiat=o.fiat, fiat_amount=_n(o.fiat_amount), price=_n(o.price), payment_method=o.payment_method,
+            seller_id=o.seller_id, seller_email=emails.get(o.seller_id, "?"),
+            buyer_id=o.buyer_id, buyer_email=emails.get(o.buyer_id, "?"),
+        )
+        for o in orders
+    ]

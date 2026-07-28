@@ -162,6 +162,21 @@ class TestDispute:
         assert await bal(db, taker.id, asset.id) == Decimal("10")
         assert (await ledger.trial_balance(db))[asset.symbol] == Decimal("0")
 
+    async def test_list_disputes_returns_open_only(self, db):
+        asset = await make_asset(db)
+        maker = await make_user(db, "p2p-ld-seller@example.com")
+        taker = await make_user(db, "p2p-ld-buyer@example.com")
+        await fund(db, maker, asset.id, "100")
+        ad = await sell_ad(db, maker, asset)
+        # One order taken to dispute, one left pending — only the disputed one should be listed.
+        d = await p2p.open_order(db, taker_id=taker.id, ad_id=ad.id, fiat_amount=Decimal("900"), payment_method="UPI")
+        await p2p.open_order(db, taker_id=taker.id, ad_id=ad.id, fiat_amount=Decimal("450"), payment_method="UPI")
+        await p2p.mark_paid(db, user_id=taker.id, order_id=d.id)
+        await p2p.open_dispute(db, user_id=taker.id, order_id=d.id)
+
+        disputes = await p2p.list_disputes(db)
+        assert [o.id for o in disputes] == [d.id]
+
     async def test_non_admin_cannot_resolve(self, db):
         asset = await make_asset(db)
         maker = await make_user(db, "p2p-d2-seller@example.com")

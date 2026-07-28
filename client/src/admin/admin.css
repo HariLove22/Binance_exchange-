@@ -193,6 +193,36 @@
 .admin-table.recon .at-r {
   grid-template-columns: 5rem 1fr 1fr 7rem;
 }
+.admin-table.dispute .at-h,
+.admin-table.dispute .at-r {
+  grid-template-columns: 4rem 1fr 1.3fr 1.3fr 15rem;
+  align-items: center;
+}
+.dispute-acts {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+.admin-primary.sm,
+.admin-ghost.sm {
+  margin-top: 0;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.admin-ghost {
+  background: none;
+  border: 1px solid #2b3139;
+  color: #eaecef;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.admin-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .at-h {
   font-size: 0.68rem;
   text-transform: uppercase;

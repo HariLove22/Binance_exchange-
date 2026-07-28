@@ -362,7 +362,22 @@ export const api = {
   p2pDispute: (id: number) => request<P2POrder>(`/p2p/orders/${id}/dispute`, { method: "POST" }),
   p2pResolve: (id: number, inFavorOfBuyer: boolean) =>
     request<P2POrder>(`/p2p/orders/${id}/resolve`, { method: "POST", body: JSON.stringify({ in_favor_of_buyer: inFavorOfBuyer }) }),
+  p2pDisputes: () => request<P2PDispute[]>("/p2p/admin/disputes"),
 };
+
+export interface P2PDispute {
+  id: number;
+  asset: string;
+  crypto_amount: string;
+  fiat: string;
+  fiat_amount: string;
+  price: string;
+  payment_method: string;
+  seller_id: number;
+  seller_email: string;
+  buyer_id: number;
+  buyer_email: string;
+}
 
 export interface P2PAd {
   id: number;
