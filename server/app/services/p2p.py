@@ -11,7 +11,7 @@ the current status, so the escrow can never be double-released or released after
 
 from decimal import ROUND_DOWN, Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -252,7 +252,14 @@ async def _restore_ad_qty(db: AsyncSession, order: P2POrder) -> None:
 # --- reads ----------------------------------------------------------------------------------------
 
 async def browse_ads(
-    db: AsyncSession, *, asset_id: int | None, fiat: str | None, side: P2PSide | None
+    db: AsyncSession,
+    *,
+    asset_id: int | None,
+    fiat: str | None,
+    side: P2PSide | None,
+    amount: Decimal | None = None,
+    payment_method: str | None = None,
+    sort: str = "price",
 ) -> list[P2PAd]:
     """Active ads, filtered. A taker browsing SELL ads wants to buy; the query mirrors the ad side."""
     q = select(P2PAd).where(P2PAd.status == P2PAdStatus.ACTIVE)
@@ -262,14 +269,69 @@ async def browse_ads(
         q = q.where(P2PAd.fiat == fiat.upper())
     if side is not None:
         q = q.where(P2PAd.side == side)
+    if amount is not None:
+        # Only ads that will accept an order of this fiat size.
+        q = q.where(P2PAd.min_fiat <= amount, P2PAd.max_fiat >= amount)
+    if payment_method:
+        # Comma-joined column, so match the method as a substring token.
+        q = q.where(P2PAd.payment_methods.ilike(f"%{payment_method}%"))
+
     # Best price first for the taker: a SELL ad (taker buys) is best when cheapest; a BUY ad
-    # (taker sells) is best when highest. Without a side filter, just newest first.
-    if side is P2PSide.SELL:
-        q = q.order_by(P2PAd.price.asc())
-    elif side is P2PSide.BUY:
-        q = q.order_by(P2PAd.price.desc())
-    else:
+    # (taker sells) is best when highest.
+    if sort == "price":
+        if side is P2PSide.SELL:
+            q = q.order_by(P2PAd.price.asc())
+        elif side is P2PSide.BUY:
+            q = q.order_by(P2PAd.price.desc())
+        else:
+            q = q.order_by(P2PAd.id.desc())
+    else:  # "recent"
         q = q.order_by(P2PAd.id.desc())
+    return list((await db.execute(q.limit(100))).scalars().all())
+
+
+async def maker_stats(db: AsyncSession, maker_ids: list[int]) -> dict[int, dict]:
+    """Display stats per advertiser: name, completed-order count, and completion rate.
+
+    Completed = RELEASED orders. Completion = released / (released + canceled). A maker with no
+    finished orders returns completion None — the UI shows a "New" badge rather than a fake 100%.
+    """
+    if not maker_ids:
+        return {}
+    names = dict(
+        (await db.execute(select(User.id, User.full_name).where(User.id.in_(maker_ids)))).all()
+    )
+    rows = (
+        await db.execute(
+            select(P2POrder.maker_id, P2POrder.status, func.count())
+            .where(P2POrder.maker_id.in_(maker_ids))
+            .group_by(P2POrder.maker_id, P2POrder.status)
+        )
+    ).all()
+    agg: dict[int, dict] = {}
+    for mid, status, cnt in rows:
+        a = agg.setdefault(mid, {"released": 0, "finished": 0})
+        if status is P2POrderStatus.RELEASED:
+            a["released"] += cnt
+            a["finished"] += cnt
+        elif status is P2POrderStatus.CANCELED:
+            a["finished"] += cnt
+
+    out: dict[int, dict] = {}
+    for mid in set(maker_ids):
+        a = agg.get(mid, {"released": 0, "finished": 0})
+        completion = (Decimal(a["released"]) / a["finished"] * 100) if a["finished"] else None
+        out[mid] = {"name": names.get(mid) or f"User {mid}", "orders": a["released"], "completion": completion}
+    return out
+
+
+async def my_ads(db: AsyncSession, *, maker_id: int) -> list[P2PAd]:
+    """A maker's own ads, active first, newest first — for the My Ads view."""
+    q = (
+        select(P2PAd)
+        .where(P2PAd.maker_id == maker_id, P2PAd.status != P2PAdStatus.CLOSED)
+        .order_by(P2PAd.id.desc())
+    )
     return list((await db.execute(q.limit(100))).scalars().all())
 
 

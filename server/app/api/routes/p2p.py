@@ -45,6 +45,10 @@ class AdRequest(BaseModel):
 class AdResponse(BaseModel):
     id: int
     maker_id: int
+    maker_name: str
+    maker_orders: int
+    maker_completion: str | None  # e.g. "100.00", or null for a new advertiser
+    pay_window_min: int
     side: str
     asset: str
     fiat: str
@@ -92,9 +96,20 @@ async def _asset(db: AsyncSession, symbol: str) -> Asset:
     return asset
 
 
-def _ad_response(ad: P2PAd, symbol: str) -> AdResponse:
+# A fixed payment window for now, like Binance's per-ad timer. Could become an ad column later.
+_PAY_WINDOW_MIN = 15
+
+
+def _ad_response(ad: P2PAd, symbol: str, stats: dict | None = None) -> AdResponse:
+    stats = stats or {}
+    completion = stats.get("completion")
     return AdResponse(
-        id=ad.id, maker_id=ad.maker_id, side=ad.side.value, asset=symbol, fiat=ad.fiat,
+        id=ad.id, maker_id=ad.maker_id,
+        maker_name=stats.get("name") or f"User {ad.maker_id}",
+        maker_orders=stats.get("orders", 0),
+        maker_completion=(f"{completion:.2f}" if completion is not None else None),
+        pay_window_min=_PAY_WINDOW_MIN,
+        side=ad.side.value, asset=symbol, fiat=ad.fiat,
         price=_n(ad.price), min_fiat=_n(ad.min_fiat), max_fiat=_n(ad.max_fiat),
         available_qty=_n(ad.available_qty),
         payment_methods=[m.strip() for m in ad.payment_methods.split(",") if m.strip()],
@@ -120,11 +135,27 @@ async def browse_ads(
     asset: str | None = Query(None),
     fiat: str | None = Query(None),
     side: P2PSide | None = Query(None),
+    amount: str | None = Query(None),
+    payment_method: str | None = Query(None),
+    sort: str = Query("price"),
 ):
     asset_id = (await _asset(db, asset)).id if asset else None
-    ads = await p2p.browse_ads(db, asset_id=asset_id, fiat=fiat, side=side)
+    amount_dec = _dec(amount, "amount") if amount else None
+    ads = await p2p.browse_ads(
+        db, asset_id=asset_id, fiat=fiat, side=side, amount=amount_dec,
+        payment_method=payment_method, sort=sort,
+    )
     symbols = {a.id: a.symbol for a in (await db.execute(select(Asset))).scalars().all()}
-    return [_ad_response(ad, symbols.get(ad.asset_id, "?")) for ad in ads]
+    stats = await p2p.maker_stats(db, [ad.maker_id for ad in ads])
+    return [_ad_response(ad, symbols.get(ad.asset_id, "?"), stats.get(ad.maker_id)) for ad in ads]
+
+
+@router.get("/ads/mine", response_model=list[AdResponse])
+async def my_ads(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    ads = await p2p.my_ads(db, maker_id=user.id)
+    symbols = {a.id: a.symbol for a in (await db.execute(select(Asset))).scalars().all()}
+    stats = await p2p.maker_stats(db, [ad.maker_id for ad in ads])
+    return [_ad_response(ad, symbols.get(ad.asset_id, "?"), stats.get(ad.maker_id)) for ad in ads]
 
 
 @router.post("/ads", response_model=AdResponse, status_code=status.HTTP_201_CREATED)

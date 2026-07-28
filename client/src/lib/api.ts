@@ -336,14 +336,18 @@ export const api = {
     request<ConvertQuote>("/wallet/convert/execute", { method: "POST", body: JSON.stringify(body) }),
 
   // P2P
-  p2pAds: (q: { asset?: string; fiat?: string; side?: "BUY" | "SELL" } = {}) => {
+  p2pAds: (q: { asset?: string; fiat?: string; side?: "BUY" | "SELL"; amount?: string; payment_method?: string; sort?: string } = {}) => {
     const p = new URLSearchParams();
     if (q.asset) p.set("asset", q.asset);
     if (q.fiat) p.set("fiat", q.fiat);
     if (q.side) p.set("side", q.side);
+    if (q.amount) p.set("amount", q.amount);
+    if (q.payment_method) p.set("payment_method", q.payment_method);
+    if (q.sort) p.set("sort", q.sort);
     const qs = p.toString();
     return request<P2PAd[]>(`/p2p/ads${qs ? `?${qs}` : ""}`);
   },
+  p2pMyAds: () => request<P2PAd[]>("/p2p/ads/mine"),
   p2pPostAd: (body: {
     side: "BUY" | "SELL"; asset: string; fiat: string; price: string;
     min_fiat: string; max_fiat: string; total_qty: string; payment_methods: string; terms?: string | null;
@@ -363,6 +367,10 @@ export const api = {
 export interface P2PAd {
   id: number;
   maker_id: number;
+  maker_name: string;
+  maker_orders: number;
+  maker_completion: string | null;
+  pay_window_min: number;
   side: "BUY" | "SELL";
   asset: string;
   fiat: string;
