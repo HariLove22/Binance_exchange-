@@ -582,14 +582,16 @@ class Balance:
         return self.available + self.locked
 
 
-async def balances(db: AsyncSession, user_id: int) -> list[Balance]:
-    """Every asset this user holds, spendable and reserved — one query, not one per asset."""
+async def balances(db: AsyncSession, user_id: int, wallet: str = WALLET_SPOT) -> list[Balance]:
+    """Every asset this user holds in one wallet, spendable and reserved — one query, not one per
+    asset. Defaults to the SPOT wallet so margin/demo funds never leak into the spot view."""
     rows = (
         await db.execute(
             select(Asset, Account.account_type, Account.balance)
             .join(Account, Account.asset_id == Asset.id)
             .where(
                 Account.user_id == user_id,
+                Account.wallet == wallet,
                 Account.account_type.in_([AccountType.AVAILABLE, AccountType.LOCKED]),
             )
             .order_by(Asset.symbol)

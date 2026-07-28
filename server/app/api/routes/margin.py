@@ -27,20 +27,11 @@ from app.models import (
     OrderType,
     User,
 )
-from app.services import marketmaker, margin, pubsub
+from app.services import margin, pubsub
 from app.services.margin import MarginError
+from app.services.pricing import usd_price_of
 
 router = APIRouter(prefix="/margin", tags=["margin"])
-
-STABLE = {"USDT", "USDC", "FDUSD", "DAI", "TUSD", "BUSD"}
-
-
-async def usd_price_of(symbol: str) -> Decimal | None:
-    """USD value of one unit of an asset: $1 for stablecoins, else its live {SYMBOL}USDT price."""
-    s = (symbol or "").upper()
-    if s in STABLE:
-        return Decimal("1")
-    return await marketmaker.fetch_reference_price(f"{s}USDT")
 
 
 def _now() -> datetime:

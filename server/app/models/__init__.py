@@ -33,6 +33,7 @@ from app.models.margin import (
     MarginMode,
     MarginTier,
 )
+from app.models.demo import DemoAccount, DemoHolding
 from app.models.market import (
     CANCELLABLE_STATUSES,
     Market,
@@ -75,6 +76,8 @@ __all__ = [
     "AssetNetwork",
     "Chain",
     "ChainFamily",
+    "DemoAccount",
+    "DemoHolding",
     "Deposit",
     "DepositAddress",
     "DepositStatus",

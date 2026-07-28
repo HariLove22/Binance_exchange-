@@ -250,6 +250,14 @@ export const api = {
   changePassword: (body: { current_password: string; new_password: string }) =>
     request<{ message: string }>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
 
+  // account center
+  accountOverview: () => request<AccountOverview>("/account/overview"),
+  demoGet: () => request<DemoAccount>("/account/demo"),
+  demoCreate: () => request<DemoAccount>("/account/demo", { method: "POST" }),
+  demoReset: () => request<DemoAccount>("/account/demo/reset", { method: "POST" }),
+  demoTrade: (body: { base: string; side: "BUY" | "SELL"; quantity: string }) =>
+    request<DemoAccount>("/account/demo/trade", { method: "POST", body: JSON.stringify(body) }),
+
   balances: () => request<Balance[]>("/wallet/balances"),
   networks: (asset?: string) =>
     request<WalletNetwork[]>(`/wallet/networks${asset ? `?asset=${asset}` : ""}`),
@@ -390,6 +398,24 @@ export interface MarginLoanRow {
   accrued_interest: string;
   owed: string;
   hourly_rate: string;
+}
+
+export interface AccountOverview {
+  spot_usd: string;
+  margin: { open: boolean; equity_usd?: string; margin_level?: string | null; health?: string; max_leverage?: string };
+  demo: { exists: boolean; total_usd?: string };
+}
+
+export interface DemoHoldingRow {
+  symbol: string;
+  quantity: string;
+  usd_value: string;
+}
+
+export interface DemoAccount {
+  exists: boolean;
+  total_usd: string;
+  holdings: DemoHoldingRow[];
 }
 
 export interface MarginAccount {

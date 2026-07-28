@@ -7,6 +7,7 @@ import { Trade } from "./Trade";
 import { P2P } from "./P2P";
 import { Margin } from "./Margin";
 import { Account } from "./Account";
+import { Settings } from "./Settings";
 import {
   IDeposit,
   IGear,
@@ -175,6 +176,8 @@ export function Dashboard({ path }: { path: string }) {
             <Assets />
           ) : seg === "account" ? (
             <Account />
+          ) : seg === "settings" ? (
+            <Settings />
           ) : (
             <Placeholder title={active.label} icon="🚧" />
           )}
