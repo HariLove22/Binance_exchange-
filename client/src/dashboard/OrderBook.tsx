@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type DepthLevel, type OrderBook as OrderBookData } from "../lib/api";
+import { useEffect, useRef, useState } from "react";
+import type { DepthLevel, OrderBook as OrderBookData } from "../lib/api";
+import { useMarketWs } from "../lib/marketWs";
 import { fromUnits, scaleOf, toUnits, trimZeros, withThousands } from "../lib/amount";
 
 type Row = {
@@ -81,36 +82,23 @@ const VIEWS: { key: View; label: string; top: string; bottom: string }[] = [
 
 export function OrderBook({
   pair = "BTC/USDT",
-  /** Bump to force a reload (e.g. after an order is placed). */
-  refreshToken = 0,
+  /** False for a coin with no market here — there is no book to subscribe to. */
+  tradeable = true,
   /** Clicking a row sends its price to the order form — standard exchange UX. */
   onPriceClick,
 }: {
   pair?: string;
-  refreshToken?: number;
+  tradeable?: boolean;
   onPriceClick?: (price: string) => void;
 }) {
-  const [book, setBook] = useState<OrderBookData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [base, quote] = pair.split("/");
   const [view, setView] = useState<View>("both");
 
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      setBook(await api.orderBook(toSymbol(pair)));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not load the order book");
-    } finally {
-      setLoading(false);
-    }
-  }, [pair]);
-
-  // refreshToken belongs here, not in load's deps: it isn't read by the fetch, it just
-  // signals "run it again".
-  useEffect(() => {
-    void load();
-  }, [load, refreshToken]);
+  // Live over WebSocket: the server pushes a fresh snapshot on connect and on every order/trade,
+  // so the book updates on its own — no polling, no manual refresh after placing/cancelling.
+  // Only subscribe for coins we actually run a market for; others have no book here.
+  const { book, live } = useMarketWs(tradeable ? toSymbol(pair) : null);
+  const loading = book === null;
 
   const bids = buildRows(book?.bids ?? []);
   // Asks come back best(lowest)-first. Displayed reversed so the best ask sits at the bottom,
@@ -119,14 +107,31 @@ export function OrderBook({
   const bestAsk = book?.asks[0]?.price ?? null;
   const spread = spreadOf(book);
 
+  // The asks pane caps at ~7 rows and scrolls. Because the best ask sits at the BOTTOM (against the
+  // spread), keep it scrolled to the bottom so the tradeable levels are what's visible by default —
+  // the worse, far-from-spread asks are the ones you scroll up to see.
+  const asksRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = asksRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [asks]);
+
   return (
     <div className="ob">
       <div className="ob-head">
         <h2>Order Book</h2>
         <span className="ob-pair">{book?.symbol ?? toSymbol(pair)}</span>
-        <button className="ob-refresh" onClick={() => void load()} title="Reload">
-          ⟳
-        </button>
+        {tradeable ? (
+          <span
+            className={`ob-live ${live ? "on" : ""}`}
+            title={live ? "Live — updates automatically" : "Reconnecting…"}
+          >
+            <span className="ob-live-dot" />
+            {live ? "Live" : "…"}
+          </span>
+        ) : (
+          <span className="ob-live">view only</span>
+        )}
       </div>
 
       <div className="ob-filter">
@@ -146,19 +151,19 @@ export function OrderBook({
       </div>
 
       <div className="ob-cols">
-        <span>Price (USDT)</span>
-        <span className="r">Amount (BTC)</span>
-        <span className="r">Total (BTC)</span>
+        <span>Price ({quote})</span>
+        <span className="r">Amount ({base})</span>
+        <span className="r">Total ({base})</span>
       </div>
 
-      {loading ? (
-        <div className="ob-msg">Loading…</div>
-      ) : error ? (
-        <div className="ob-msg err">{error}</div>
+      {!tradeable ? (
+        <div className="ob-msg">No market here yet — {base} is view-only.</div>
+      ) : loading ? (
+        <div className="ob-msg">Connecting…</div>
       ) : (
         <>
           {view !== "bids" && (
-          <div className="ob-side">
+          <div className="ob-side ob-side-asks" ref={asksRef}>
             {asks.length === 0 ? (
               <div className="ob-msg">No sell orders</div>
             ) : (
@@ -187,7 +192,7 @@ export function OrderBook({
           </div>
 
           {view !== "asks" && (
-          <div className="ob-side">
+          <div className="ob-side ob-side-bids">
             {bids.length === 0 ? (
               <div className="ob-msg">No buy orders</div>
             ) : (

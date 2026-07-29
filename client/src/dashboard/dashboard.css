@@ -574,6 +574,22 @@
   font-weight: 600;
   color: var(--gold-2);
 }
+
+/* Orders page pair selector: a coin picker + the fixed USDT quote. */
+.pair-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pair-picker .coin-select-btn {
+  font-size: 0.95rem;
+  padding: 0.4rem 0.7rem;
+}
+.pair-quote {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
 .trade-grid {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -652,6 +668,13 @@
   color: var(--text-faint);
   font-size: 0.82rem;
   padding-left: 0.5rem;
+}
+/* Coin picker sitting inside the amount field — the unit label, but clickable. */
+.of-input .coin-select {
+  margin-left: 0.4rem;
+}
+.of-input .coin-select-btn {
+  padding: 0.28rem 0.5rem;
 }
 .of-total {
   display: flex;
@@ -892,13 +915,27 @@
 .ob-side {
   display: flex;
   flex-direction: column;
+  /* Show ~7 rows per side, then scroll — a fixed row height makes the count exact. */
+  max-height: calc(7 * 1.55rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.ob-side::-webkit-scrollbar {
+  width: 6px;
+}
+.ob-side::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 .ob-row {
   position: relative;
   display: grid;
   grid-template-columns: 1.1fr 1fr 1fr;
   gap: 0.5rem;
-  padding: 0.24rem 1rem;
+  height: 1.55rem;
+  align-items: center;
+  padding: 0 1rem;
   font-size: 0.82rem;
   font-family: ui-monospace, Menlo, monospace;
   cursor: default;
@@ -906,8 +943,13 @@
 .ob-row:hover {
   background: rgba(255, 255, 255, 0.04);
 }
-/* Depth bar: grows from the right, sits behind the numbers. */
-.ob-bar {
+/* Depth bar: grows from the right, sits behind the numbers.
+   Scoped through `.ob-side .ob-row` (specificity 0,3,0) so it outranks trade.css's
+   `.ob-row > span:not(.bar)` (0,2,1). That rule bleeds in whenever the Trade terminal's
+   stylesheet is loaded (Dashboard imports Trade, so it always is) and, being more specific than
+   a bare `.ob-bar`, would force this bar back into flow — making it a 4th grid item and wrapping
+   the Total column onto its own line. Keeping it absolute leaves exactly 3 in-flow cells. */
+.ob-side .ob-row .ob-bar {
   position: absolute;
   right: 0;
   top: 0;
@@ -973,6 +1015,397 @@
 @media (max-width: 900px) {
   .trade-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* My Open Orders — all pending orders across every pair, with a Cancel per row.
+   `moo-` prefix keeps these off trade.css's app-wide `.oo-*`/`.ob-*` order classes. */
+.moo {
+  margin-top: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 0;
+  font-variant-numeric: tabular-nums;
+}
+.moo-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1rem 0.7rem;
+}
+.moo-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.moo-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: rgba(240, 185, 11, 0.14);
+  color: #f0b90b;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.moo-reload {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  width: 1.9rem;
+  height: 1.9rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.moo-reload:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+.moo-cols,
+.moo-row {
+  display: grid;
+  grid-template-columns: 1.1fr 0.7fr 0.9fr 1.1fr 1.1fr 1.3fr 1fr 0.9fr;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 1rem;
+}
+.moo-cols {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.moo-cols .r,
+.moo-row .r {
+  text-align: right;
+}
+.moo-row {
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.moo-row:last-child {
+  border-bottom: none;
+}
+.moo-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.moo-pair {
+  font-weight: 600;
+}
+.moo-num {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--text-dim);
+}
+.moo-side {
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+.moo-side.buy {
+  color: var(--up);
+}
+.moo-side.sell {
+  color: var(--down);
+}
+.moo-type {
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+.moo-filled em {
+  font-style: normal;
+  color: var(--text-faint);
+}
+.moo-status {
+  font-size: 0.72rem;
+  text-transform: capitalize;
+  color: var(--text-dim);
+}
+.moo-status.partially_filled {
+  color: #f0b90b;
+}
+.moo-cancel {
+  background: none;
+  border: 1px solid var(--down);
+  color: var(--down);
+  border-radius: 7px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.moo-cancel:hover:not(:disabled) {
+  background: var(--down);
+  color: #fff;
+}
+.moo-cancel:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.moo-msg {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+.moo-msg.err {
+  color: var(--down);
+}
+
+@media (max-width: 720px) {
+  .moo {
+    overflow-x: auto;
+  }
+  .moo-cols,
+  .moo-row {
+    min-width: 640px;
+  }
+}
+
+/* Order book "Live" indicator — WebSocket connection state. */
+.ob-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+.ob-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.ob-live.on {
+  color: var(--up);
+}
+.ob-live.on .ob-live-dot {
+  background: var(--up);
+  box-shadow: 0 0 0 0 rgba(14, 203, 129, 0.55);
+  animation: ob-pulse 1.6s ease-out infinite;
+}
+@keyframes ob-pulse {
+  to {
+    box-shadow: 0 0 0 6px rgba(14, 203, 129, 0);
+  }
+}
+
+/* Order form — available balance line (click to fill max). */
+.of-avail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.15rem 0.9rem 0;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+.of-avail-val {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-dim);
+  font: inherit;
+  font-family: ui-monospace, Menlo, monospace;
+  cursor: pointer;
+  border-bottom: 1px dashed var(--border);
+}
+.of-avail-val:hover {
+  color: #f0b90b;
+  border-bottom-color: #f0b90b;
+}
+
+/* Order History — finished orders, filter + sort. `oh-` prefix avoids trade.css collisions. */
+.oh {
+  margin-top: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 0;
+  font-variant-numeric: tabular-nums;
+}
+.oh-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0 1rem 0.7rem;
+}
+.oh-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.oh-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
+}
+.oh-tab {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.24rem 0.6rem;
+  cursor: pointer;
+}
+.oh-tab:hover {
+  color: var(--text);
+}
+.oh-tab.on {
+  color: var(--text);
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.05);
+}
+.oh-sort {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.24rem 0.6rem;
+  cursor: pointer;
+}
+.oh-sort:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+.oh-cols,
+.oh-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.7fr 0.9fr 1.1fr 1.1fr 1.3fr 1fr 0.9fr;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 1rem;
+}
+.oh-cols {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.oh-cols .r,
+.oh-row .r {
+  text-align: right;
+}
+.oh-row {
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.oh-row:last-child {
+  border-bottom: none;
+}
+.oh-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.oh-date {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+.oh-pair {
+  font-weight: 600;
+}
+.oh-num {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--text-dim);
+}
+.oh-side {
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+.oh-side.buy {
+  color: var(--up);
+}
+.oh-side.sell {
+  color: var(--down);
+}
+.oh-type {
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+.oh-status {
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+.oh-status.filled {
+  color: var(--up);
+}
+.oh-status.canceled {
+  color: var(--text-faint);
+}
+.oh-status.new,
+.oh-status.partially_filled {
+  color: #f0b90b;
+}
+.oh-filled em {
+  font-style: normal;
+  color: var(--text-faint);
+}
+.oh-badge {
+  margin-left: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: rgba(240, 185, 11, 0.16);
+  color: #f0b90b;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.oh-cancel {
+  background: none;
+  border: 1px solid var(--down);
+  color: var(--down);
+  border-radius: 7px;
+  padding: 0.24rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.oh-cancel:hover:not(:disabled) {
+  background: var(--down);
+  color: #fff;
+}
+.oh-cancel:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.oh-dash {
+  color: var(--text-faint);
+}
+
+.oh-msg {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+.oh-msg.err {
+  color: var(--down);
+}
+
+@media (max-width: 720px) {
+  .oh {
+    overflow-x: auto;
+  }
+  .oh-cols,
+  .oh-row {
+    min-width: 680px;
   }
 }
 
@@ -1112,6 +1545,130 @@
 .buy-arrow { text-align: center; color: var(--text-faint); font-size: 1.1rem; margin: 0.3rem 0; }
 .buy-rate { margin: 0.7rem 0 0; font-size: 0.78rem; color: var(--text-faint); }
 .buy-submit { width: 100%; margin-top: 1rem; padding: 0.7rem; font-size: 0.95rem; }
+
+/* Coin icon: CDN logo, or a coloured letter badge when the CDN has no image for it. */
+.coin-img {
+  border-radius: 50%;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.05);
+  flex: none;
+}
+.coin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  flex: none;
+}
+
+/* Coin picker — icon pill that opens a searchable list. */
+.coin-select {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.coin-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(148, 163, 184, 0.12);
+  border: none;
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+.coin-select-btn:hover {
+  background: rgba(148, 163, 184, 0.2);
+}
+.coin-select-chev {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+.coin-select-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: 15rem;
+  max-width: 78vw;
+  background: var(--surface, #161a1e);
+  border: 1px solid var(--border, #2b3139);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  padding: 0.5rem;
+}
+.coin-select-search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border, #2b3139);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.55rem;
+  margin-bottom: 0.4rem;
+}
+.coin-select-search:focus {
+  outline: none;
+  border-color: var(--text-faint);
+}
+.coin-select-list {
+  max-height: 15rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.coin-select-list::-webkit-scrollbar {
+  width: 6px;
+}
+.coin-select-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+.coin-select-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0.4rem 0.45rem;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.coin-select-opt:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.coin-select-opt.on {
+  background: rgba(240, 185, 11, 0.14);
+}
+.coin-select-opt-sym {
+  font-weight: 600;
+}
+.coin-select-tag {
+  margin-left: auto;
+  font-size: 0.64rem;
+  color: var(--text-faint);
+  border: 1px solid var(--border, #2b3139);
+  border-radius: 5px;
+  padding: 0.05rem 0.35rem;
+}
+.coin-select-empty {
+  padding: 0.9rem;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+}
 
 /* convert extras */
 .cv-avail { display: block; font-size: 0.72rem; color: var(--text-faint); margin-top: 0.3rem; }

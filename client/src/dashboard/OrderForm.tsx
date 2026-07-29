@@ -1,13 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, type OrderRow } from "../lib/api";
+import { api, ApiError, trimAmount, type Balance, type OrderRow } from "../lib/api";
 import {
+  fromUnits,
   isPositive,
   multiply,
   product,
   sumProducts,
+  toUnits,
   trimZeros,
   withThousands,
 } from "../lib/amount";
+import { CoinSelect } from "./CoinSelect";
 
 const SCALE = 8; // BTC and USDT both track 8 decimals here
 
@@ -28,23 +31,69 @@ function sanitizeAmount(value: string): string {
 export function OrderForm({
   pair = "BTC/USDT",
   presetPrice,
+  refreshToken = 0,
+  tradeable = true,
+  coins,
+  onBaseChange,
   onPlaced,
 }: {
   pair?: string;
   /** Price clicked in the order book — fills the field. */
   presetPrice?: string;
+  /** Bump to refetch the balance (e.g. after an order is placed or cancelled elsewhere). */
+  refreshToken?: number;
+  /** False for a coin we don't run a market for — the form goes read-only (browse, not trade). */
+  tradeable?: boolean;
+  /** All selectable base coins + which are custodied — powers the coin picker in the amount field. */
+  coins?: { list: string[]; tradeable: Set<string> };
+  /** Called when the user picks a different base coin from the amount-field dropdown. */
+  onBaseChange?: (base: string) => void;
   onPlaced?: () => void;
 }) {
+  const [base, quote] = pair.split("/");
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<OrderRow | null>(null);
+  const [balances, setBalances] = useState<Balance[] | null>(null);
 
   useEffect(() => {
     if (presetPrice) setPrice(sanitizeAmount(presetPrice));
   }, [presetPrice]);
+
+  // The balance the user is about to spend: quote (USDT) to buy, base (BTC) to sell. Shown so they
+  // know their limit up front instead of discovering it as an "insufficient funds" error.
+  useEffect(() => {
+    let alive = true;
+    api
+      .balances()
+      .then((b) => alive && setBalances(b))
+      .catch(() => alive && setBalances([]));
+    return () => {
+      alive = false;
+    };
+  }, [refreshToken]);
+
+  const spendAsset = side === "BUY" ? quote : base;
+  const spendAvail = balances?.find((b) => b.asset === spendAsset)?.available ?? null;
+
+  /** Fill quantity with the most the balance allows. Selling: all the base. Buying: quote / price. */
+  function fillMax() {
+    if (spendAvail === null) return;
+    if (side === "SELL") {
+      setQuantity(spendAvail);
+      return;
+    }
+    if (!isPositive(price)) {
+      setError("Enter a price first to compute the max quantity");
+      return;
+    }
+    // maxQty = availableQuote / price, truncated to SCALE — floors, so it never exceeds the balance.
+    const maxUnits = (toUnits(spendAvail, SCALE) * 10n ** BigInt(SCALE)) / toUnits(price, SCALE);
+    setQuantity(fromUnits(maxUnits, SCALE));
+  }
 
   const valid = isPositive(price) && isPositive(quantity);
   // Preview only — the server computes the real numbers.
@@ -55,6 +104,7 @@ export function OrderForm({
     setError("");
     setResult(null);
 
+    if (!tradeable) return setError(`${base} isn't tradeable here yet — view only`);
     if (!isPositive(price)) return setError("Enter a price greater than zero");
     if (!isPositive(quantity)) return setError("Enter a quantity greater than zero");
 
@@ -97,6 +147,13 @@ export function OrderForm({
         </button>
       </div>
 
+      <div className="of-avail">
+        <span>Available</span>
+        <button type="button" className="of-avail-val" onClick={fillMax} title="Use max">
+          {spendAvail === null ? "…" : `${trimAmount(spendAvail)} ${spendAsset}`}
+        </button>
+      </div>
+
       <label className="of-field">
         <span>Price</span>
         <div className="of-input">
@@ -106,7 +163,7 @@ export function OrderForm({
             placeholder="0.00"
             inputMode="decimal"
           />
-          <em>USDT</em>
+          <em>{quote}</em>
         </div>
       </label>
 
@@ -119,32 +176,49 @@ export function OrderForm({
             placeholder="0.00000000"
             inputMode="decimal"
           />
-          <em>BTC</em>
+          {coins && onBaseChange ? (
+            <CoinSelect
+              value={base}
+              options={coins.list}
+              tradeable={coins.tradeable}
+              onChange={onBaseChange}
+            />
+          ) : (
+            <em>{base}</em>
+          )}
         </div>
       </label>
 
       <div className="of-total">
         <span>Total</span>
-        <strong>{total ? `${withThousands(total)} USDT` : "—"}</strong>
+        <strong>{total ? `${withThousands(total)} ${quote}` : "—"}</strong>
       </div>
 
       {/* Not disabled on invalid input — a dead button with no explanation reads as "the app
           is broken". Let the click through and say what's missing. */}
-      <button className={`of-submit ${side.toLowerCase()}`} type="submit" disabled={busy}>
-        {busy ? "Placing…" : `${side === "BUY" ? "Buy" : "Sell"} BTC`}
+      <button
+        className={`of-submit ${side.toLowerCase()}`}
+        type="submit"
+        disabled={busy || !tradeable}
+      >
+        {!tradeable ? "View only" : busy ? "Placing…" : `${side === "BUY" ? "Buy" : "Sell"} ${base}`}
       </button>
 
-      {!valid && !error && (
+      {!tradeable ? (
+        <div className="of-msg hint">
+          {base} isn't custodied here yet — chart &amp; book are view-only.
+        </div>
+      ) : !valid && !error ? (
         <div className="of-msg hint">
           {!isPositive(price)
             ? "Enter a price to continue"
             : "Enter a quantity to continue"}
         </div>
-      )}
+      ) : null}
 
       {error && <div className="of-msg err">{error}</div>}
 
-      {result && <Receipt order={result} />}
+      {result && <Receipt order={result} base={base} quote={quote} />}
     </form>
   );
 }
@@ -157,7 +231,7 @@ export function OrderForm({
  * costs less than 3 x 50,300. The form's "Total" is the limit-price estimate; the number
  * here is what actually moved.
  */
-function Receipt({ order }: { order: OrderRow }) {
+function Receipt({ order, base, quote }: { order: OrderRow; base: string; quote: string }) {
   // order.side, not the form's `side` state — the tab may have been toggled since this
   // order was placed, and the receipt must describe the order it belongs to.
   const spent = order.side === "BUY";
@@ -172,12 +246,12 @@ function Receipt({ order }: { order: OrderRow }) {
 
       <div className="of-receipt-line with-amount">
         <span>
-          Filled {trimZeros(order.filled_quantity, 5)} of {trimZeros(order.quantity, 5)} BTC
+          Filled {trimZeros(order.filled_quantity, 5)} of {trimZeros(order.quantity, 5)} {base}
         </span>
         {order.fills.length > 0 && (
           <strong className="of-amount">
             <em>{spent ? "Paid" : "Received"}</em>
-            {withThousands(trimZeros(total, 2))} USDT
+            {withThousands(trimZeros(total, 2))} {quote}
           </strong>
         )}
       </div>

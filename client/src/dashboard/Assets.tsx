@@ -10,6 +10,8 @@ import {
   type WalletNetwork,
   type WithdrawalRecord,
 } from "../lib/api";
+import { useCoins } from "../lib/useCoins";
+import { CoinSelect } from "./CoinSelect";
 
 /**
  * The Spot wallet — balances, plus the deposit and withdrawal flows.
@@ -49,9 +51,8 @@ export function Assets() {
 
 /* ------------------------------------------------------------------ convert */
 
-const CONVERT_ASSETS = ["USDT", "USDC", "BTC", "ETH", "SOL", "BNB", "AVAX", "POL", "TRX"];
-
 function Convert() {
+  const { coins, tradeable } = useCoins();
   const [balances, setBalances] = useState<Balance[]>([]);
   const [from, setFrom] = useState("USDT");
   const [to, setTo] = useState("BTC");
@@ -108,9 +109,7 @@ function Convert() {
           <span>From</span>
           <div className="buy-input">
             <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
-            <select value={from} onChange={(e) => setFrom(e.target.value)}>
-              {CONVERT_ASSETS.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <CoinSelect value={from} options={coins} tradeable={tradeable} onChange={setFrom} />
           </div>
           <span className="cv-avail">Available: {avail.toFixed(4)} {from}</span>
         </label>
@@ -121,9 +120,7 @@ function Convert() {
           <span>To (est.)</span>
           <div className="buy-input">
             <input value={quote ? trimAmount(quote.to_amount) : "…"} readOnly />
-            <select value={to} onChange={(e) => setTo(e.target.value)}>
-              {CONVERT_ASSETS.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <CoinSelect value={to} options={coins} tradeable={tradeable} onChange={setTo} />
           </div>
         </label>
 
@@ -140,9 +137,8 @@ function Convert() {
 
 /* --------------------------------------------------------------- buy crypto */
 
-const CRYPTOS = ["BTC", "ETH", "SOL", "BNB", "USDT", "USDC", "AVAX", "POL", "TRX"];
-
 function BuyCrypto() {
+  const { coins, tradeable } = useCoins();
   const [currencies, setCurrencies] = useState<{ code: string; name: string }[]>([]);
   const [fiat, setFiat] = useState("INR");
   const [amount, setAmount] = useState("10000");
@@ -207,9 +203,7 @@ function BuyCrypto() {
           <span>You receive (est.)</span>
           <div className="buy-input">
             <input value={quote ? trimAmount(quote.crypto_amount) : "…"} readOnly />
-            <select value={asset} onChange={(e) => setAsset(e.target.value)}>
-              {CRYPTOS.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <CoinSelect value={asset} options={coins} tradeable={tradeable} onChange={setAsset} />
           </div>
         </label>
 

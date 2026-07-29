@@ -1,18 +1,15 @@
 import asyncio
 import contextlib
-import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.routes import admin, auth, health, market, trade, wallet, ws
 from app.core.config import settings
 from app.services import trigger_monitor
-
-logger = logging.getLogger("app.errors")
 
 
 @asynccontextmanager
@@ -45,36 +42,18 @@ app.add_middleware(
 
 @app.exception_handler(SQLAlchemyError)
 async def database_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
-    """Turn a database failure into a readable response instead of an unhandled 500.
+    """Turn any database failure into a readable 503 instead of an unhandled 500.
 
-    An app-level handler is needed at all because Starlette's ServerErrorMiddleware sits
-    *outside* CORSMiddleware: an unhandled 500 carries no CORS headers, so the browser blocks
-    it and the frontend only sees an opaque "can't reach the server". Handling it here keeps
-    the CORS headers and lets the client read the real status.
-
-    Two very different failures were previously reported identically — that hid a schema/
-    migration bug behind a "database down" message for far too long:
-
-      • OperationalError  → couldn't connect (Postgres down, wrong host/port). A real 503.
-      • everything else   → connected fine, but the query failed (missing column after a
-                            merge, constraint violation, bad SQL). That is a 500, and the
-                            hint is "run your migrations", not "start Postgres".
-
-    The real exception is always logged so the actual cause is one glance away.
+    This matters for more than tidiness. Starlette's ServerErrorMiddleware sits *outside*
+    CORSMiddleware, so an unhandled exception produces a 500 with no CORS headers at all —
+    the browser blocks it and the frontend reports an opaque "can't reach the server"
+    instead of the real cause. An app-level handler runs *inside* the middleware stack, so
+    this response keeps its CORS headers and the client can actually read it.
     """
-    if isinstance(exc, OperationalError):
-        logger.error("database unreachable: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"detail": "Database unavailable — is Postgres running? (docker compose up -d)"},
-        )
-
-    logger.exception("database query failed")
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
-            "detail": "Database query failed — the schema may be out of date. "
-            "Run pending migrations: cd server && alembic upgrade head"
+            "detail": "Database unavailable — is Postgres running? (docker compose up -d)"
         },
     )
 

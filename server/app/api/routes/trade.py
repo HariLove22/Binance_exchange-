@@ -64,6 +64,9 @@ class OrderResponse(BaseModel):
     quantity: str
     filled_quantity: str
     status: str
+    # When the order was placed. Given to the client so order history can sort and group by date
+    # (the id is monotonic too, but a real timestamp is what a user reads).
+    created_at: str
     # Trades that executed as this order was placed — empty when it rests unmatched. Lets the
     # client show what the order actually cost, which differs from price x quantity when a
     # taker sweeps several levels.
@@ -77,6 +80,7 @@ def _order_response(order: Order, symbol: str, trades: list[Trade] | None = None
         trigger_price=f"{order.trigger_price.normalize():f}" if order.trigger_price is not None else None,
         quantity=f"{order.quantity.normalize():f}", filled_quantity=f"{order.filled_quantity.normalize():f}",
         status=order.status.value,
+        created_at=order.created_at.isoformat(),
         fills=[
             FillOut(price=f"{t.price.normalize():f}", quantity=f"{t.quantity.normalize():f}")
             for t in (trades or [])
