@@ -1,0 +1,72 @@
+.accs { max-width: 980px; margin: 0 auto; padding: 1rem 1.2rem 2rem; color: #eaecef; }
+.accs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+.accs-head h1 { font-size: 1.4rem; margin: 0; }
+.accs-sub { color: #848e9c; font-size: 0.85rem; margin: 0.3rem 0 0; }
+.accs-head-right { display: flex; align-items: center; gap: 1.2rem; }
+.accs-add { background: #f0b90b; color: #1e2026; border: none; border-radius: 8px; padding: 0.55rem 1rem; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.accs-total { text-align: right; }
+.accs-total span { display: block; font-size: 0.7rem; color: #848e9c; text-transform: uppercase; letter-spacing: 0.03em; }
+.accs-total b { font-size: 1.5rem; font-family: ui-monospace, monospace; }
+
+/* add-account modal */
+.aa-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: grid; place-items: center; z-index: 60; padding: 1rem; }
+.aa-box { background: #181a20; border: 1px solid #2b3139; border-radius: 14px; width: 100%; max-width: 860px; max-height: 90vh; overflow-y: auto; padding: 1.4rem; }
+.aa-head { display: flex; align-items: center; justify-content: space-between; }
+.aa-head h2 { margin: 0; font-size: 1.2rem; }
+.aa-x { background: none; border: none; color: #848e9c; font-size: 1.1rem; cursor: pointer; }
+.aa-sub { color: #848e9c; font-size: 0.85rem; margin: 0.3rem 0 1rem; }
+.aa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.9rem; }
+.aa-card { border: 1px solid #2b3139; border-radius: 12px; padding: 1rem; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; }
+.aa-card:hover { border-color: #3b444f; }
+.aa-card.active { border-color: #f0b90b; background: rgba(240,185,11,0.05); }
+.aa-card.disabled { opacity: 0.5; cursor: not-allowed; }
+.aa-card-top { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.7rem; }
+.aa-card-top h3 { margin: 0; font-size: 0.95rem; }
+.aa-details { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.aa-details li { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.76rem; }
+.aa-details li span { color: #848e9c; }
+.aa-details li b { text-align: right; font-weight: 500; }
+.aa-note { color: #848e9c; font-size: 0.75rem; margin: 0.7rem 0 0; line-height: 1.4; }
+.aa-reason { margin-top: 0.6rem; font-size: 0.72rem; color: #f0b90b; background: rgba(240,185,11,0.1); padding: 0.3rem 0.5rem; border-radius: 6px; text-align: center; }
+.aa-config { margin-top: 1.1rem; border-top: 1px solid #2b3139; padding-top: 1rem; display: flex; gap: 0.9rem; align-items: flex-end; flex-wrap: wrap; }
+.aa-config label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.72rem; color: #848e9c; }
+.aa-config input, .aa-config select { background: #0d1117; border: 1px solid #2b3139; border-radius: 7px; color: #eaecef; font: inherit; font-size: 0.85rem; padding: 0.5rem 0.6rem; }
+.aa-create { flex: 1; min-width: 200px; }
+.accs-err { color: #f6465d; font-size: 0.82rem; margin: 0.4rem 0; }
+
+.accs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.acc-card { background: #16191e; border: 1px solid #2b3139; border-radius: 12px; padding: 1.1rem; display: flex; flex-direction: column; }
+.acc-card.demo { border-color: rgba(240,185,11,0.3); }
+.acc-top { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+.acc-top h3 { margin: 0; font-size: 1.05rem; }
+.acc-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 1.1rem; }
+.acc-icon.spot { background: rgba(240,185,11,0.15); color: #f0b90b; }
+.acc-icon.margin { background: rgba(14,203,129,0.15); color: #0ecb81; }
+.acc-icon.pro { background: rgba(246,70,93,0.15); color: #f6465d; }
+.acc-icon.iso { background: rgba(99,102,241,0.18); color: #a5b4fc; }
+.acc-icon.demo { background: rgba(148,163,184,0.14); }
+.acc-tag { margin-left: auto; font-size: 0.62rem; background: rgba(240,185,11,0.15); color: #f0b90b; padding: 0.15rem 0.45rem; border-radius: 4px; text-transform: uppercase; }
+.acc-desc { color: #848e9c; font-size: 0.8rem; margin: 0 0 0.8rem; flex: 1; }
+.acc-val { font-size: 1.4rem; font-weight: 600; font-family: ui-monospace, monospace; }
+.acc-val.muted { font-size: 1rem; color: #848e9c; font-weight: 400; }
+.acc-val-sub { font-size: 0.7rem; color: #848e9c; font-family: inherit; font-weight: 400; }
+.acc-health { font-size: 0.75rem; margin-top: 0.25rem; color: #0ecb81; }
+.acc-health.margin_call { color: #f0b90b; }
+.acc-health.liquidatable { color: #f6465d; }
+.acc-actions { display: flex; gap: 0.5rem; margin-top: 0.9rem; }
+.acc-btn { flex: 1; background: #2b3139; border: none; color: #eaecef; font: inherit; font-size: 0.82rem; padding: 0.5rem; border-radius: 8px; cursor: pointer; }
+.acc-btn.primary { background: #f0b90b; color: #1e2026; font-weight: 600; }
+.acc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.demo-panel { margin-top: 0.9rem; border-top: 1px solid #2b3139; padding-top: 0.8rem; }
+.demo-holdings { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; max-height: 130px; overflow-y: auto; }
+.demo-h { display: flex; justify-content: space-between; font-size: 0.82rem; }
+.mono { font-family: ui-monospace, monospace; }
+.dim { color: #848e9c; }
+.demo-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.demo-form select, .demo-form input { background: #0d1117; border: 1px solid #2b3139; border-radius: 7px; color: #eaecef; font: inherit; font-size: 0.82rem; padding: 0.45rem 0.55rem; }
+.demo-form .acc-btn { grid-column: 1 / -1; }
+.demo-seg { display: inline-flex; background: #0d1117; border: 1px solid #2b3139; border-radius: 7px; padding: 2px; }
+.demo-seg button { flex: 1; background: none; border: none; color: #848e9c; font: inherit; font-size: 0.8rem; padding: 0.35rem; border-radius: 5px; cursor: pointer; }
+.demo-seg button.buy.on { background: #0ecb81; color: #06121a; }
+.demo-seg button.sell.on { background: #f6465d; color: #fff; }

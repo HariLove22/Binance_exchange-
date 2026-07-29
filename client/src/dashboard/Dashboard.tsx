@@ -5,6 +5,10 @@ import { Overview, Placeholder } from "./pages";
 import { Assets } from "./Assets";
 import { Orders } from "./Orders";
 import { Trade } from "./Trade";
+import { P2P } from "./P2P";
+import { MarginTrade } from "./MarginTrade";
+import { Account } from "./Account";
+import { Settings } from "./Settings";
 import {
   IDeposit,
   IGear,
@@ -37,8 +41,8 @@ const NAV: NavItem[] = [
 type TradeOption = { label: string; desc: string; to?: string; tag?: string };
 const TRADE_OPTIONS: TradeOption[] = [
   { label: "Spot", desc: "Trade crypto on the order book", to: "/dashboard/trade" },
-  { label: "Margin", desc: "Leverage — not built yet", tag: "soon" },
-  { label: "P2P", desc: "Buy & sell with bank transfer — not built yet", tag: "soon" },
+  { label: "Margin", desc: "Trade with leverage", to: "/dashboard/margin" },
+  { label: "P2P", desc: "Buy & sell with bank transfer", to: "/dashboard/p2p" },
   { label: "Convert", desc: "Instant swap — not built yet", tag: "soon" },
   { label: "Demo Trading", desc: "Practice with virtual funds — not built yet", tag: "soon" },
 ];
@@ -141,8 +145,8 @@ export function Dashboard({ path }: { path: string }) {
       </header>
 
       {/* The trading terminal takes the full width — hide the sidebar there, like Binance. */}
-      <div className={`dash-body ${seg === "trade" ? "full" : ""}`}>
-        {seg !== "trade" && (
+      <div className={`dash-body ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
+        {seg !== "trade" && seg !== "margin" && (
           <aside className="dash-side">
             {NAV.map((n) => {
               const Icon = n.icon;
@@ -160,15 +164,23 @@ export function Dashboard({ path }: { path: string }) {
           </aside>
         )}
 
-        <main className={`dash-main ${seg === "trade" ? "full" : ""}`}>
+        <main className={`dash-main ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
           {seg === "" ? (
             <Overview user={user} />
           ) : seg === "trade" ? (
             <Trade />
           ) : seg === "orders" ? (
             <Orders />
+          ) : seg === "p2p" ? (
+            <P2P />
+          ) : seg === "margin" ? (
+            <MarginTrade />
           ) : seg === "assets" ? (
             <Assets />
+          ) : seg === "account" ? (
+            <Account />
+          ) : seg === "settings" ? (
+            <Settings />
           ) : (
             <Placeholder title={active.label} icon="🚧" />
           )}

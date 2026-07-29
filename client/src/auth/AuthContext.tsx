@@ -8,6 +8,8 @@ type AuthState = {
   loading: boolean;
   login: (token: string, user: AuthUser) => void;
   logout: () => void;
+  // Replace the cached user (e.g. after a profile edit) so the UI reflects it immediately.
+  setUser: (user: AuthUser) => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -45,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );

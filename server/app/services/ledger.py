@@ -22,6 +22,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    NEGATIVE_ALLOWED,
+    WALLET_SPOT,
     Account,
     AccountType,
     Asset,
@@ -56,23 +58,30 @@ async def get_or_create_account(
     asset_id: int,
     account_type: AccountType,
     user_id: int | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> Account:
     """Fetch an account, creating it on first use.
 
     Lazy rather than pre-seeded: pre-creating every user × asset × type is tens of thousands of
     empty rows per user, all migrated whenever an asset is listed. The INSERT can lose a race, so
     a unique violation is handled by re-reading — checking first *is* the race.
+
+    `wallet` selects the sub-wallet (SPOT by default, MARGIN / MARGIN:{symbol} for margin). Spot and
+    margin balances of the same asset are different accounts.
     """
     stmt = select(Account).where(
         Account.asset_id == asset_id,
         Account.account_type == account_type,
+        Account.wallet == wallet,
         Account.user_id == user_id if user_id is not None else Account.user_id.is_(None),
     )
     account = (await db.execute(stmt)).scalar_one_or_none()
     if account is not None:
         return account
 
-    account = Account(user_id=user_id, asset_id=asset_id, account_type=account_type, balance=Decimal(0))
+    account = Account(
+        user_id=user_id, asset_id=asset_id, account_type=account_type, wallet=wallet, balance=Decimal(0)
+    )
     db.add(account)
     try:
         # Savepoint so a unique violation does not poison the caller's outer transaction.
@@ -138,10 +147,7 @@ async def post(
             )
         )
         m.account.balance = m.account.balance + m.amount
-        if m.account.balance < 0 and m.account.account_type not in {
-            AccountType.EXTERNAL,
-            AccountType.TDS_PAYABLE,
-        }:
+        if m.account.balance < 0 and m.account.account_type not in NEGATIVE_ALLOWED:
             raise LedgerError(
                 f"account {m.account.id} ({m.account.account_type.value}) would go negative"
             )
@@ -188,19 +194,20 @@ async def lock(
     amount: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
-    """Reserve funds against an open order: AVAILABLE -> LOCKED.
+    """Reserve funds against an open order: AVAILABLE -> LOCKED, within one sub-wallet.
 
     Must happen before the order reaches the matching engine, never after. The engine has no
     database and cannot check balances, so an unfunded order reaching it produces a trade the
     ledger cannot settle — after the counterparty has been told they filled. The funds stay the
-    user's; they are just not spendable twice.
+    user's; they are just not spendable twice. `wallet` keeps a margin order's lock off spot funds.
     """
     if amount <= 0:
         raise LedgerError("lock amount must be positive")
 
-    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
-    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id, wallet=wallet)
     if available.balance < amount:
         asset = await db.get(Asset, asset_id)
         raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, available.balance)
@@ -222,13 +229,14 @@ async def unlock(
     amount: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
-    """Release a reservation on cancel or expiry: LOCKED -> AVAILABLE."""
+    """Release a reservation on cancel or expiry: LOCKED -> AVAILABLE, within one sub-wallet."""
     if amount <= 0:
         raise LedgerError("unlock amount must be positive")
 
-    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
-    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id, wallet=wallet)
     if locked.balance < amount:
         asset = await db.get(Asset, asset_id)
         raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, locked.balance)
@@ -347,6 +355,8 @@ async def settle_trade(
     seller_fee: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    buyer_wallet: str = WALLET_SPOT,
+    seller_wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
     """Settle one fill: the buyer gets base, the seller gets quote, each pays a fee on what they
     receive. Both sides' funds are already LOCKED (buyer's quote, seller's base).
@@ -355,14 +365,15 @@ async def settle_trade(
         base  (seller.LOCKED -> buyer.AVAILABLE, minus buyer's fee to FEE_INCOME)
 
     Sums to zero in each asset independently. Fees are taken from the received side, exactly as
-    Binance does — the buyer pays their fee in base, the seller in quote.
+    Binance does — the buyer pays their fee in base, the seller in quote. Each side settles in its
+    own wallet, so a margin taker and a spot maker fill against each other cleanly.
     """
     quote_amount = price * quantity
 
-    buyer_quote_locked = await get_or_create_account(db, quote_asset_id, AccountType.LOCKED, buyer_id)
-    seller_quote_avail = await get_or_create_account(db, quote_asset_id, AccountType.AVAILABLE, seller_id)
-    seller_base_locked = await get_or_create_account(db, base_asset_id, AccountType.LOCKED, seller_id)
-    buyer_base_avail = await get_or_create_account(db, base_asset_id, AccountType.AVAILABLE, buyer_id)
+    buyer_quote_locked = await get_or_create_account(db, quote_asset_id, AccountType.LOCKED, buyer_id, wallet=buyer_wallet)
+    seller_quote_avail = await get_or_create_account(db, quote_asset_id, AccountType.AVAILABLE, seller_id, wallet=seller_wallet)
+    seller_base_locked = await get_or_create_account(db, base_asset_id, AccountType.LOCKED, seller_id, wallet=seller_wallet)
+    buyer_base_avail = await get_or_create_account(db, base_asset_id, AccountType.AVAILABLE, buyer_id, wallet=buyer_wallet)
 
     movements = [
         Movement(buyer_quote_locked, -quote_amount),
@@ -384,6 +395,180 @@ async def settle_trade(
     )
 
 
+async def p2p_release_escrow(
+    db: AsyncSession,
+    *,
+    seller_id: int,
+    buyer_id: int,
+    asset_id: int,
+    amount: Decimal,
+    fee: Decimal = Decimal(0),
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Release P2P escrow: the seller's LOCKED crypto goes to the buyer's AVAILABLE.
+
+    The fiat leg settles off-platform between the two people, so only the crypto moves on our books.
+    An optional platform fee is skimmed to FEE_INCOME. Balances to zero in the crypto asset:
+    seller.LOCKED -= amount ; buyer.AVAILABLE += amount - fee ; FEE_INCOME += fee.
+    """
+    if amount <= 0:
+        raise LedgerError("release amount must be positive")
+    if fee < 0 or fee >= amount:
+        raise LedgerError("fee must be non-negative and less than the amount")
+
+    seller_locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, seller_id)
+    buyer_avail = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, buyer_id)
+    if seller_locked.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, seller_locked.balance)
+
+    movements = [Movement(seller_locked, -amount), Movement(buyer_avail, amount - fee)]
+    if fee > 0:
+        movements.append(Movement(await get_or_create_account(db, asset_id, AccountType.FEE_INCOME), fee))
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.TRADE,
+        reference=reference,
+        movements=movements,
+    )
+
+
+async def transfer_wallet(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    from_wallet: str,
+    to_wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move a user's AVAILABLE funds from one sub-wallet to another (e.g. spot -> margin collateral).
+
+    Same asset, same user, both AVAILABLE — so it balances to zero. This is how collateral enters and
+    leaves a margin account without ever leaving the user's ownership.
+    """
+    if amount <= 0:
+        raise LedgerError("transfer amount must be positive")
+    if from_wallet == to_wallet:
+        raise LedgerError("source and destination wallets are the same")
+
+    src = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=from_wallet)
+    dst = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=to_wallet)
+    if src.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, src.balance)
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.MARGIN_TRANSFER,
+        reference=reference,
+        movements=[Movement(src, -amount), Movement(dst, amount)],
+    )
+
+
+async def margin_borrow(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Lend a margin borrower funds: their MARGIN AVAILABLE += amount, the pool goes negative.
+
+    The MARGIN_BORROWED pool is the exchange's lent-out liability in this asset; its magnitude is the
+    outstanding principal. Balances to zero — nothing is minted, the pool simply owes it out.
+    """
+    if amount <= 0:
+        raise LedgerError("borrow amount must be positive")
+
+    borrower = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    pool = await get_or_create_account(db, asset_id, AccountType.MARGIN_BORROWED)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.MARGIN_BORROW,
+        reference=reference,
+        movements=[Movement(pool, -amount), Movement(borrower, amount)],
+    )
+
+
+async def margin_repay(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    principal: Decimal,
+    interest: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Repay a margin loan: principal returns to the pool, interest becomes fee income.
+
+    MARGIN AVAILABLE -= principal+interest ; pool += principal ; FEE_INCOME += interest. Balances to
+    zero: the principal the pool lent comes back, and the interest is what the exchange earned.
+    """
+    if principal < 0 or interest < 0 or principal + interest <= 0:
+        raise LedgerError("bad repay amounts")
+
+    borrower = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    total = principal + interest
+    if borrower.balance < total:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), total, borrower.balance)
+
+    pool = await get_or_create_account(db, asset_id, AccountType.MARGIN_BORROWED)
+    movements = [Movement(borrower, -total), Movement(pool, principal)]
+    if interest > 0:
+        movements.append(Movement(await get_or_create_account(db, asset_id, AccountType.FEE_INCOME), interest))
+
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.MARGIN_INTEREST if interest > 0 else TransactionKind.MARGIN_BORROW,
+        reference=reference,
+        movements=movements,
+    )
+
+
+async def collect_fee(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    kind: TransactionKind = TransactionKind.FEE,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Take a fee from a user's AVAILABLE (in `wallet`) into FEE_INCOME. Used for liquidation fees."""
+    if amount <= 0:
+        raise LedgerError("fee amount must be positive")
+    src = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    if src.balance < amount:
+        amount = src.balance  # never take more than is there; the insurance fund covers any shortfall
+    if amount <= 0:
+        return None
+    fee_income = await get_or_create_account(db, asset_id, AccountType.FEE_INCOME)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=kind,
+        reference=reference,
+        movements=[Movement(src, -amount), Movement(fee_income, amount)],
+    )
+
+
 @dataclass(frozen=True)
 class Balance:
     asset_id: int
@@ -397,14 +582,16 @@ class Balance:
         return self.available + self.locked
 
 
-async def balances(db: AsyncSession, user_id: int) -> list[Balance]:
-    """Every asset this user holds, spendable and reserved — one query, not one per asset."""
+async def balances(db: AsyncSession, user_id: int, wallet: str = WALLET_SPOT) -> list[Balance]:
+    """Every asset this user holds in one wallet, spendable and reserved — one query, not one per
+    asset. Defaults to the SPOT wallet so margin/demo funds never leak into the spot view."""
     rows = (
         await db.execute(
             select(Asset, Account.account_type, Account.balance)
             .join(Account, Account.asset_id == Asset.id)
             .where(
                 Account.user_id == user_id,
+                Account.wallet == wallet,
                 Account.account_type.in_([AccountType.AVAILABLE, AccountType.LOCKED]),
             )
             .order_by(Asset.symbol)

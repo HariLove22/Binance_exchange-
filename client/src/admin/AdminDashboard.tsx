@@ -5,6 +5,7 @@ import {
   trimAmount,
   type AdminUserRow,
   type AuthUser,
+  type P2PDispute,
   type ReconciliationRow,
 } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
@@ -19,7 +20,7 @@ import "./admin.css";
  */
 export function AdminDashboard({ user }: { user: AuthUser }) {
   const { logout } = useAuth();
-  const [tab, setTab] = useState<"users" | "reconcile">("users");
+  const [tab, setTab] = useState<"users" | "reconcile" | "disputes">("users");
 
   return (
     <div className="admin">
@@ -42,10 +43,13 @@ export function AdminDashboard({ user }: { user: AuthUser }) {
         <button className={tab === "reconcile" ? "active" : ""} onClick={() => setTab("reconcile")}>
           Reconciliation
         </button>
+        <button className={tab === "disputes" ? "active" : ""} onClick={() => setTab("disputes")}>
+          P2P Disputes
+        </button>
       </nav>
 
       <main className="admin-main">
-        {tab === "users" ? <UsersAndFunds /> : <Reconciliation />}
+        {tab === "users" ? <UsersAndFunds /> : tab === "reconcile" ? <Reconciliation /> : <P2PDisputes />}
       </main>
     </div>
   );
@@ -237,6 +241,89 @@ function Reconciliation() {
         ))}
         {active.length === 0 && <div className="at-r"><span className="admin-sub">no funded assets yet</span></div>}
       </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------- p2p disputes */
+
+function P2PDisputes() {
+  const [rows, setRows] = useState<P2PDispute[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setRows(await api.p2pDisputes());
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function resolve(id: number, inFavorOfBuyer: boolean) {
+    setBusy(id);
+    setError(null);
+    try {
+      await api.p2pResolve(id, inFavorOfBuyer);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="admin-card wide">
+      <div className="admin-card-head">
+        <h2>P2P Disputes</h2>
+        <button className="admin-link" onClick={() => void load()}>refresh</button>
+      </div>
+      <p className="admin-sub">
+        Orders where the buyer paid but the seller hasn&apos;t released (or the reverse). Resolving
+        either releases the escrowed crypto to the buyer or refunds it to the seller — the escrow
+        can only go one way, and the ledger stays balanced.
+      </p>
+
+      {error && <p className="admin-error">{error}</p>}
+
+      {rows.length === 0 ? (
+        <div className="recon-banner good">No open disputes 🎉</div>
+      ) : (
+        <div className="admin-table dispute">
+          <div className="at-h">
+            <span>Order</span>
+            <span>Amount</span>
+            <span>Seller (holds crypto)</span>
+            <span>Buyer (paid fiat)</span>
+            <span className="num">Resolve</span>
+          </div>
+          {rows.map((d) => (
+            <div className="at-r" key={d.id}>
+              <span className="mono">#{d.id}</span>
+              <span>
+                <div className="mono">{trimAmount(d.crypto_amount)} {d.asset}</div>
+                <div className="admin-sub">{trimAmount(d.fiat_amount)} {d.fiat} · {d.payment_method}</div>
+              </span>
+              <span className="trunc">{d.seller_email}</span>
+              <span className="trunc">{d.buyer_email}</span>
+              <span className="num dispute-acts">
+                <button className="admin-primary sm" disabled={busy === d.id} onClick={() => resolve(d.id, true)}>
+                  Release to buyer
+                </button>
+                <button className="admin-ghost sm" disabled={busy === d.id} onClick={() => resolve(d.id, false)}>
+                  Refund seller
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

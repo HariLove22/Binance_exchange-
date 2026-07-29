@@ -16,7 +16,7 @@ import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
 import "./trade.css";
 
-const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
+export const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
 /**
  * Spot trading terminal, laid out like Binance: order book and our trades on the left, the chart
@@ -155,7 +155,7 @@ export function Trade() {
 
 /* -------------------------------------------------------------- market list */
 
-function fmtPx(p: number): string {
+export function fmtPx(p: number): string {
   if (p >= 1000) return p.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (p >= 1) return p.toFixed(2);
   if (p >= 0.01) return p.toFixed(4);
@@ -168,7 +168,7 @@ function fmtPx(p: number): string {
  * universe is thousands of rows — too many for individual WebSocket subscriptions, so the snapshot
  * is polled and the *selected* pair alone gets the live WS ticker in the header).
  */
-function MarketList({ current, onPick }: { current: string; onPick: (s: string) => void }) {
+export function MarketList({ current, onPick }: { current: string; onPick: (s: string) => void }) {
   const [segments, setSegments] = useState<string[]>(["USDT"]);
   const [seg, setSeg] = useState("USDT");
   const [rows, setRows] = useState<UniverseRow[]>([]);
@@ -255,7 +255,7 @@ function ListForTrading({ symbol, onListed }: { symbol: string; onListed: () => 
   );
 }
 
-function SeedLiquidity() {
+export function SeedLiquidity() {
   const [busy, setBusy] = useState(false);
   return (
     <button
@@ -289,7 +289,7 @@ function usePoll(fn: () => void, ms: number) {
 
 /* ------------------------------------------------------------------- book */
 
-function OrderBookPanel({
+export function OrderBookPanel({
   book, onPick, live,
 }: {
   book: OrderBook | null;
@@ -626,7 +626,7 @@ function SideForm({
 
 /* ---------------------------------------------------------------- trades */
 
-function RecentTrades({ symbol, trades }: { symbol: string; trades: TradeTick[] }) {
+export function RecentTrades({ symbol, trades }: { symbol: string; trades: TradeTick[] }) {
   return (
     <div className="tp trades-box">
       <div className="tp-head"><span className="tp-title">Market trades</span><span className="tp-sub">ours · live</span></div>

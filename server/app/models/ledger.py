@@ -66,13 +66,30 @@ class AccountType(str, enum.Enum):
     EXTERNAL = "EXTERNAL"
     FEE_INCOME = "FEE_INCOME"
     TDS_PAYABLE = "TDS_PAYABLE"
+    # The margin lending pool, per asset (system-owned). Goes negative by the amount lent out to
+    # margin borrowers — its magnitude is the exchange's outstanding margin loans in that asset.
+    MARGIN_BORROWED = "MARGIN_BORROWED"
+
+
+# Which wallet an account belongs to. SPOT is the default everything has used until now; MARGIN is
+# the cross-margin sub-wallet; isolated margin uses "MARGIN:{symbol}". A user's spendable USDT in
+# spot and in margin are different accounts, so margin risk never touches spot funds.
+WALLET_SPOT = "SPOT"
+WALLET_MARGIN = "MARGIN"
+
+
+def isolated_wallet(symbol: str) -> str:
+    return f"MARGIN:{symbol.upper()}"
 
 
 USER_ACCOUNT_TYPES = frozenset(
     {AccountType.AVAILABLE, AccountType.LOCKED, AccountType.PENDING_WITHDRAWAL}
 )
-# May legitimately go negative. EXTERNAL is negative by construction; TDS accrues as a liability.
-NEGATIVE_ALLOWED = frozenset({AccountType.EXTERNAL, AccountType.TDS_PAYABLE})
+# May legitimately go negative. EXTERNAL is negative by construction; TDS accrues as a liability;
+# MARGIN_BORROWED is negative by the amount the pool has lent to margin borrowers.
+NEGATIVE_ALLOWED = frozenset(
+    {AccountType.EXTERNAL, AccountType.TDS_PAYABLE, AccountType.MARGIN_BORROWED}
+)
 
 
 class TransactionKind(str, enum.Enum):
@@ -84,6 +101,10 @@ class TransactionKind(str, enum.Enum):
     FEE = "FEE"
     TDS = "TDS"
     ADJUSTMENT = "ADJUSTMENT"
+    # Margin: moving collateral between spot and margin wallets, borrowing, and interest on repay.
+    MARGIN_TRANSFER = "MARGIN_TRANSFER"
+    MARGIN_BORROW = "MARGIN_BORROW"
+    MARGIN_INTEREST = "MARGIN_INTEREST"
     # Test funds credited by an admin — a distinct kind so it is never mistaken for a real
     # deposit in reporting and every one is trivially findable.
     ADMIN_CREDIT = "ADMIN_CREDIT"
@@ -102,26 +123,32 @@ class Account(TimestampMixin, Base):
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id", ondelete="RESTRICT"), nullable=False)
     account_type: Mapped[AccountType] = mapped_column(str_enum(AccountType, "account_type"), nullable=False)
 
+    # Which sub-wallet: SPOT (default), MARGIN (cross), or MARGIN:{symbol} (isolated). Part of the
+    # account's identity, so spot and margin balances of the same asset never share a row.
+    wallet: Mapped[str] = mapped_column(String(24), nullable=False, server_default="SPOT", default="SPOT")
+
     balance: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal(0))
 
     entries: Mapped[list["LedgerEntry"]] = relationship(back_populates="account")
 
     __table_args__ = (
-        # One account per (user, asset, type) — a second AVAILABLE in the same asset would let a
-        # race double-spend across the two.
+        # One account per (user, asset, type, wallet) — a second AVAILABLE in the same asset+wallet
+        # would let a race double-spend across the two.
         Index(
             "uq_accounts_user_asset_type",
             "user_id",
             "asset_id",
             "account_type",
+            "wallet",
             unique=True,
             postgresql_where=user_id.isnot(None),
         ),
-        # One system account per (asset, type).
+        # One system account per (asset, type, wallet).
         Index(
             "uq_accounts_system_asset_type",
             "asset_id",
             "account_type",
+            "wallet",
             unique=True,
             postgresql_where=user_id.is_(None),
         ),
@@ -132,9 +159,10 @@ class Account(TimestampMixin, Base):
             " OR (account_type NOT IN ('AVAILABLE', 'LOCKED', 'PENDING_WITHDRAWAL') AND user_id IS NULL)",
             name="ck_accounts_user_type_consistency",
         ),
-        # A negative user balance means we let someone spend money they did not have.
+        # A negative user balance means we let someone spend money they did not have. The margin
+        # pool is the sanctioned exception alongside EXTERNAL/TDS.
         CheckConstraint(
-            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE')",
+            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE', 'MARGIN_BORROWED')",
             name="ck_accounts_no_negative_user_balance",
         ),
     )

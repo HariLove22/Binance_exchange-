@@ -16,12 +16,24 @@ from app.models.asset import (
 from app.models.ledger import (
     NEGATIVE_ALLOWED,
     USER_ACCOUNT_TYPES,
+    WALLET_MARGIN,
+    WALLET_SPOT,
     Account,
     AccountType,
     LedgerEntry,
     LedgerTransaction,
     TransactionKind,
+    isolated_wallet,
 )
+from app.models.margin import (
+    MarginAccount,
+    MarginAccountStatus,
+    MarginLoan,
+    MarginLoanStatus,
+    MarginMode,
+    MarginTier,
+)
+from app.models.demo import DemoAccount, DemoHolding
 from app.models.market import (
     CANCELLABLE_STATUSES,
     Market,
@@ -32,6 +44,14 @@ from app.models.market import (
     OrderType,
     STOP_TYPES,
     Trade,
+)
+from app.models.p2p import (
+    P2P_OPEN_STATUSES,
+    P2PAd,
+    P2PAdStatus,
+    P2POrder,
+    P2POrderStatus,
+    P2PSide,
 )
 from app.models.user import User, UserRole
 from app.models.wallet import (
@@ -45,6 +65,9 @@ from app.models.wallet import (
 __all__ = [
     "NEGATIVE_ALLOWED",
     "USER_ACCOUNT_TYPES",
+    "WALLET_MARGIN",
+    "WALLET_SPOT",
+    "isolated_wallet",
     "Account",
     "AccountType",
     "AddressModel",
@@ -53,18 +76,32 @@ __all__ = [
     "AssetNetwork",
     "Chain",
     "ChainFamily",
+    "DemoAccount",
+    "DemoHolding",
     "Deposit",
     "DepositAddress",
     "DepositStatus",
     "CANCELLABLE_STATUSES",
     "LedgerEntry",
     "LedgerTransaction",
+    "MarginAccount",
+    "MarginAccountStatus",
+    "MarginLoan",
+    "MarginLoanStatus",
+    "MarginMode",
+    "MarginTier",
     "Market",
     "OPEN_STATUSES",
     "Order",
     "OrderSide",
     "OrderStatus",
     "OrderType",
+    "P2P_OPEN_STATUSES",
+    "P2PAd",
+    "P2PAdStatus",
+    "P2POrder",
+    "P2POrderStatus",
+    "P2PSide",
     "STOP_TYPES",
     "Trade",
     "TransactionKind",

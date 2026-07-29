@@ -1,0 +1,123 @@
+.p2p { max-width: 1180px; margin: 0 auto; padding: 0.5rem 1.2rem 2rem; color: #eaecef; }
+
+/* sub-nav */
+.p2p-subnav { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2b3139; margin-bottom: 1.2rem; }
+.p2p-subtabs { display: flex; gap: 1.6rem; }
+.p2p-subtabs button { background: none; border: none; font: inherit; font-size: 1rem; font-weight: 600; color: #848e9c; padding: 0.8rem 0; cursor: pointer; border-bottom: 2px solid transparent; }
+.p2p-subtabs button.on { color: #eaecef; border-bottom-color: #f0b90b; }
+.p2p-subtabs button.disabled { color: #5b626b; cursor: not-allowed; }
+.p2p-subactions { display: flex; align-items: center; gap: 0.4rem; }
+.p2p-subactions > button { background: none; border: none; color: #b7bdc6; font: inherit; font-size: 0.85rem; padding: 0.45rem 0.7rem; border-radius: 6px; cursor: pointer; }
+.p2p-subactions > button.on { background: #2b3139; color: #eaecef; }
+.p2p-more { position: relative; }
+.p2p-more > button { background: none; border: none; color: #f0b90b; font: inherit; font-size: 0.85rem; padding: 0.45rem 0.7rem; cursor: pointer; }
+.p2p-more-menu { position: absolute; right: 0; top: 110%; background: #1e2329; border: 1px solid #2b3139; border-radius: 8px; padding: 0.4rem; min-width: 170px; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.p2p-more-menu button { display: block; width: 100%; text-align: left; background: none; border: none; color: #eaecef; font: inherit; font-size: 0.85rem; padding: 0.55rem 0.7rem; border-radius: 6px; cursor: pointer; }
+.p2p-more-menu button:hover { background: #2b3139; }
+
+/* toolbar: buy/sell + coin strip */
+.p2p-toolbar { display: flex; align-items: center; gap: 1.4rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.p2p-bs { display: inline-flex; background: #2b3139; border-radius: 8px; padding: 3px; }
+.p2p-bs.sm { padding: 2px; }
+.p2p-bs button { background: none; border: none; color: #848e9c; font: inherit; font-weight: 600; padding: 0.45rem 1.5rem; border-radius: 6px; cursor: pointer; }
+.p2p-bs.sm button { padding: 0.4rem 1rem; }
+.p2p-bs button.buy.on { background: #0ecb81; color: #06121a; }
+.p2p-bs button.sell.on { background: #f6465d; color: #fff; }
+.p2p-coins { display: flex; gap: 1.1rem; flex-wrap: wrap; align-items: center; }
+.p2p-coins button { background: none; border: none; color: #848e9c; font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; padding: 0.2rem 0; display: inline-flex; align-items: center; gap: 0.35rem; }
+.p2p-coins button.on { color: #eaecef; position: relative; }
+.p2p-coins button.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; background: #f0b90b; border-radius: 2px; }
+.p2p-apr { color: #0ecb81; font-size: 0.62rem; background: rgba(14,203,129,0.12); padding: 0.05rem 0.3rem; border-radius: 3px; }
+
+/* filters */
+.p2p-filters { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+.p2p-amount { display: flex; align-items: center; background: #1e2329; border: 1px solid #2b3139; border-radius: 8px; overflow: hidden; }
+.p2p-amount input { background: none; border: none; color: #eaecef; font: inherit; font-size: 0.85rem; padding: 0.6rem 0.8rem; width: 190px; }
+.p2p-amount input:focus { outline: none; }
+.p2p-fiatsel { background: #2b3139; border: none; color: #eaecef; font: inherit; font-size: 0.82rem; padding: 0.6rem 0.7rem; cursor: pointer; }
+.p2p-paysel { background: #1e2329; border: 1px solid #2b3139; color: #eaecef; font: inherit; font-size: 0.82rem; padding: 0.6rem 0.8rem; border-radius: 8px; cursor: pointer; }
+.p2p-refresh { background: #1e2329; border: 1px solid #2b3139; color: #b7bdc6; font: inherit; font-size: 0.82rem; padding: 0.6rem 0.9rem; border-radius: 8px; cursor: pointer; }
+.p2p-sort { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; color: #848e9c; font-size: 0.82rem; }
+.p2p-sort select { background: #1e2329; border: 1px solid #2b3139; color: #eaecef; font: inherit; font-size: 0.82rem; padding: 0.5rem 0.6rem; border-radius: 8px; cursor: pointer; }
+
+/* ad table */
+.p2p-ads-h, .p2p-ad-row { display: grid; grid-template-columns: 2fr 1.1fr 1.5fr 1.4fr 1fr; align-items: center; gap: 0.8rem; }
+.p2p-ads-h { padding: 0.6rem 0.4rem; font-size: 0.72rem; color: #848e9c; border-bottom: 1px solid #2b3139; }
+.ta-r { text-align: right; }
+.p2p-ad { border-bottom: 1px solid #1c2127; }
+.p2p-ad-row { padding: 1rem 0.4rem; }
+
+.p2p-adv { display: flex; align-items: flex-start; gap: 0.6rem; }
+.p2p-avatar { position: relative; width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#f0b90b,#c99400); display: grid; place-items: center; font-size: 0.85rem; font-weight: 700; color: #1e2026; flex-shrink: 0; }
+.p2p-online { position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px; border-radius: 50%; background: #0ecb81; border: 2px solid #181a20; }
+.p2p-adv-body { display: flex; flex-direction: column; gap: 0.15rem; }
+.p2p-adv-name { font-size: 0.9rem; font-weight: 600; }
+.p2p-badge { color: #f0b90b; font-size: 0.7rem; }
+.p2p-adv-stats { font-size: 0.72rem; color: #b7bdc6; }
+.p2p-adv-meta { font-size: 0.72rem; color: #848e9c; }
+.p2p-new { color: #0ecb81; }
+.dot { color: #5b626b; margin: 0 0.15rem; }
+
+.p2p-price { font-size: 1.2rem; font-weight: 600; font-family: ui-monospace, monospace; }
+.p2p-price em { font-style: normal; color: #848e9c; font-size: 0.72rem; font-family: inherit; }
+.p2p-avail { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
+.p2p-avail em { font-style: normal; color: #848e9c; font-size: 0.75rem; }
+.mono { font-family: ui-monospace, monospace; }
+
+.p2p-pm { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.p2p-chip { display: inline-flex; align-items: center; gap: 0.35rem; color: #b7bdc6; font-size: 0.72rem; }
+.p2p-chip i { width: 3px; height: 12px; border-radius: 2px; background: #f0b90b; display: inline-block; }
+
+.p2p-act { border: none; border-radius: 6px; padding: 0.55rem 1.3rem; font-weight: 600; cursor: pointer; color: #06121a; font-size: 0.88rem; }
+.p2p-act.buy { background: #0ecb81; }
+.p2p-act.sell { background: #f6465d; color: #fff; }
+
+/* inline order form */
+.p2p-order-form { background: #16191e; border-radius: 8px; padding: 0.9rem; margin: 0 0.4rem 0.9rem; }
+.p2p-terms { color: #b7bdc6; font-size: 0.82rem; margin: 0 0 0.7rem; font-style: italic; }
+.p2p-of-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.p2p-of-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: #848e9c; flex: 1; min-width: 160px; }
+.p2p-inp { display: flex; align-items: center; background: #1e2026; border: 1px solid #2b3139; border-radius: 6px; padding: 0 0.55rem; }
+.p2p-inp input { border: none; background: none; color: #eaecef; font: inherit; font-family: ui-monospace, monospace; padding: 0.45rem 0; flex: 1; min-width: 0; }
+.p2p-inp span { color: #848e9c; font-size: 0.75rem; }
+.p2p-of-row select { background: #1e2026; border: 1px solid #2b3139; border-radius: 6px; color: #eaecef; font: inherit; font-size: 0.85rem; padding: 0.45rem 0.55rem; }
+.p2p-of-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 0.8rem; gap: 1rem; flex-wrap: wrap; }
+.p2p-recv { color: #848e9c; font-size: 0.85rem; }
+.p2p-confirm { background: #f0b90b; color: #1e2026; border: none; border-radius: 6px; padding: 0.6rem 1.4rem; font-weight: 600; cursor: pointer; }
+.p2p-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.p2p-empty, .p2p-err { padding: 1.4rem 0.4rem; color: #848e9c; font-size: 0.85rem; }
+.p2p-err { color: #f6465d; }
+
+/* post-ad modal */
+.p2p-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: grid; place-items: center; z-index: 50; padding: 1rem; }
+.p2p-postform { box-sizing: border-box; background: #181a20; border: 1px solid #2b3139; border-radius: 12px; padding: 1.4rem; width: 100%; max-width: 680px; }
+.p2p-postform * { box-sizing: border-box; }
+.p2p-pf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.p2p-pf-head h3 { margin: 0; font-size: 1.1rem; }
+.p2p-x { background: none; border: none; color: #848e9c; font-size: 1rem; cursor: pointer; }
+.p2p-pf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; margin-bottom: 1rem; }
+.p2p-pf-grid label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.72rem; color: #848e9c; min-width: 0; }
+.p2p-pf-grid label.wide { grid-column: 1 / -1; }
+.p2p-pf-grid select, .p2p-pf-grid input { width: 100%; min-width: 0; background: #1e2026; border: 1px solid #2b3139; border-radius: 6px; color: #eaecef; font: inherit; font-size: 0.85rem; padding: 0.5rem 0.6rem; }
+.p2p-pf-grid .p2p-bs { width: 100%; }
+.p2p-pf-grid .p2p-bs button { flex: 1; padding: 0.45rem 0; }
+@media (max-width: 560px) { .p2p-pf-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* my orders */
+.p2p-orders { margin-top: 1.8rem; }
+.p2p-orders h2 { font-size: 1.05rem; margin-bottom: 0.6rem; }
+.p2p-order { display: grid; grid-template-columns: auto auto 1fr auto auto; align-items: center; gap: 0.7rem; padding: 0.65rem 0.8rem; border: 1px solid #2b3139; border-radius: 8px; margin-bottom: 0.5rem; }
+.p2p-side { font-weight: 700; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+.p2p-side.buy { background: rgba(14,203,129,0.15); color: #0ecb81; }
+.p2p-side.sell { background: rgba(246,70,93,0.15); color: #f6465d; }
+.dim { color: #848e9c; font-size: 0.82rem; }
+.p2p-status { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: #2b3139; color: #b7bdc6; text-transform: capitalize; }
+.p2p-status.s-released { color: #0ecb81; }
+.p2p-status.s-canceled { color: #848e9c; }
+.p2p-status.s-disputed, .p2p-status.s-paid { color: #f0b90b; }
+.p2p-order-acts { display: flex; gap: 0.4rem; }
+.p2p-mini { background: #2b3139; border: none; color: #eaecef; border-radius: 6px; padding: 0.4rem 0.8rem; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.p2p-mini.buy { background: #0ecb81; color: #06121a; font-weight: 600; }
+.p2p-mini.warn { background: rgba(240,185,11,0.18); color: #f0b90b; }
+.p2p-mini:disabled { opacity: 0.5; }

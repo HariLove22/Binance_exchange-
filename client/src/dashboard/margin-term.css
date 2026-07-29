@@ -1,0 +1,46 @@
+/* Margin terminal — extends trade.css with margin-specific bits. */
+
+.mgt-lev { font-size: 0.72rem; background: rgba(240,185,11,0.16); color: #f0b90b; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.4rem; font-weight: 600; }
+
+.mgt-ml { display: flex; flex-direction: column; align-items: flex-end; margin-right: 0.8rem; }
+.mgt-ml span { font-size: 0.6rem; color: #848e9c; text-transform: uppercase; letter-spacing: 0.03em; }
+.mgt-ml b { font-family: ui-monospace, monospace; font-size: 0.95rem; color: #0ecb81; }
+.mgt-ml b.margin_call { color: #f0b90b; }
+.mgt-ml b.liquidatable { color: #f6465d; }
+
+.mgt-hbtn { background: #2b3139; border: none; color: #eaecef; font: inherit; font-size: 0.75rem; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.4rem; }
+.mgt-hbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.mgt-modes { display: flex; align-items: center; gap: 0.3rem; padding: 0.5rem 0.9rem 0; }
+.mgt-modes button { background: none; border: none; color: #848e9c; font: inherit; font-size: 0.85rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 6px; cursor: pointer; }
+.mgt-modes button.on { background: rgba(240,185,11,0.14); color: #f0b90b; }
+.mgt-steps { margin-left: auto; font-size: 0.64rem; color: #6b7280; }
+
+/* Normal / Borrow toggle inside each side form */
+.mgt-nb { display: inline-flex; background: #0d1117; border: 1px solid #2b3139; border-radius: 6px; padding: 2px; margin-bottom: 0.5rem; align-self: flex-start; }
+.mgt-nb button { background: none; border: none; color: #848e9c; font: inherit; font-size: 0.72rem; padding: 0.25rem 0.7rem; border-radius: 4px; cursor: pointer; }
+.mgt-nb button.on { background: #2b3139; color: #f0b90b; }
+
+.mgt-open { padding: 1rem 0.9rem; }
+.mgt-open-row { display: flex; gap: 0.6rem; align-items: flex-end; margin-top: 0.6rem; }
+.mgt-open-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: #848e9c; }
+.mgt-open-row input, .mgt-frow input, .mgt-frow select { background: #0d1117; border: 1px solid #2b3139; border-radius: 6px; color: #eaecef; font: inherit; font-size: 0.85rem; padding: 0.45rem 0.55rem; }
+.mgt-open-btn { background: #f0b90b; color: #1e2026; border: none; border-radius: 7px; padding: 0.55rem 1rem; font: inherit; font-weight: 600; cursor: pointer; width: 100%; }
+.mgt-open-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mgt-err { color: #f6465d; font-size: 0.8rem; margin: 0.4rem 0 0; }
+
+.mgt-eq { margin-left: auto; font-size: 0.72rem; color: #848e9c; }
+
+/* modals */
+.mgt-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: grid; place-items: center; z-index: 60; padding: 1rem; }
+.mgt-box { background: #181a20; border: 1px solid #2b3139; border-radius: 12px; width: 100%; max-width: 380px; padding: 1.2rem; }
+.mgt-box-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
+.mgt-box-h h3 { margin: 0; font-size: 1rem; }
+.mgt-box-h button { background: none; border: none; color: #848e9c; font-size: 1rem; cursor: pointer; }
+.mgt-seg { display: flex; background: #0d1117; border: 1px solid #2b3139; border-radius: 8px; padding: 3px; margin-bottom: 0.8rem; }
+.mgt-seg button { flex: 1; background: none; border: none; color: #848e9c; font: inherit; font-size: 0.82rem; padding: 0.45rem; border-radius: 6px; cursor: pointer; }
+.mgt-seg button.on { background: #2b3139; color: #eaecef; }
+.mgt-hint { font-size: 0.76rem; color: #848e9c; margin: 0 0 0.7rem; }
+.mgt-frow { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
+.mgt-frow select { min-width: 90px; }
+.mgt-frow input { flex: 1; min-width: 0; }

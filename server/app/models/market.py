@@ -136,6 +136,10 @@ class Order(TimestampMixin, Base):
         str_enum(OrderStatus, "order_status"), nullable=False, default=OrderStatus.NEW
     )
 
+    # Which sub-wallet this order trades from: SPOT by default, or a MARGIN wallet for a leveraged
+    # order. Funds lock and settle in this wallet, so a margin order never touches spot balances.
+    wallet: Mapped[str] = mapped_column(String(24), nullable=False, server_default="SPOT", default="SPOT")
+
     # How much is still locked for this order. Set when funds are reserved, decremented as fills
     # consume it, released on cancel or completion. The release path reads exactly this — so it can
     # never release more or less than remains.

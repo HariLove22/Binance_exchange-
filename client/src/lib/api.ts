@@ -260,6 +260,18 @@ export const api = {
   login: (body: LoginBody) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request<AuthUser>("/auth/me"),
+  updateProfile: (body: { full_name: string }) =>
+    request<AuthUser>("/auth/profile", { method: "PATCH", body: JSON.stringify(body) }),
+  changePassword: (body: { current_password: string; new_password: string }) =>
+    request<{ message: string }>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
+
+  // account center
+  accountOverview: () => request<AccountOverview>("/account/overview"),
+  demoGet: () => request<DemoAccount>("/account/demo"),
+  demoCreate: () => request<DemoAccount>("/account/demo", { method: "POST" }),
+  demoReset: () => request<DemoAccount>("/account/demo/reset", { method: "POST" }),
+  demoTrade: (body: { base: string; side: "BUY" | "SELL"; quantity: string }) =>
+    request<DemoAccount>("/account/demo/trade", { method: "POST", body: JSON.stringify(body) }),
 
   balances: () => request<Balance[]>("/wallet/balances"),
   networks: (asset?: string) =>
@@ -349,7 +361,147 @@ export const api = {
     request<ConvertQuote>("/wallet/convert/quote", { method: "POST", body: JSON.stringify(body) }),
   convertExecute: (body: { from_asset: string; to_asset: string; from_amount: string }) =>
     request<ConvertQuote>("/wallet/convert/execute", { method: "POST", body: JSON.stringify(body) }),
+
+  // P2P
+  p2pAds: (q: { asset?: string; fiat?: string; side?: "BUY" | "SELL"; amount?: string; payment_method?: string; sort?: string } = {}) => {
+    const p = new URLSearchParams();
+    if (q.asset) p.set("asset", q.asset);
+    if (q.fiat) p.set("fiat", q.fiat);
+    if (q.side) p.set("side", q.side);
+    if (q.amount) p.set("amount", q.amount);
+    if (q.payment_method) p.set("payment_method", q.payment_method);
+    if (q.sort) p.set("sort", q.sort);
+    const qs = p.toString();
+    return request<P2PAd[]>(`/p2p/ads${qs ? `?${qs}` : ""}`);
+  },
+  p2pMyAds: () => request<P2PAd[]>("/p2p/ads/mine"),
+  p2pPostAd: (body: {
+    side: "BUY" | "SELL"; asset: string; fiat: string; price: string;
+    min_fiat: string; max_fiat: string; total_qty: string; payment_methods: string; terms?: string | null;
+  }) => request<P2PAd>("/p2p/ads", { method: "POST", body: JSON.stringify(body) }),
+  p2pCloseAd: (id: number) => request<P2PAd>(`/p2p/ads/${id}/close`, { method: "POST" }),
+  p2pOpenOrder: (body: { ad_id: number; fiat_amount: string; payment_method: string }) =>
+    request<P2POrder>("/p2p/orders", { method: "POST", body: JSON.stringify(body) }),
+  p2pMyOrders: (openOnly = false) => request<P2POrder[]>(`/p2p/orders${openOnly ? "?open_only=true" : ""}`),
+  p2pMarkPaid: (id: number) => request<P2POrder>(`/p2p/orders/${id}/paid`, { method: "POST" }),
+  p2pRelease: (id: number) => request<P2POrder>(`/p2p/orders/${id}/release`, { method: "POST" }),
+  p2pCancel: (id: number) => request<P2POrder>(`/p2p/orders/${id}/cancel`, { method: "POST" }),
+  p2pDispute: (id: number) => request<P2POrder>(`/p2p/orders/${id}/dispute`, { method: "POST" }),
+  p2pResolve: (id: number, inFavorOfBuyer: boolean) =>
+    request<P2POrder>(`/p2p/orders/${id}/resolve`, { method: "POST", body: JSON.stringify({ in_favor_of_buyer: inFavorOfBuyer }) }),
+  p2pDisputes: () => request<P2PDispute[]>("/p2p/admin/disputes"),
+
+  // margin
+  marginOpen: (body: { mode?: "CROSS" | "ISOLATED"; symbol?: string | null; tier?: "CLASSIC" | "PRO"; leverage?: string | null }) =>
+    request<MarginAccount>("/margin/account", { method: "POST", body: JSON.stringify(body) }),
+  marginAccount: (mode: "CROSS" | "ISOLATED" = "CROSS", symbol?: string) =>
+    request<MarginAccount>(`/margin/account?mode=${mode}${symbol ? `&symbol=${symbol}` : ""}`),
+  marginTransfer: (body: { mode?: string; symbol?: string | null; asset: string; amount: string; deposit: boolean }) =>
+    request<MarginAccount>("/margin/transfer", { method: "POST", body: JSON.stringify(body) }),
+  marginBorrow: (body: { mode?: string; symbol?: string | null; asset: string; amount: string }) =>
+    request<MarginAccount>("/margin/borrow", { method: "POST", body: JSON.stringify(body) }),
+  marginRepay: (body: { loan_id: number; amount: string }) =>
+    request<MarginAccount>("/margin/repay", { method: "POST", body: JSON.stringify(body) }),
+  marginOrder: (body: { mode?: string; symbol: string; side: "BUY" | "SELL"; type?: "LIMIT" | "MARKET"; quantity: string; price?: string | null; auto_borrow?: boolean }) =>
+    request<{ id: number; status: string; filled_quantity: string; quantity: string; wallet: string }>("/margin/order", { method: "POST", body: JSON.stringify(body) }),
 };
+
+export interface MarginLoanRow {
+  id: number;
+  asset: string;
+  principal: string;
+  accrued_interest: string;
+  owed: string;
+  hourly_rate: string;
+}
+
+export interface AccountOverview {
+  spot_usd: string;
+  margin: { open: boolean; equity_usd?: string; margin_level?: string | null; health?: string; max_leverage?: string };
+  demo: { exists: boolean; total_usd?: string };
+}
+
+export interface DemoHoldingRow {
+  symbol: string;
+  quantity: string;
+  usd_value: string;
+}
+
+export interface DemoAccount {
+  exists: boolean;
+  total_usd: string;
+  holdings: DemoHoldingRow[];
+}
+
+export interface MarginBalanceRow {
+  asset: string;
+  available: string;
+  locked: string;
+}
+
+export interface MarginAccount {
+  id: number;
+  mode: string;
+  symbol: string | null;
+  tier: string;
+  max_leverage: string;
+  wallet: string;
+  gross_usd: string;
+  debt_usd: string;
+  equity_usd: string;
+  max_borrow_usd: string;
+  margin_level: string | null;
+  health: string;
+  loans: MarginLoanRow[];
+  balances: MarginBalanceRow[];
+}
+
+export interface P2PDispute {
+  id: number;
+  asset: string;
+  crypto_amount: string;
+  fiat: string;
+  fiat_amount: string;
+  price: string;
+  payment_method: string;
+  seller_id: number;
+  seller_email: string;
+  buyer_id: number;
+  buyer_email: string;
+}
+
+export interface P2PAd {
+  id: number;
+  maker_id: number;
+  maker_name: string;
+  maker_orders: number;
+  maker_completion: string | null;
+  pay_window_min: number;
+  side: "BUY" | "SELL";
+  asset: string;
+  fiat: string;
+  price: string;
+  min_fiat: string;
+  max_fiat: string;
+  available_qty: string;
+  payment_methods: string[];
+  terms: string | null;
+  status: string;
+}
+
+export interface P2POrder {
+  id: number;
+  ad_id: number;
+  side_for_me: "BUY" | "SELL";
+  counterparty_id: number;
+  asset: string;
+  fiat: string;
+  price: string;
+  crypto_amount: string;
+  fiat_amount: string;
+  payment_method: string;
+  status: string;
+}
 
 export interface ConvertQuote {
   from_asset: string;
