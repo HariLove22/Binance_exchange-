@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     # client's fetch timeout, or the UI reports a timeout instead of the actual error.
     db_connect_timeout: int = 3
     db_pool_timeout: int = 5
+    # SQL statement logging. Off by default — it slows every request measurably. Opt in per-run.
+    db_echo: bool = False
 
     redis_host: str = "localhost"
     redis_port: int = 6379
