@@ -12,6 +12,7 @@ import {
 } from "../lib/api";
 import { useCoins } from "../lib/useCoins";
 import { CoinSelect } from "./CoinSelect";
+import { FiatSelect } from "./FiatSelect";
 
 /**
  * The Spot wallet — balances, plus the deposit and withdrawal flows.
@@ -191,9 +192,13 @@ function BuyCrypto() {
           <span>You pay</span>
           <div className="buy-input">
             <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
-            <select value={fiat} onChange={(e) => setFiat(e.target.value)}>
-              {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-            </select>
+            {/* Static ISO 4217 list (see lib/fiat). `currencies` is only used to mark which of
+                them the on-ramp can actually quote — it does not populate the list. */}
+            <FiatSelect
+              value={fiat}
+              onChange={setFiat}
+              supported={currencies.length ? new Set(currencies.map((c) => c.code)) : undefined}
+            />
           </div>
         </label>
 
