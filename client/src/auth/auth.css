@@ -4,17 +4,17 @@
    ========================================================================== */
 
 .auth {
-  --bg: #0b0e11;
-  --bg-2: #0f1318;
-  --surface: #161a21;
-  --surface-2: #1b212b;
+  --bg: #070b09;
+  --bg-2: #0b100d;
+  --surface: #101613;
+  --surface-2: #151d19;
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #eaecef;
-  --text-dim: #9aa4b2;
-  --text-faint: #6b7482;
-  --gold: #f0b90b;
-  --gold-2: #fcd535;
+  --text: #e6efe9;
+  --text-dim: #8b9a92;
+  --text-faint: #63736a;
+  --gold: #2bd97c;
+  --gold-2: #4fe89b;
   --up: #0ecb81;
   --down: #f6465d;
   --radius: 16px;
@@ -40,8 +40,8 @@
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(700px 400px at 20% 0%, rgba(240, 185, 11, 0.14), transparent 60%),
-    linear-gradient(160deg, #14100a, var(--bg-2) 60%);
+    radial-gradient(700px 400px at 20% 0%, rgba(43, 217, 124, 0.14), transparent 60%),
+    linear-gradient(160deg, #04140c, var(--bg-2) 60%);
   border-right: 1px solid var(--border);
 }
 .auth-brand-glow {
@@ -69,7 +69,7 @@
 .auth-logo .brand-mark {
   color: var(--gold);
   font-size: 1.4rem;
-  filter: drop-shadow(0 0 10px rgba(240, 185, 11, 0.5));
+  filter: drop-shadow(0 0 10px rgba(43, 217, 124, 0.5));
 }
 .auth-brand-body {
   margin-top: auto;
@@ -111,7 +111,7 @@
   display: grid;
   place-items: center;
   font-size: 0.7rem;
-  color: #1a1400;
+  color: #04170e;
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
 }
 .auth-brand-foot {
@@ -259,7 +259,7 @@
 }
 .field input:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(240, 185, 11, 0.15);
+  box-shadow: 0 0 0 3px rgba(43, 217, 124, 0.15);
 }
 .field-error input {
   border-color: var(--down);
@@ -310,7 +310,7 @@
   transition: background 0.2s ease;
 }
 .strength.s-1 .strength-bars i.on { background: var(--down); }
-.strength.s-2 .strength-bars i.on { background: #f0a020; }
+.strength.s-2 .strength-bars i.on { background: #25c973; }
 .strength.s-3 .strength-bars i.on { background: var(--gold-2); }
 .strength.s-4 .strength-bars i.on { background: var(--up); }
 .strength-label {
@@ -378,11 +378,11 @@
 }
 .btn-primary {
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
-  color: #1a1400;
-  box-shadow: 0 6px 22px -8px rgba(240, 185, 11, 0.6);
+  color: #04170e;
+  box-shadow: 0 6px 22px -8px rgba(43, 217, 124, 0.6);
 }
 .btn-primary:hover {
-  box-shadow: 0 10px 30px -8px rgba(240, 185, 11, 0.7);
+  box-shadow: 0 10px 30px -8px rgba(43, 217, 124, 0.7);
 }
 .btn-block {
   width: 100%;
@@ -396,8 +396,8 @@
   margin-top: 0.3rem;
   padding: 0.8rem 0.9rem;
   border-radius: 10px;
-  border: 1px solid rgba(240, 185, 11, 0.3);
-  background: rgba(240, 185, 11, 0.08);
+  border: 1px solid rgba(43, 217, 124, 0.3);
+  background: rgba(43, 217, 124, 0.08);
   color: var(--gold-2);
   font-size: 0.85rem;
   line-height: 1.5;

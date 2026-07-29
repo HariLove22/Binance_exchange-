@@ -7,20 +7,20 @@ export function FullScreenLoader() {
         minHeight: "100vh",
         display: "grid",
         placeItems: "center",
-        background: "#0b0e11",
-        color: "#f0b90b",
+        background: "#070b09",
+        color: "#2bd97c",
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
         <span className="spinner" />
-        <span style={{ color: "#9aa4b2", fontFamily: "system-ui, sans-serif", fontSize: ".9rem" }}>
+        <span style={{ color: "#8b9a92", fontFamily: "system-ui, sans-serif", fontSize: ".9rem" }}>
           Loading…
         </span>
       </div>
       <style>{`
         .spinner {
           width: 34px; height: 34px; border-radius: 50%;
-          border: 3px solid rgba(240,185,11,.2); border-top-color: #f0b90b;
+          border: 3px solid rgba(43,217,124,.2); border-top-color: #2bd97c;
           animation: spin .7s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }

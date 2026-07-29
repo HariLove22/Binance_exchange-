@@ -1,2 +1,87 @@
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;color-scheme:light dark;}
-body{margin:0;min-height:100vh;}
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;color-scheme:dark;}
+body{margin:0;min-height:100vh;background:#070b09;color:#e6efe9;}
+
+/* ============================================================================
+   Theme layer — mint-on-black.
+   Purely cosmetic: colour, radius, shadow, focus ring. Nothing here changes
+   layout or behaviour, so it can be deleted wholesale to undo the look.
+   The palette itself lives in each surface's own token block
+   (.landing / .auth / .dash); this file only adds what they all share.
+   ========================================================================== */
+
+:root {
+  --accent: #2bd97c;
+  --accent-2: #4fe89b;
+  --accent-ink: #04170e;          /* text printed on an accent fill */
+  --accent-glow: rgba(43, 217, 124, 0.28);
+}
+
+/* Ambient green wash behind the app surfaces. .landing and .auth already carry
+   their own ::before glow; these two did not. Specificity is bumped with `body`
+   so it wins over the plain `.dash` / `.admin` rule regardless of import order. */
+body .dash,
+body .admin {
+  background:
+    radial-gradient(900px 480px at 88% -8%, rgba(43, 217, 124, 0.07), transparent 62%),
+    radial-gradient(700px 420px at -5% 8%, rgba(43, 217, 124, 0.05), transparent 60%),
+    #070b09;
+  background-attachment: fixed;
+}
+
+/* Primary call-to-action: the accent fill lifts off the page with a soft glow.
+   On a near-black background that glow is most of what carries the look. */
+.btn-gold,
+.btn-primary,
+.dash-deposit {
+  border-radius: 10px;
+  box-shadow: 0 6px 18px -8px var(--accent-glow);
+  transition: box-shadow 0.18s ease, filter 0.18s ease;
+}
+.btn-gold:hover,
+.btn-primary:hover,
+.dash-deposit:hover {
+  box-shadow: 0 10px 26px -8px var(--accent-glow);
+  filter: brightness(1.05);
+}
+
+/* Cards read as soft slabs rather than boxes — the reference leans on a larger
+   radius than the original Binance-style surfaces used. */
+.step-card,
+.balance-card,
+.assets-table,
+.admin-card {
+  border-radius: 16px;
+}
+
+/* Focus ring in the accent instead of the browser default blue. */
+:where(input, select, textarea, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: rgba(43, 217, 124, 0.28);
+}
+
+/* Scrollbars, tinted to match. */
+* {
+  scrollbar-color: #24352c transparent;
+  scrollbar-width: thin;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #24352c;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #33513f;
+  background-clip: content-box;
+}

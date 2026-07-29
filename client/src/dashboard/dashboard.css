@@ -3,17 +3,17 @@
    ========================================================================== */
 
 .dash {
-  --bg: #0b0e11;
-  --bg-2: #0f1318;
-  --surface: #181a20;
-  --surface-2: #1e2329;
-  --surface-3: #252a31;
-  --border: #2b3139;
-  --text: #eaecef;
-  --text-dim: #b7bdc6;
-  --text-faint: #848e9c;
-  --gold: #f0b90b;
-  --gold-2: #fcd535;
+  --bg: #070b09;
+  --bg-2: #0b100d;
+  --surface: #101613;
+  --surface-2: #151d19;
+  --surface-3: #1b2420;
+  --border: #1f2c26;
+  --text: #e6efe9;
+  --text-dim: #a7b4ac;
+  --text-faint: #7c8b83;
+  --gold: #2bd97c;
+  --gold-2: #4fe89b;
   --up: #0ecb81;
   --down: #f6465d;
 
@@ -49,7 +49,7 @@
 }
 .dash-brand .brand-mark {
   color: var(--gold);
-  filter: drop-shadow(0 0 8px rgba(240, 185, 11, 0.5));
+  filter: drop-shadow(0 0 8px rgba(43, 217, 124, 0.5));
 }
 .dash-topnav {
   display: flex;
@@ -92,7 +92,7 @@
   align-items: center;
   gap: 0.4rem;
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
-  color: #1a1400;
+  color: #04170e;
   font-weight: 600;
   border: none;
   border-radius: 8px;
@@ -112,7 +112,7 @@
   display: grid;
   place-items: center;
   font-weight: 700;
-  color: #1a1400;
+  color: #04170e;
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
   border: none;
   cursor: pointer;
@@ -234,7 +234,7 @@
   place-items: center;
   font-size: 1.6rem;
   font-weight: 700;
-  color: #1a1400;
+  color: #04170e;
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
 }
 .profile-id .p-name {
@@ -247,7 +247,7 @@
 .social-chip {
   font-size: 0.72rem;
   color: var(--gold-2);
-  border: 1px solid rgba(240, 185, 11, 0.35);
+  border: 1px solid rgba(43, 217, 124, 0.35);
   border-radius: 20px;
   padding: 0.15rem 0.6rem;
   font-weight: 500;
@@ -311,7 +311,7 @@
 }
 .step-card.active .step-num {
   background: var(--gold);
-  color: #1a1400;
+  color: #04170e;
   border-color: var(--gold);
 }
 .step-card h3 {
@@ -329,7 +329,7 @@
 }
 .btn-gold {
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
-  color: #1a1400;
+  color: #04170e;
   font-weight: 600;
   border: none;
   border-radius: 8px;
@@ -475,8 +475,8 @@
 .at-asset { display: flex; align-items: center; gap: .6rem; font-weight: 600; }
 .at-badge {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 50%; background: rgba(240,185,11,.15);
-  color: var(--gold, #f0b90b); font-size: .62rem; font-weight: 700;
+  width: 26px; height: 26px; border-radius: 50%; background: rgba(43,217,124,.15);
+  color: var(--gold, #2bd97c); font-size: .62rem; font-weight: 700;
 }
 .at-locked { color: var(--text-faint); }
 .assets-note { margin-top: 1rem; font-size: .78rem; line-height: 1.6; color: var(--text-faint); }
@@ -487,7 +487,7 @@
   background: none; border: none; color: var(--text-faint); font: inherit; font-size: .95rem;
   padding: .5rem 0; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
 }
-.assets-tabs button.active { color: var(--text, #eaecef); border-bottom-color: #f0b90b; font-weight: 600; }
+.assets-tabs button.active { color: var(--text, #e6efe9); border-bottom-color: #2bd97c; font-weight: 600; }
 .wallet-form { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; }
 .wallet-form-col { display: flex; flex-direction: column; gap: .75rem; max-width: 30rem; }
 .wallet-form label, .wallet-form-col label { display: flex; flex-direction: column; gap: .3rem; flex: 1; min-width: 12rem; }
@@ -495,15 +495,15 @@
   font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint);
 }
 .wallet-form select, .wallet-form input, .wallet-form-col select, .wallet-form-col input {
-  padding: .55rem .7rem; background: var(--bg, #0b0e11); border: 1px solid var(--border, #2b3139);
-  border-radius: 8px; color: var(--text, #eaecef); font: inherit; font-size: .9rem;
+  padding: .55rem .7rem; background: var(--bg, #070b09); border: 1px solid var(--border, #1f2c26);
+  border-radius: 8px; color: var(--text, #e6efe9); font: inherit; font-size: .9rem;
 }
 .deposit-address {
   margin-top: 1rem; padding: 1rem; border: 1px dashed var(--border); border-radius: 10px;
   display: flex; flex-direction: column; gap: .4rem;
 }
 .da-label { font-size: .72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
-.deposit-address code { font-family: ui-monospace, monospace; font-size: .85rem; word-break: break-all; color: #f0b90b; }
+.deposit-address code { font-family: ui-monospace, monospace; font-size: .85rem; word-break: break-all; color: #2bd97c; }
 .da-memo { font-size: .8rem; color: var(--text-faint); }
 .btn-outline-d.small { padding: .25rem .6rem; font-size: .75rem; }
 .assets-note.mono { font-family: ui-monospace, monospace; color: #0ecb81; word-break: break-all; }
@@ -513,39 +513,39 @@
 .topnav-trigger {
   background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 0;
 }
-.topnav-trigger.active { color: #f0b90b; }
+.topnav-trigger.active { color: #2bd97c; }
 .trade-dropdown {
   position: absolute; top: 140%; left: 0; z-index: 50; width: 20rem;
-  background: #1e2329; border: 1px solid #2b3139; border-radius: 12px; padding: 0.5rem;
+  background: #151d19; border: 1px solid #1f2c26; border-radius: 12px; padding: 0.5rem;
   box-shadow: 0 12px 32px rgba(0,0,0,0.4);
 }
 .td-item {
   display: flex; flex-direction: column; gap: 0.15rem; width: 100%; text-align: left;
-  background: none; border: none; color: #eaecef; font: inherit; padding: 0.6rem 0.7rem;
+  background: none; border: none; color: #e6efe9; font: inherit; padding: 0.6rem 0.7rem;
   border-radius: 8px; cursor: pointer;
 }
-.td-item:hover:not(.disabled) { background: rgba(240,185,11,0.08); }
+.td-item:hover:not(.disabled) { background: rgba(43,217,124,0.08); }
 .td-item.disabled { opacity: 0.45; cursor: not-allowed; }
 .td-label { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
 .td-tag {
   font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.1rem 0.35rem;
-  border-radius: 4px; background: rgba(148,163,184,0.2); color: #848e9c;
+  border-radius: 4px; background: rgba(132,168,150,0.2); color: #7c8b83;
 }
-.td-desc { font-size: 0.74rem; color: #848e9c; }
+.td-desc { font-size: 0.74rem; color: #7c8b83; }
 
 /* --- buy crypto ------------------------------------------------------- */
 .buy-card { max-width: 26rem; margin-top: 1rem; }
 .buy-field { display: block; margin-bottom: 0.4rem; }
 .buy-field > span { display: block; font-size: 0.72rem; color: var(--text-faint); margin-bottom: 0.3rem; }
-.buy-input { display: flex; align-items: center; border: 1px solid var(--border, #2b3139); border-radius: 10px; padding: 0.6rem 0.8rem; gap: 0.5rem; }
+.buy-input { display: flex; align-items: center; border: 1px solid var(--border, #1f2c26); border-radius: 10px; padding: 0.6rem 0.8rem; gap: 0.5rem; }
 .buy-input input { flex: 1; min-width: 0; border: none; background: none; color: inherit; font: inherit; font-size: 1.15rem; font-family: ui-monospace, monospace; }
 .buy-input input:focus { outline: none; }
-.buy-input select { border: none; background: rgba(148,163,184,0.12); border-radius: 8px; color: inherit; font: inherit; font-weight: 600; padding: 0.35rem 0.5rem; cursor: pointer; }
+.buy-input select { border: none; background: rgba(132,168,150,0.12); border-radius: 8px; color: inherit; font: inherit; font-weight: 600; padding: 0.35rem 0.5rem; cursor: pointer; }
 .buy-arrow { text-align: center; color: var(--text-faint); font-size: 1.1rem; margin: 0.3rem 0; }
 .buy-rate { margin: 0.7rem 0 0; font-size: 0.78rem; color: var(--text-faint); }
 .buy-submit { width: 100%; margin-top: 1rem; padding: 0.7rem; font-size: 0.95rem; }
 
 /* convert extras */
 .cv-avail { display: block; font-size: 0.72rem; color: var(--text-faint); margin-top: 0.3rem; }
-.cv-flip { display: block; margin: 0.3rem auto; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--border, #2b3139); background: var(--surface-2, #1e2329); color: inherit; cursor: pointer; font-size: 1rem; }
-.cv-flip:hover { border-color: #f0b90b; color: #f0b90b; }
+.cv-flip { display: block; margin: 0.3rem auto; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--border, #1f2c26); background: var(--surface-2, #151d19); color: inherit; cursor: pointer; font-size: 1rem; }
+.cv-flip:hover { border-color: #2bd97c; color: #2bd97c; }

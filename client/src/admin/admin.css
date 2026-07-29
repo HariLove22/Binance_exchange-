@@ -1,7 +1,7 @@
 .admin {
   min-height: 100vh;
-  background: #0b0e11;
-  color: #eaecef;
+  background: #070b09;
+  color: #e6efe9;
 }
 
 .admin-top {
@@ -9,7 +9,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.9rem 1.5rem;
-  border-bottom: 1px solid #1e2329;
+  border-bottom: 1px solid #151d19;
 }
 
 .admin-brand {
@@ -17,7 +17,7 @@
   font-size: 1.1rem;
 }
 .admin-brand .brand-mark {
-  color: #f0b90b;
+  color: #2bd97c;
 }
 .admin-tag {
   margin-left: 0.5rem;
@@ -26,8 +26,8 @@
   letter-spacing: 0.08em;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
-  background: rgba(240, 185, 11, 0.15);
-  color: #f0b90b;
+  background: rgba(43, 217, 124, 0.15);
+  color: #2bd97c;
   vertical-align: middle;
 }
 
@@ -36,12 +36,12 @@
   align-items: center;
   gap: 1rem;
   font-size: 0.85rem;
-  color: #848e9c;
+  color: #7c8b83;
 }
 .admin-logout {
   background: none;
-  border: 1px solid #2b3139;
-  color: #eaecef;
+  border: 1px solid #1f2c26;
+  color: #e6efe9;
   padding: 0.4rem 0.8rem;
   border-radius: 6px;
   cursor: pointer;
@@ -49,7 +49,7 @@
   font-size: 0.82rem;
 }
 .admin-logout:hover {
-  border-color: #474d57;
+  border-color: #33463d;
 }
 
 .admin-tabs {
@@ -60,7 +60,7 @@
 .admin-tabs button {
   background: none;
   border: none;
-  color: #848e9c;
+  color: #7c8b83;
   padding: 0.5rem 0.25rem;
   margin-right: 1rem;
   cursor: pointer;
@@ -69,8 +69,8 @@
   border-bottom: 2px solid transparent;
 }
 .admin-tabs button.active {
-  color: #eaecef;
-  border-bottom-color: #f0b90b;
+  color: #e6efe9;
+  border-bottom-color: #2bd97c;
   font-weight: 600;
 }
 
@@ -93,8 +93,8 @@
 }
 
 .admin-card {
-  background: #161a1e;
-  border: 1px solid #1e2329;
+  background: #0e1411;
+  border: 1px solid #151d19;
   border-radius: 12px;
   padding: 1.25rem;
 }
@@ -114,7 +114,7 @@
   margin: 0 0 1rem;
   font-size: 0.82rem;
   line-height: 1.55;
-  color: #848e9c;
+  color: #7c8b83;
 }
 .admin-error {
   color: #f6465d;
@@ -123,7 +123,7 @@
 .admin-link {
   background: none;
   border: none;
-  color: #848e9c;
+  color: #7c8b83;
   text-decoration: underline;
   cursor: pointer;
   font: inherit;
@@ -142,23 +142,23 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #848e9c;
+  color: #7c8b83;
 }
 .credit-form select,
 .credit-form input {
   padding: 0.55rem 0.7rem;
-  background: #0b0e11;
-  border: 1px solid #2b3139;
+  background: #070b09;
+  border: 1px solid #1f2c26;
   border-radius: 8px;
-  color: #eaecef;
+  color: #e6efe9;
   font: inherit;
   font-size: 0.9rem;
 }
 .admin-primary {
   margin-top: 0.25rem;
   padding: 0.6rem;
-  background: #f0b90b;
-  color: #0b0e11;
+  background: #2bd97c;
+  color: #070b09;
   border: none;
   border-radius: 8px;
   font: inherit;
@@ -213,8 +213,8 @@
 }
 .admin-ghost {
   background: none;
-  border: 1px solid #2b3139;
-  color: #eaecef;
+  border: 1px solid #1f2c26;
+  color: #e6efe9;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -227,11 +227,11 @@
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #848e9c;
-  border-bottom: 1px solid #1e2329;
+  color: #7c8b83;
+  border-bottom: 1px solid #151d19;
 }
 .at-r {
-  border-bottom: 1px solid #14181c;
+  border-bottom: 1px solid #0c120f;
 }
 .num {
   text-align: right;
@@ -252,8 +252,8 @@
   font-weight: 600;
   padding: 0.12rem 0.5rem;
   border-radius: 999px;
-  background: #1e2329;
-  color: #848e9c;
+  background: #151d19;
+  color: #7c8b83;
 }
 .role-chip.admin {
   background: rgba(246, 70, 93, 0.15);
