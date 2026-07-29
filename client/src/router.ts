@@ -1,13 +1,23 @@
 import { useEffect, useState } from "react";
 
 // Minimal hash-based, path-style router — no dependency, consistent with the project's
-// minimal-deps philosophy. Paths look like "/", "/login", "/dashboard/assets".
-// Swap for react-router if real deep-linking / server routes are needed.
+// minimal-deps philosophy. Paths look like "/", "/login", "/dashboard/assets", and may carry
+// a query string: "/login?registered=1". Swap for react-router if server routes are needed.
+
+function rawHash(): string {
+  return window.location.hash.replace(/^#/, "");
+}
 
 export function currentPath(): string {
-  const h = window.location.hash.replace(/^#/, "");
-  if (h === "" || h === "/") return "/";
-  return h.replace(/\/+$/, "") || "/";
+  const [p] = rawHash().split("?");
+  if (p === "" || p === "/") return "/";
+  return p.replace(/\/+$/, "") || "/";
+}
+
+export function currentQuery(): URLSearchParams {
+  const h = rawHash();
+  const i = h.indexOf("?");
+  return new URLSearchParams(i >= 0 ? h.slice(i + 1) : "");
 }
 
 export function navigate(path: string): void {

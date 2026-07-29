@@ -95,6 +95,13 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+// Registering creates the account but does NOT start a session — no token here by design.
+export interface RegisterResponse {
+  user: AuthUser;
+  requires_verification: boolean;
+  message: string;
+}
+
 export interface RegisterBody {
   email: string;
   full_name: string;
@@ -115,7 +122,6 @@ export interface Balance {
   locked: string;
   total: string;
 }
-
 export interface WalletNetwork {
   asset_network_id: number;
   asset: string;
@@ -197,6 +203,10 @@ export interface TradeTick {
   created_at: string;
 }
 
+export interface OrderFill {
+  price: string; // the trade price (maker's resting price)
+  quantity: string;
+}
 export interface OrderRow {
   id: number;
   symbol: string;
@@ -207,6 +217,11 @@ export interface OrderRow {
   quantity: string;
   filled_quantity: string;
   status: string;
+  // ISO timestamp of when the order was placed — used by order history for date sort/display.
+  created_at: string;
+  // Trades that executed when this order was placed. Empty for a resting (unmatched) order.
+  // The server includes these on the place-order response so a receipt can show what it cost.
+  fills: OrderFill[];
 }
 
 export interface MyTrade {
@@ -241,7 +256,7 @@ export const api = {
   dbHealth: () => request<DbHealthResponse>("/health/db"),
 
   register: (body: RegisterBody) =>
-    request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+    request<RegisterResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body: LoginBody) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request<AuthUser>("/auth/me"),
@@ -505,9 +520,30 @@ export interface OnrampQuote {
   crypto_amount: string;
 }
 
-/** Trim trailing zeros from a fixed-scale amount string for display only. Never used for math. */
-export function trimAmount(value: string): string {
+/**
+ * Format a fixed-scale amount string for display — capped at `maxDecimals` (2 by default) so the
+ * UI never shows the ledger's full 18-decimal precision. Display only; never used for math.
+ *
+ * Truncates rather than rounds — an exact string slice, no float — so a shown "available" is never
+ * rounded *up* past the real balance. Trailing zeros are then dropped (5.00 -> 5).
+ *
+ * The one subtlety is small crypto amounts: 0.00076 BTC cut to 2 places would read as "0" and look
+ * like the balance vanished. So when the integer part is 0, we keep enough places to show two
+ * significant fraction digits — a real value is never displayed as a false zero.
+ */
+export function trimAmount(value: string, maxDecimals = 2): string {
   if (!value.includes(".")) return value;
-  const trimmed = value.replace(/0+$/, "").replace(/\.$/, "");
-  return trimmed === "" || trimmed === "-" ? "0" : trimmed;
+  const neg = value.startsWith("-");
+  const [rawInt, frac = ""] = (neg ? value.slice(1) : value).split(".");
+  const int = rawInt || "0";
+
+  let places = maxDecimals;
+  if (int === "0") {
+    const firstSignificant = frac.search(/[1-9]/);
+    if (firstSignificant >= 0) places = Math.max(maxDecimals, firstSignificant + 2);
+  }
+
+  const capped = frac.slice(0, places).replace(/0+$/, "");
+  const body = capped ? `${int}.${capped}` : int;
+  return neg && body !== "0" ? `-${body}` : body;
 }

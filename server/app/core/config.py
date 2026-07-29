@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     verification_token_expire_hours: int = 48
     frontend_url: str = "http://localhost:5173"
 
+    # --- Dev faucet -------------------------------------------------------
+    # Mints fake money for testing (Phase 1 is paper trading). MUST be False in production —
+    # it is, literally, a money printer.
+    faucet_enabled: bool = True
+    faucet_max_amount: str = "1000000"
+
     # SMTP — unused while email_enabled is False, wired for later.
     smtp_host: str = ""
     smtp_port: int = 587

@@ -1,6 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { navigate } from "../router";
-import { useAuth } from "./AuthContext";
 import { api, ApiError } from "../lib/api";
 import { AuthShell } from "./components/AuthShell";
 import { Field } from "./components/Field";
@@ -30,7 +29,6 @@ function passwordProblem(pw: string): string | undefined {
 }
 
 export function Signup() {
-  const { login } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,9 +62,9 @@ export function Signup() {
       if (res.requires_verification) {
         // Only reachable once email verification is enabled server-side.
         setNotice("Account created! Check your email to verify before logging in.");
-      } else if (res.access_token) {
-        login(res.access_token, res.user);
-        navigate("/dashboard");
+      } else {
+        // Registering does not sign you in — send them to log in with the new credentials.
+        navigate("/login?registered=1");
       }
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");

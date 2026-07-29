@@ -31,6 +31,9 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        # Off by default in Alembic — without it, adding/changing a server_default is
+        # silently skipped and autogenerate produces an empty migration.
+        compare_server_default=True,
     )
     with context.begin_transaction():
         context.run_migrations()

@@ -49,6 +49,11 @@ class OrderRequest(BaseModel):
     trigger_price: str | None = None
 
 
+class FillOut(BaseModel):
+    price: str
+    quantity: str
+
+
 class OrderResponse(BaseModel):
     id: int
     symbol: str
@@ -59,15 +64,27 @@ class OrderResponse(BaseModel):
     quantity: str
     filled_quantity: str
     status: str
+    # When the order was placed. Given to the client so order history can sort and group by date
+    # (the id is monotonic too, but a real timestamp is what a user reads).
+    created_at: str
+    # Trades that executed as this order was placed — empty when it rests unmatched. Lets the
+    # client show what the order actually cost, which differs from price x quantity when a
+    # taker sweeps several levels.
+    fills: list[FillOut] = []
 
 
-def _order_response(order: Order, symbol: str) -> OrderResponse:
+def _order_response(order: Order, symbol: str, trades: list[Trade] | None = None) -> OrderResponse:
     return OrderResponse(
         id=order.id, symbol=symbol, side=order.side.value, type=order.type.value,
         price=f"{order.price.normalize():f}" if order.price is not None else None,
         trigger_price=f"{order.trigger_price.normalize():f}" if order.trigger_price is not None else None,
         quantity=f"{order.quantity.normalize():f}", filled_quantity=f"{order.filled_quantity.normalize():f}",
         status=order.status.value,
+        created_at=order.created_at.isoformat(),
+        fills=[
+            FillOut(price=f"{t.price.normalize():f}", quantity=f"{t.quantity.normalize():f}")
+            for t in (trades or [])
+        ],
     )
 
 
@@ -103,16 +120,18 @@ async def place_order(
                 db, user_id=user.id, market=market, side=body.side, order_type=body.type,
                 quantity=quantity, trigger_price=trigger_price, reference_price=reference, price=price,
             )
+            trades = []
         else:
-            order = (await trading.place_order(
+            placed = await trading.place_order(
                 db, user_id=user.id, market=market, side=body.side,
                 order_type=body.type, quantity=quantity, price=price,
-            )).order
+            )
+            order, trades = placed.order, placed.trades
     except TradingError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
     pubsub.publish(pubsub.market_channel(market.symbol))  # wake live subscribers
-    return _order_response(order, market.symbol)
+    return _order_response(order, market.symbol, trades)
 
 
 class OCORequest(BaseModel):

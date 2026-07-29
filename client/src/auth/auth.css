@@ -407,6 +407,11 @@
   background: rgba(246, 70, 93, 0.1);
   color: #ff8497;
 }
+.auth-notice.ok {
+  border-color: rgba(14, 203, 129, 0.4);
+  background: rgba(14, 203, 129, 0.1);
+  color: #4ade9f;
+}
 
 .btn:disabled {
   opacity: 0.6;

@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 import { navigate } from "../router";
 import { Overview, Placeholder } from "./pages";
 import { Assets } from "./Assets";
+import { Orders } from "./Orders";
 import { Trade } from "./Trade";
 import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
@@ -168,6 +169,8 @@ export function Dashboard({ path }: { path: string }) {
             <Overview user={user} />
           ) : seg === "trade" ? (
             <Trade />
+          ) : seg === "orders" ? (
+            <Orders />
           ) : seg === "p2p" ? (
             <P2P />
           ) : seg === "margin" ? (
