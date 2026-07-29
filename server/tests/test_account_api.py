@@ -19,8 +19,10 @@ async def client():
 
 async def register(client) -> tuple[str, str]:
     email = f"acct-{uuid.uuid4().hex[:12]}@example.com"
-    res = await client.post(f"{PREFIX}/auth/register",
-                            json={"email": email, "full_name": "Acct Tester", "password": PASSWORD})
+    # Register no longer starts a session (no token), so log in for one.
+    await client.post(f"{PREFIX}/auth/register",
+                      json={"email": email, "full_name": "Acct Tester", "password": PASSWORD})
+    res = await client.post(f"{PREFIX}/auth/login", json={"email": email, "password": PASSWORD})
     return email, res.json()["access_token"]
 
 

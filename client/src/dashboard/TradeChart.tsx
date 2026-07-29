@@ -29,10 +29,10 @@ export function TradeChart({ symbol, interval }: { symbol: string; interval: str
     if (!host.current) return;
     const c = createChart(host.current, {
       autoSize: true,
-      layout: { background: { color: "transparent" }, textColor: "#848e9c", attributionLogo: false },
-      grid: { vertLines: { color: "rgba(148,163,184,0.06)" }, horzLines: { color: "rgba(148,163,184,0.06)" } },
-      rightPriceScale: { borderColor: "rgba(148,163,184,0.15)", scaleMargins: { top: 0.05, bottom: 0.25 } },
-      timeScale: { borderColor: "rgba(148,163,184,0.15)", timeVisible: true, secondsVisible: false },
+      layout: { background: { color: "transparent" }, textColor: "#7c8b83", attributionLogo: false },
+      grid: { vertLines: { color: "rgba(132,168,150,0.06)" }, horzLines: { color: "rgba(132,168,150,0.06)" } },
+      rightPriceScale: { borderColor: "rgba(132,168,150,0.15)", scaleMargins: { top: 0.05, bottom: 0.25 } },
+      timeScale: { borderColor: "rgba(132,168,150,0.15)", timeVisible: true, secondsVisible: false },
       crosshair: { mode: 0 },
     });
     price.current = c.addSeries(CandlestickSeries, {

@@ -3,17 +3,17 @@
    ========================================================================== */
 
 .dash {
-  --bg: #0b0e11;
-  --bg-2: #0f1318;
-  --surface: #181a20;
-  --surface-2: #1e2329;
-  --surface-3: #252a31;
-  --border: #2b3139;
-  --text: #eaecef;
-  --text-dim: #b7bdc6;
-  --text-faint: #848e9c;
-  --gold: #f0b90b;
-  --gold-2: #fcd535;
+  --bg: #070b09;
+  --bg-2: #0b100d;
+  --surface: #101613;
+  --surface-2: #151d19;
+  --surface-3: #1b2420;
+  --border: #1f2c26;
+  --text: #e6efe9;
+  --text-dim: #a7b4ac;
+  --text-faint: #7c8b83;
+  --gold: #2bd97c;
+  --gold-2: #4fe89b;
   --up: #0ecb81;
   --down: #f6465d;
 
@@ -49,7 +49,7 @@
 }
 .dash-brand .brand-mark {
   color: var(--gold);
-  filter: drop-shadow(0 0 8px rgba(240, 185, 11, 0.5));
+  filter: drop-shadow(0 0 8px rgba(43, 217, 124, 0.5));
 }
 .dash-topnav {
   display: flex;
@@ -92,7 +92,7 @@
   align-items: center;
   gap: 0.4rem;
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
-  color: #1a1400;
+  color: #04170e;
   font-weight: 600;
   border: none;
   border-radius: 8px;
@@ -112,7 +112,7 @@
   display: grid;
   place-items: center;
   font-weight: 700;
-  color: #1a1400;
+  color: #04170e;
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
   border: none;
   cursor: pointer;
@@ -234,7 +234,7 @@
   place-items: center;
   font-size: 1.6rem;
   font-weight: 700;
-  color: #1a1400;
+  color: #04170e;
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
 }
 .profile-id .p-name {
@@ -247,7 +247,7 @@
 .social-chip {
   font-size: 0.72rem;
   color: var(--gold-2);
-  border: 1px solid rgba(240, 185, 11, 0.35);
+  border: 1px solid rgba(43, 217, 124, 0.35);
   border-radius: 20px;
   padding: 0.15rem 0.6rem;
   font-weight: 500;
@@ -311,7 +311,7 @@
 }
 .step-card.active .step-num {
   background: var(--gold);
-  color: #1a1400;
+  color: #04170e;
   border-color: var(--gold);
 }
 .step-card h3 {
@@ -329,7 +329,7 @@
 }
 .btn-gold {
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
-  color: #1a1400;
+  color: #04170e;
   font-weight: 600;
   border: none;
   border-radius: 8px;
@@ -454,7 +454,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--gold-2);
-  border: 1px solid rgba(240, 185, 11, 0.4);
+  border: 1px solid rgba(43, 217, 124, 0.4);
   border-radius: 4px;
   padding: 0.1rem 0.35rem;
 }
@@ -607,12 +607,12 @@
   gap: 0.9rem;
   max-width: 24rem;
 }
-.of-tabs {
+.of .of-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
 }
-.of-tab {
+.of .of-tab {
   padding: 0.6rem;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -622,26 +622,26 @@
   font-weight: 600;
   cursor: pointer;
 }
-.of-tab.buy.on {
+.of .of-tab.buy.on {
   background: rgba(14, 203, 129, 0.15);
   border-color: var(--up);
   color: var(--up);
 }
-.of-tab.sell.on {
+.of .of-tab.sell.on {
   background: rgba(246, 70, 93, 0.15);
   border-color: var(--down);
   color: var(--down);
 }
-.of-field {
+.of .of-field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
-.of-field > span {
+.of .of-field > span {
   font-size: 0.82rem;
   color: var(--text-faint);
 }
-.of-input {
+.of .of-input {
   display: flex;
   align-items: center;
   background: rgba(0, 0, 0, 0.3);
@@ -649,10 +649,10 @@
   border-radius: 8px;
   padding: 0 0.75rem;
 }
-.of-input:focus-within {
+.of .of-input:focus-within {
   border-color: var(--gold);
 }
-.of-input input {
+.of .of-input input {
   flex: 1;
   min-width: 0;
   background: none;
@@ -663,20 +663,20 @@
   font-family: ui-monospace, Menlo, monospace;
   padding: 0.65rem 0;
 }
-.of-input em {
+.of .of-input em {
   font-style: normal;
   color: var(--text-faint);
   font-size: 0.82rem;
   padding-left: 0.5rem;
 }
 /* Coin picker sitting inside the amount field — the unit label, but clickable. */
-.of-input .coin-select {
+.of .of-input .coin-select {
   margin-left: 0.4rem;
 }
-.of-input .coin-select-btn {
+.of .of-input .coin-select-btn {
   padding: 0.28rem 0.5rem;
 }
-.of-total {
+.of .of-total {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -684,25 +684,25 @@
   font-size: 0.86rem;
   color: var(--text-faint);
 }
-.of-total strong {
+.of .of-total strong {
   color: var(--text);
   font-family: ui-monospace, Menlo, monospace;
 }
 /* USDT-equivalent of a fiat-denominated order, and the per-unit conversion under the price. */
-.of-total-sub {
+.of .of-total-sub {
   text-align: right;
   font-size: 0.74rem;
   color: var(--text-faint);
   font-family: ui-monospace, Menlo, monospace;
   margin-top: 0.15rem;
 }
-.of-quote-hint {
+.of .of-quote-hint {
   font-size: 0.74rem;
   color: var(--text-faint);
   font-family: ui-monospace, Menlo, monospace;
   margin-top: 0.3rem;
 }
-.of-submit {
+.of .of-submit {
   padding: 0.8rem;
   border: none;
   border-radius: 8px;
@@ -711,45 +711,45 @@
   cursor: pointer;
   color: #06120c;
 }
-.of-submit.buy {
+.of .of-submit.buy {
   background: var(--up);
 }
-.of-submit.sell {
+.of .of-submit.sell {
   background: var(--down);
   color: #1a0509;
 }
-.of-submit:disabled {
+.of .of-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.of-msg {
+.of .of-msg {
   font-size: 0.83rem;
   line-height: 1.45;
 }
-.of-msg.err {
+.of .of-msg.err {
   color: var(--down);
 }
-.of-msg.ok {
+.of .of-msg.ok {
   color: var(--up);
 }
-.of-msg.hint {
+.of .of-msg.hint {
   color: var(--text-faint);
 }
 
-.of-receipt {
+.of .of-receipt {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.7rem 0.8rem;
   background: rgba(0, 0, 0, 0.25);
   font-size: 0.83rem;
 }
-.of-receipt-head {
+.of .of-receipt-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.4rem;
 }
-.of-status {
+.of .of-status {
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -758,33 +758,33 @@
   background: var(--surface-3);
   color: var(--text-dim);
 }
-.of-status.filled {
+.of .of-status.filled {
   background: rgba(14, 203, 129, 0.18);
   color: var(--up);
 }
-.of-status.partially_filled {
-  background: rgba(240, 185, 11, 0.18);
+.of .of-status.partially_filled {
+  background: rgba(43, 217, 124, 0.18);
   color: var(--gold-2);
 }
-.of-receipt-line {
+.of .of-receipt-line {
   color: var(--text-dim);
 }
-.of-receipt-line.dim {
+.of .of-receipt-line.dim {
   color: var(--text-faint);
 }
-.of-receipt-line.with-amount {
+.of .of-receipt-line.with-amount {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
 }
-.of-amount {
+.of .of-amount {
   font-family: ui-monospace, Menlo, monospace;
   color: var(--text);
   /* Never let the settled total wrap mid-number — a broken figure is unreadable. */
   white-space: nowrap;
 }
-.of-amount em {
+.of .of-amount em {
   font-family: inherit;
   font-style: normal;
   font-weight: 400;
@@ -792,7 +792,7 @@
   color: var(--text-faint);
   margin-right: 0.35rem;
 }
-.of-fills {
+.of .of-fills {
   list-style: none;
   margin: 0.45rem 0 0;
   padding: 0;
@@ -807,12 +807,12 @@
   font-size: 0.79rem;
   color: var(--up);
 }
-.of-fills li {
+.of .of-fills li {
   display: grid;
   grid-template-columns: subgrid;
   grid-column: 1 / -1;
 }
-.of-fill-amt {
+.of .of-fill-amt {
   text-align: right;
   /* Dimmer than the price so the fill itself stays the headline. */
   color: var(--text-dim);
@@ -1060,8 +1060,8 @@
   height: 1.4rem;
   padding: 0 0.4rem;
   border-radius: 999px;
-  background: rgba(240, 185, 11, 0.14);
-  color: #f0b90b;
+  background: rgba(43, 217, 124, 0.14);
+  color: #2bd97c;
   font-size: 0.74rem;
   font-weight: 600;
 }
@@ -1142,7 +1142,7 @@
   color: var(--text-dim);
 }
 .moo-status.partially_filled {
-  color: #f0b90b;
+  color: #2bd97c;
 }
 .moo-cancel {
   background: none;
@@ -1213,7 +1213,7 @@
 }
 
 /* Order form — available balance line (click to fill max). */
-.of-avail {
+.of .of-avail {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1221,7 +1221,7 @@
   font-size: 0.78rem;
   color: var(--text-faint);
 }
-.of-avail-val {
+.of .of-avail-val {
   background: none;
   border: none;
   padding: 0;
@@ -1231,9 +1231,9 @@
   cursor: pointer;
   border-bottom: 1px dashed var(--border);
 }
-.of-avail-val:hover {
-  color: #f0b90b;
-  border-bottom-color: #f0b90b;
+.of .of-avail-val:hover {
+  color: #2bd97c;
+  border-bottom-color: #2bd97c;
 }
 
 /* Order History — finished orders, filter + sort. `oh-` prefix avoids trade.css collisions. */
@@ -1361,7 +1361,7 @@
 }
 .oh-status.new,
 .oh-status.partially_filled {
-  color: #f0b90b;
+  color: #2bd97c;
 }
 .oh-filled em {
   font-style: normal;
@@ -1376,8 +1376,8 @@
   height: 1.15rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: rgba(240, 185, 11, 0.16);
-  color: #f0b90b;
+  background: rgba(43, 217, 124, 0.16);
+  color: #2bd97c;
   font-size: 0.68rem;
   font-weight: 600;
 }
@@ -1490,8 +1490,8 @@
 .at-asset { display: flex; align-items: center; gap: .6rem; font-weight: 600; }
 .at-badge {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 50%; background: rgba(240,185,11,.15);
-  color: var(--gold, #f0b90b); font-size: .62rem; font-weight: 700;
+  width: 26px; height: 26px; border-radius: 50%; background: rgba(43,217,124,.15);
+  color: var(--gold, #2bd97c); font-size: .62rem; font-weight: 700;
 }
 .at-locked { color: var(--text-faint); }
 .assets-note { margin-top: 1rem; font-size: .78rem; line-height: 1.6; color: var(--text-faint); }
@@ -1502,7 +1502,7 @@
   background: none; border: none; color: var(--text-faint); font: inherit; font-size: .95rem;
   padding: .5rem 0; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
 }
-.assets-tabs button.active { color: var(--text, #eaecef); border-bottom-color: #f0b90b; font-weight: 600; }
+.assets-tabs button.active { color: var(--text, #e6efe9); border-bottom-color: #2bd97c; font-weight: 600; }
 .wallet-form { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; }
 .wallet-form-col { display: flex; flex-direction: column; gap: .75rem; max-width: 30rem; }
 .wallet-form label, .wallet-form-col label { display: flex; flex-direction: column; gap: .3rem; flex: 1; min-width: 12rem; }
@@ -1510,15 +1510,15 @@
   font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint);
 }
 .wallet-form select, .wallet-form input, .wallet-form-col select, .wallet-form-col input {
-  padding: .55rem .7rem; background: var(--bg, #0b0e11); border: 1px solid var(--border, #2b3139);
-  border-radius: 8px; color: var(--text, #eaecef); font: inherit; font-size: .9rem;
+  padding: .55rem .7rem; background: var(--bg, #070b09); border: 1px solid var(--border, #1f2c26);
+  border-radius: 8px; color: var(--text, #e6efe9); font: inherit; font-size: .9rem;
 }
 .deposit-address {
   margin-top: 1rem; padding: 1rem; border: 1px dashed var(--border); border-radius: 10px;
   display: flex; flex-direction: column; gap: .4rem;
 }
 .da-label { font-size: .72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
-.deposit-address code { font-family: ui-monospace, monospace; font-size: .85rem; word-break: break-all; color: #f0b90b; }
+.deposit-address code { font-family: ui-monospace, monospace; font-size: .85rem; word-break: break-all; color: #2bd97c; }
 .da-memo { font-size: .8rem; color: var(--text-faint); }
 .btn-outline-d.small { padding: .25rem .6rem; font-size: .75rem; }
 .assets-note.mono { font-family: ui-monospace, monospace; color: #0ecb81; word-break: break-all; }
@@ -1528,34 +1528,34 @@
 .topnav-trigger {
   background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 0;
 }
-.topnav-trigger.active { color: #f0b90b; }
+.topnav-trigger.active { color: #2bd97c; }
 .trade-dropdown {
   position: absolute; top: 140%; left: 0; z-index: 50; width: 20rem;
-  background: #1e2329; border: 1px solid #2b3139; border-radius: 12px; padding: 0.5rem;
+  background: #151d19; border: 1px solid #1f2c26; border-radius: 12px; padding: 0.5rem;
   box-shadow: 0 12px 32px rgba(0,0,0,0.4);
 }
 .td-item {
   display: flex; flex-direction: column; gap: 0.15rem; width: 100%; text-align: left;
-  background: none; border: none; color: #eaecef; font: inherit; padding: 0.6rem 0.7rem;
+  background: none; border: none; color: #e6efe9; font: inherit; padding: 0.6rem 0.7rem;
   border-radius: 8px; cursor: pointer;
 }
-.td-item:hover:not(.disabled) { background: rgba(240,185,11,0.08); }
+.td-item:hover:not(.disabled) { background: rgba(43,217,124,0.08); }
 .td-item.disabled { opacity: 0.45; cursor: not-allowed; }
 .td-label { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
 .td-tag {
   font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.1rem 0.35rem;
-  border-radius: 4px; background: rgba(148,163,184,0.2); color: #848e9c;
+  border-radius: 4px; background: rgba(132,168,150,0.2); color: #7c8b83;
 }
-.td-desc { font-size: 0.74rem; color: #848e9c; }
+.td-desc { font-size: 0.74rem; color: #7c8b83; }
 
 /* --- buy crypto ------------------------------------------------------- */
 .buy-card { max-width: 26rem; margin-top: 1rem; }
 .buy-field { display: block; margin-bottom: 0.4rem; }
 .buy-field > span { display: block; font-size: 0.72rem; color: var(--text-faint); margin-bottom: 0.3rem; }
-.buy-input { display: flex; align-items: center; border: 1px solid var(--border, #2b3139); border-radius: 10px; padding: 0.6rem 0.8rem; gap: 0.5rem; }
+.buy-input { display: flex; align-items: center; border: 1px solid var(--border, #1f2c26); border-radius: 10px; padding: 0.6rem 0.8rem; gap: 0.5rem; }
 .buy-input input { flex: 1; min-width: 0; border: none; background: none; color: inherit; font: inherit; font-size: 1.15rem; font-family: ui-monospace, monospace; }
 .buy-input input:focus { outline: none; }
-.buy-input select { border: none; background: rgba(148,163,184,0.12); border-radius: 8px; color: inherit; font: inherit; font-weight: 600; padding: 0.35rem 0.5rem; cursor: pointer; }
+.buy-input select { border: none; background: rgba(132,168,150,0.12); border-radius: 8px; color: inherit; font: inherit; font-weight: 600; padding: 0.35rem 0.5rem; cursor: pointer; }
 .buy-arrow { text-align: center; color: var(--text-faint); font-size: 1.1rem; margin: 0.3rem 0; }
 .buy-rate { margin: 0.7rem 0 0; font-size: 0.78rem; color: var(--text-faint); }
 .buy-submit { width: 100%; margin-top: 1rem; padding: 0.7rem; font-size: 0.95rem; }
@@ -1588,7 +1588,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: rgba(148, 163, 184, 0.12);
+  background: rgba(132, 168, 150, 0.12);
   border: none;
   border-radius: 8px;
   color: inherit;
@@ -1598,7 +1598,7 @@
   cursor: pointer;
 }
 .coin-select-btn:hover {
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(132, 168, 150, 0.2);
 }
 .coin-select-chev {
   font-size: 0.7rem;
@@ -1611,8 +1611,8 @@
   z-index: 40;
   width: 15rem;
   max-width: 78vw;
-  background: var(--surface, #161a1e);
-  border: 1px solid var(--border, #2b3139);
+  background: var(--surface, #0e1411);
+  border: 1px solid var(--border, #1f2c26);
   border-radius: 10px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
   padding: 0.5rem;
@@ -1620,7 +1620,7 @@
 .coin-select-search {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--border, #2b3139);
+  border: 1px solid var(--border, #1f2c26);
   border-radius: 7px;
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
@@ -1664,7 +1664,7 @@
   background: rgba(255, 255, 255, 0.06);
 }
 .coin-select-opt.on {
-  background: rgba(240, 185, 11, 0.14);
+  background: rgba(43, 217, 124, 0.14);
 }
 .coin-select-opt-sym {
   font-weight: 600;
@@ -1673,7 +1673,7 @@
   margin-left: auto;
   font-size: 0.64rem;
   color: var(--text-faint);
-  border: 1px solid var(--border, #2b3139);
+  border: 1px solid var(--border, #1f2c26);
   border-radius: 5px;
   padding: 0.05rem 0.35rem;
 }
@@ -1709,5 +1709,5 @@
 
 /* convert extras */
 .cv-avail { display: block; font-size: 0.72rem; color: var(--text-faint); margin-top: 0.3rem; }
-.cv-flip { display: block; margin: 0.3rem auto; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--border, #2b3139); background: var(--surface-2, #1e2329); color: inherit; cursor: pointer; font-size: 1rem; }
-.cv-flip:hover { border-color: #f0b90b; color: #f0b90b; }
+.cv-flip { display: block; margin: 0.3rem auto; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--border, #1f2c26); background: var(--surface-2, #151d19); color: inherit; cursor: pointer; font-size: 1rem; }
+.cv-flip:hover { border-color: #2bd97c; color: #2bd97c; }
