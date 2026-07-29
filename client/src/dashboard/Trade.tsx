@@ -30,7 +30,12 @@ export const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
  */
 export function Trade() {
   const [markets, setMarkets] = useState<MarketInfo[]>([]);
-  const [symbol, setSymbol] = useState("ETHUSDT");
+  // Opened from the Markets page? Pick up the symbol it stashed, then clear it.
+  const [symbol, setSymbol] = useState(() => {
+    const picked = sessionStorage.getItem("trade_symbol");
+    if (picked) sessionStorage.removeItem("trade_symbol");
+    return picked || "ETHUSDT";
+  });
   const [interval, setInterval] = useState("1m");
   const [balances, setBalances] = useState<Balance[]>([]);
   const [clickedPrice, setClickedPrice] = useState<string | null>(null);

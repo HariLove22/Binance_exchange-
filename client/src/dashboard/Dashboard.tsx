@@ -9,6 +9,7 @@ import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
+import { Markets } from "./Markets";
 import {
   IDeposit,
   IGear,
@@ -81,8 +82,8 @@ export function Dashboard({ path }: { path: string }) {
           <span className="brand-mark" aria-hidden>◈</span> Novex
         </a>
         <nav className="dash-topnav">
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Buy Crypto</a>
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Markets</a>
+          <a href="#/dashboard/p2p" className={seg === "p2p" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/p2p"); }}>Buy Crypto</a>
+          <a href="#/dashboard/markets" className={seg === "markets" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/markets"); }}>Markets</a>
 
           <div className="topnav-drop" ref={tradeRef}>
             <button
@@ -173,6 +174,8 @@ export function Dashboard({ path }: { path: string }) {
             <Orders />
           ) : seg === "p2p" ? (
             <P2P />
+          ) : seg === "markets" ? (
+            <Markets onPick={(s) => { sessionStorage.setItem("trade_symbol", s); navigate("/dashboard/trade"); }} />
           ) : seg === "margin" ? (
             <MarginTrade />
           ) : seg === "assets" ? (

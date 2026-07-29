@@ -3,9 +3,11 @@ import {
   api,
   ApiError,
   trimAmount,
+  type AccountOverview,
   type Balance,
   type ConvertQuote,
   type DepositRecord,
+  type MarginBalanceRow,
   type OnrampQuote,
   type WalletNetwork,
   type WithdrawalRecord,
@@ -23,10 +25,12 @@ import { FiatSelect } from "./FiatSelect";
  * reserve-on-request, refund-on-fail — is real.
  */
 export function Assets() {
-  const [tab, setTab] = useState<"balances" | "buy" | "convert" | "deposit" | "withdraw">("balances");
+  const [tab, setTab] = useState<"overview" | "spot" | "margin" | "buy" | "convert" | "deposit" | "withdraw">("overview");
 
   const tabs: [typeof tab, string][] = [
-    ["balances", "Balances"],
+    ["overview", "Overview"],
+    ["spot", "Spot"],
+    ["margin", "Margin"],
     ["buy", "Buy Crypto"],
     ["convert", "Convert"],
     ["deposit", "Deposit"],
@@ -41,11 +45,107 @@ export function Assets() {
         ))}
       </div>
 
-      {tab === "balances" && <Balances />}
+      {tab === "overview" && <AssetsOverview onGoto={setTab} />}
+      {tab === "spot" && <Balances />}
+      {tab === "margin" && <MarginBalances />}
       {tab === "buy" && <BuyCrypto />}
       {tab === "convert" && <Convert />}
       {tab === "deposit" && <Deposit />}
       {tab === "withdraw" && <Withdraw />}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- overview */
+
+function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) {
+  const [ov, setOv] = useState<AccountOverview | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.accountOverview().then(setOv).catch((e) => setErr(e instanceof ApiError ? e.message : String(e)));
+  }, []);
+
+  const spot = ov ? Number(ov.spot_usd) : 0;
+  const marginEq = ov?.margin.open ? Number(ov.margin.equity_usd) : 0;
+  const demo = ov?.demo.exists ? Number(ov.demo.total_usd) : 0;
+  const total = spot + marginEq;
+
+  return (
+    <div className="asset-ov">
+      <div className="asset-total">
+        <span>Estimated Total Value (real accounts)</span>
+        <b>${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b>
+        {ov?.demo.exists && <span className="asset-demo-note">+ ${demo.toLocaleString(undefined, { maximumFractionDigits: 2 })} virtual (demo)</span>}
+      </div>
+      {err && <p className="asset-err">{err}</p>}
+
+      <div className="asset-wallets">
+        <button className="asset-wallet" onClick={() => onGoto("spot")}>
+          <div className="aw-top"><span className="aw-icon spot">◈</span><span className="aw-name">Spot Wallet</span></div>
+          <div className="aw-val">${spot.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+          <div className="aw-sub">Your main trading & holding wallet</div>
+        </button>
+
+        <button className="asset-wallet" onClick={() => onGoto("margin")}>
+          <div className="aw-top"><span className="aw-icon margin">⇄</span><span className="aw-name">Margin Wallet</span></div>
+          {ov?.margin.open ? (
+            <>
+              <div className="aw-val">${marginEq.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="aw-eq">equity</span></div>
+              <div className={`aw-sub ${ov.margin.health}`}>
+                {ov.margin.margin_level ? `Margin level ${Number(ov.margin.margin_level).toFixed(2)}` : "No debt"} · {ov.margin.max_leverage}x
+              </div>
+            </>
+          ) : (
+            <><div className="aw-val muted">Not opened</div><div className="aw-sub">Open a margin account to trade with leverage</div></>
+          )}
+        </button>
+
+        <div className="asset-wallet static">
+          <div className="aw-top"><span className="aw-icon demo">🎮</span><span className="aw-name">Demo Wallet</span></div>
+          {ov?.demo.exists
+            ? <><div className="aw-val">${demo.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="aw-eq">virtual</span></div><div className="aw-sub">Practice funds — not real money</div></>
+            : <><div className="aw-val muted">—</div><div className="aw-sub">Create a demo account from Accounts</div></>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------------------------------------- margin balances */
+
+function MarginBalances() {
+  const [balances, setBalances] = useState<MarginBalanceRow[] | null>(null);
+  const [open, setOpen] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.marginAccount("CROSS")
+      .then((a) => { setBalances(a.balances); setOpen(true); })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 404) { setOpen(false); setBalances([]); }
+        else setErr(e instanceof ApiError ? e.message : String(e));
+      });
+  }, []);
+
+  if (!open) return <p className="asset-empty">No margin account yet. Open one from Accounts or the Margin terminal.</p>;
+  if (err) return <p className="asset-err">{err}</p>;
+  if (!balances) return <p className="asset-empty">loading…</p>;
+
+  return (
+    <div className="bal-wrap">
+      <p className="bal-note">Cross margin wallet balances.</p>
+      <div className="bal-table">
+        <div className="bal-h"><span>Asset</span><span className="num">Available</span><span className="num">Locked</span></div>
+        {balances.length === 0 && <p className="asset-empty">No margin balances. Transfer collateral from the Margin terminal.</p>}
+        {balances.map((b) => (
+          <div className="bal-r" key={b.asset}>
+            <span className="mono">{b.asset}</span>
+            <span className="num mono">{trimAmount(b.available)}</span>
+            <span className="num mono dim">{trimAmount(b.locked)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
