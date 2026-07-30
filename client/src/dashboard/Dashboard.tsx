@@ -10,6 +10,7 @@ import { MarginTrade } from "./MarginTrade";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
 import { Markets } from "./Markets";
+import { Verification } from "./Verification";
 import {
   IDeposit,
   IGear,
@@ -180,6 +181,8 @@ export function Dashboard({ path }: { path: string }) {
             <MarginTrade />
           ) : seg === "assets" ? (
             <Assets />
+          ) : seg === "verification" ? (
+            <Verification />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (

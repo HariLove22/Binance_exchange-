@@ -314,6 +314,12 @@
   color: #04170e;
   border-color: var(--gold);
 }
+.step-card.done { border-color: rgba(43,217,124,0.3); }
+.step-card.done .step-num {
+  background: #2bd97c;
+  color: #04170e;
+  border-color: #2bd97c;
+}
 .step-card h3 {
   font-size: 1.05rem;
   margin: 0.4rem 0 0.5rem;

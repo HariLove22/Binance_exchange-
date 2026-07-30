@@ -5,6 +5,7 @@ import {
   trimAmount,
   type AdminUserRow,
   type AuthUser,
+  type KycPending,
   type P2PDispute,
   type ReconciliationRow,
 } from "../lib/api";
@@ -20,7 +21,7 @@ import "./admin.css";
  */
 export function AdminDashboard({ user }: { user: AuthUser }) {
   const { logout } = useAuth();
-  const [tab, setTab] = useState<"users" | "reconcile" | "disputes">("users");
+  const [tab, setTab] = useState<"users" | "reconcile" | "disputes" | "kyc">("users");
 
   return (
     <div className="admin">
@@ -46,10 +47,13 @@ export function AdminDashboard({ user }: { user: AuthUser }) {
         <button className={tab === "disputes" ? "active" : ""} onClick={() => setTab("disputes")}>
           P2P Disputes
         </button>
+        <button className={tab === "kyc" ? "active" : ""} onClick={() => setTab("kyc")}>
+          KYC Review
+        </button>
       </nav>
 
       <main className="admin-main">
-        {tab === "users" ? <UsersAndFunds /> : tab === "reconcile" ? <Reconciliation /> : <P2PDisputes />}
+        {tab === "users" ? <UsersAndFunds /> : tab === "reconcile" ? <Reconciliation /> : tab === "disputes" ? <P2PDisputes /> : <KycReview />}
       </main>
     </div>
   );
@@ -319,6 +323,88 @@ function P2PDisputes() {
                 <button className="admin-ghost sm" disabled={busy === d.id} onClick={() => resolve(d.id, false)}>
                   Refund seller
                 </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------- kyc review */
+
+function KycReview() {
+  const [rows, setRows] = useState<KycPending[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setRows(await api.kycPending());
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function decide(id: number, approve: boolean) {
+    setBusy(id);
+    setError(null);
+    try {
+      const reason = approve ? undefined : (prompt("Reason for rejection (optional):") ?? undefined);
+      await api.kycReview(id, approve, reason);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="admin-card wide">
+      <div className="admin-card-head">
+        <h2>KYC Review</h2>
+        <button className="admin-link" onClick={() => void load()}>refresh</button>
+      </div>
+      <p className="admin-sub">
+        Pending identity submissions. Approving marks the user verified (higher limits); rejecting
+        lets them correct and resubmit. No real documents are stored in this demo.
+      </p>
+
+      {error && <p className="admin-error">{error}</p>}
+
+      {rows.length === 0 ? (
+        <div className="recon-banner good">No pending KYC applications 🎉</div>
+      ) : (
+        <div className="admin-table dispute">
+          <div className="at-h">
+            <span>User</span>
+            <span>Legal name</span>
+            <span>ID</span>
+            <span>Country / DOB</span>
+            <span className="num">Review</span>
+          </div>
+          {rows.map((r) => (
+            <div className="at-r" key={r.id}>
+              <span className="trunc">{r.email}</span>
+              <span>{r.legal_name}</span>
+              <span>
+                <div>{r.id_type.replace(/_/g, " ")}</div>
+                <div className="admin-sub mono">{r.id_number}</div>
+              </span>
+              <span>
+                <div>{r.country}</div>
+                <div className="admin-sub">{r.date_of_birth}</div>
+              </span>
+              <span className="num dispute-acts">
+                <button className="admin-primary sm" disabled={busy === r.id} onClick={() => decide(r.id, true)}>Approve</button>
+                <button className="admin-ghost sm" disabled={busy === r.id} onClick={() => decide(r.id, false)}>Reject</button>
               </span>
             </div>
           ))}

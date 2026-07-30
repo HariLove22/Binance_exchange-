@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type AuthUser, type Balance } from "../lib/api";
+import { api, type AuthUser, type Balance, type KycStatus } from "../lib/api";
 import { useTickers } from "../lib/useLive";
 import { navigate } from "../router";
 
@@ -46,18 +46,50 @@ function handle(user: AuthUser): string {
   return `User-${user.id.toString(16).padStart(5, "0")}`;
 }
 
+function kycTitle(kyc: KycStatus | null): string {
+  switch (kyc?.status) {
+    case "APPROVED": return "Complete";
+    case "PENDING": return "Under Review";
+    case "REJECTED": return "Action Needed";
+    default: return "";
+  }
+}
+
+function kycBody(kyc: KycStatus | null): string {
+  switch (kyc?.status) {
+    case "APPROVED": return "Your identity is verified. Higher limits are unlocked.";
+    case "PENDING": return "Your details are being reviewed. This usually takes a few minutes.";
+    case "REJECTED": return kyc.reject_reason || "Your submission was rejected. Please correct and resubmit.";
+    default: return "Verify your identity (KYC) to unlock higher limits and full access.";
+  }
+}
+
 export function Overview({ user }: { user: AuthUser }) {
   const [balances, setBalances] = useState<Balance[] | null>(null);
+  const [kyc, setKyc] = useState<KycStatus | null>(null);
+  const [traded, setTraded] = useState(false);
 
   useEffect(() => {
-    // Best-effort: the overview still renders if this fails; the Assets page surfaces errors.
+    // Best-effort: the overview still renders if any of these fail.
     api.balances().then(setBalances).catch(() => setBalances([]));
+    api.kycMe().then(setKyc).catch(() => setKyc(null));
+    api.myTrades().then((t) => setTraded(t.length > 0)).catch(() => {});
   }, []);
 
   const assetCount = balances?.filter((b) => b.total !== "0" && Number(b.available) + Number(b.locked) > 0).length ?? 0;
   const funded = assetCount > 0;
   const { value, pnl24h } = usePortfolio(balances);
   const pnlUp = pnl24h >= 0;
+
+  // The three onboarding steps, each done/active/todo from real state. The first not-done step is
+  // highlighted as the next action.
+  const verified = kyc?.status === "APPROVED";
+  const steps = [
+    { done: verified, key: "verify" },
+    { done: funded, key: "deposit" },
+    { done: traded, key: "trade" },
+  ];
+  const activeIdx = steps.findIndex((s) => !s.done);
 
   return (
     <div>
@@ -79,9 +111,11 @@ export function Overview({ user }: { user: AuthUser }) {
             <div className="ps-label">UID</div>
             <div className="ps-val">{uid(user)}</div>
           </div>
-          <div>
-            <div className="ps-label">VIP Level</div>
-            <div className="ps-val">Regular User ›</div>
+          <div style={{ cursor: "pointer" }} onClick={() => navigate("/dashboard/verification")}>
+            <div className="ps-label">Verification</div>
+            <div className="ps-val" style={{ color: verified ? "#2bd97c" : kyc?.status === "PENDING" ? "#f0b90b" : undefined }}>
+              {verified ? "Verified ✓" : kyc?.status === "PENDING" ? "Pending ›" : "Unverified ›"}
+            </div>
           </div>
           <div>
             <div className="ps-label">Following</div>
@@ -94,37 +128,41 @@ export function Overview({ user }: { user: AuthUser }) {
         </div>
       </div>
 
-      {/* get started */}
+      {/* get started — each step reflects real state; the next unfinished one is highlighted */}
       <h2 className="section-title">Get Started</h2>
       <div className="steps">
-        <div className="step-card">
-          <span className="step-num">1</span>
-          <h3>Verification {user.is_verified ? "Complete" : "Under Review"}</h3>
-          <p>
-            {user.is_verified
-              ? "Your email is verified. Identity (KYC) verification will unlock higher limits."
-              : "Your details are being reviewed. This usually takes a few minutes."}
-          </p>
+        <div className={`step-card ${steps[0].done ? "done" : activeIdx === 0 ? "active" : ""}`}>
+          <span className="step-num">{steps[0].done ? "✓" : "1"}</span>
+          <h3>Identity Verification {kycTitle(kyc)}</h3>
+          <p>{kycBody(kyc)}</p>
           <div className="step-cta">
-            <button className="btn-outline-d">View Details</button>
+            <button className={verified ? "btn-outline-d" : "btn-gold"} onClick={() => navigate("/dashboard/verification")}>
+              {verified ? "View Details" : kyc?.status === "PENDING" ? "View Status" : "Verify Now"}
+            </button>
           </div>
         </div>
 
-        <div className="step-card active">
-          <span className="step-num">2</span>
-          <h3>Complete a Deposit to Start Your Trading Journey</h3>
-          <p>Add funds to your account to begin trading crypto on Novex.</p>
+        <div className={`step-card ${steps[1].done ? "done" : activeIdx === 1 ? "active" : ""}`}>
+          <span className="step-num">{steps[1].done ? "✓" : "2"}</span>
+          <h3>{funded ? "Funds Added" : "Complete a Deposit to Start Your Trading Journey"}</h3>
+          <p>{funded ? "Your account is funded. You're ready to trade." : "Add funds to your account to begin trading crypto on Novex."}</p>
           <div className="step-cta">
-            <button className="btn-gold">Deposit</button>
+            <button className={activeIdx === 1 ? "btn-gold" : "btn-outline-d"} onClick={() => navigate("/dashboard/assets")}>
+              {funded ? "Add More" : "Deposit"}
+            </button>
           </div>
         </div>
 
-        <div className="step-card">
-          <span className="step-num">3</span>
+        <div className={`step-card ${steps[2].done ? "done" : activeIdx === 2 ? "active" : ""}`}>
+          <span className="step-num">{steps[2].done ? "✓" : "3"}</span>
           <h3>Trade</h3>
-          <p>Buy and sell crypto once your deposit lands.</p>
+          <p>{traded ? "You've placed your first trade. Keep going." : "Buy and sell crypto once your deposit lands."}</p>
           <div className="step-cta">
-            <span className="step-pending">◷ Pending</span>
+            {traded || funded ? (
+              <button className={activeIdx === 2 ? "btn-gold" : "btn-outline-d"} onClick={() => navigate("/dashboard/trade")}>Trade Now</button>
+            ) : (
+              <span className="step-pending">◷ Pending</span>
+            )}
           </div>
         </div>
       </div>
