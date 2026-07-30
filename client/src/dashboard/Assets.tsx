@@ -13,6 +13,7 @@ import {
   type WithdrawalRecord,
 } from "../lib/api";
 import { useCoins } from "../lib/useCoins";
+import { useLocale } from "../lib/locale";
 import { CoinSelect } from "./CoinSelect";
 import { FiatSelect } from "./FiatSelect";
 
@@ -68,6 +69,7 @@ export function Assets() {
 function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) {
   const [ov, setOv] = useState<AccountOverview | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const { fmt } = useLocale();
 
   useEffect(() => {
     api.accountOverview().then(setOv).catch((e) => setErr(e instanceof ApiError ? e.message : String(e)));
@@ -82,15 +84,15 @@ function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) 
     <div className="asset-ov">
       <div className="asset-total">
         <span>Estimated Total Value (real accounts)</span>
-        <b>${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b>
-        {ov?.demo.exists && <span className="asset-demo-note">+ ${demo.toLocaleString(undefined, { maximumFractionDigits: 2 })} virtual (demo)</span>}
+        <b>{fmt(total)}</b>
+        {ov?.demo.exists && <span className="asset-demo-note">+ {fmt(demo)} virtual (demo)</span>}
       </div>
       {err && <p className="asset-err">{err}</p>}
 
       <div className="asset-wallets">
         <button className="asset-wallet" onClick={() => onGoto("spot")}>
           <div className="aw-top"><span className="aw-icon spot">◈</span><span className="aw-name">Spot Wallet</span></div>
-          <div className="aw-val">${spot.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+          <div className="aw-val">{fmt(spot)}</div>
           <div className="aw-sub">Your main trading & holding wallet</div>
         </button>
 
@@ -98,7 +100,7 @@ function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) 
           <div className="aw-top"><span className="aw-icon margin">⇄</span><span className="aw-name">Margin Wallet</span></div>
           {ov?.margin.open ? (
             <>
-              <div className="aw-val">${marginEq.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="aw-eq">equity</span></div>
+              <div className="aw-val">{fmt(marginEq)} <span className="aw-eq">equity</span></div>
               <div className={`aw-sub ${ov.margin.health}`}>
                 {ov.margin.margin_level ? `Margin level ${Number(ov.margin.margin_level).toFixed(2)}` : "No debt"} · {ov.margin.max_leverage}x
               </div>
@@ -111,7 +113,7 @@ function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) 
         <div className="asset-wallet static">
           <div className="aw-top"><span className="aw-icon demo">🎮</span><span className="aw-name">Demo Wallet</span></div>
           {ov?.demo.exists
-            ? <><div className="aw-val">${demo.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="aw-eq">virtual</span></div><div className="aw-sub">Practice funds — not real money</div></>
+            ? <><div className="aw-val">{fmt(demo)} <span className="aw-eq">virtual</span></div><div className="aw-sub">Practice funds — not real money</div></>
             : <><div className="aw-val muted">—</div><div className="aw-sub">Create a demo account from Accounts</div></>}
         </div>
       </div>
