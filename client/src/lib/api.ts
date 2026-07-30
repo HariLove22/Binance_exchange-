@@ -122,6 +122,34 @@ export interface ReferralSummary {
   referrals: ReferralRow[];
 }
 
+export interface ApiKeyRow {
+  id: number;
+  label: string;
+  key: string;
+  can_read: boolean;
+  can_trade: boolean;
+  can_withdraw: boolean;
+  created_at: string;
+  last_used_at: string | null;
+}
+export interface ApiKeyCreated extends ApiKeyRow {
+  secret: string;
+}
+export interface StatementRow {
+  time: string;
+  kind: string;
+  asset: string;
+  amount: string;
+}
+export interface AccountReports {
+  deposits_usd: string;
+  withdrawals_usd: string;
+  rewards_usd: string;
+  referral_usd: string;
+  trades: number;
+  net_flow_usd: string;
+}
+
 export interface SubBalanceRow {
   asset: string;
   available: string;
@@ -329,6 +357,13 @@ export const api = {
   // kyc
   referralMe: () => request<ReferralSummary>("/referral/me"),
   vipMe: () => request<VipStatus>("/vip/me"),
+  apiKeys: () => request<ApiKeyRow[]>("/apikeys"),
+  apiKeyCreate: (body: { label: string; can_trade: boolean; can_withdraw: boolean }) =>
+    request<ApiKeyCreated>("/apikeys", { method: "POST", body: JSON.stringify(body) }),
+  apiKeyRevoke: (id: number) => request<void>(`/apikeys/${id}`, { method: "DELETE" }),
+  accountStatement: () => request<StatementRow[]>("/account/statement"),
+  accountReports: () => request<AccountReports>("/account/reports"),
+
   subAccounts: () => request<SubAccount[]>("/subaccounts"),
   subCreate: (label: string) => request<SubAccount>("/subaccounts", { method: "POST", body: JSON.stringify({ label }) }),
   subTransfer: (body: { sub_id: number; asset: string; amount: string; to_sub: boolean }) =>

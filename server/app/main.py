@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.routes import account, admin, auth, health, kyc, margin, market, p2p, referral, rewards, subaccounts, trade, vip, wallet, ws
+from app.api.routes import account, admin, apikeys, auth, health, kyc, margin, market, p2p, referral, rewards, subaccounts, trade, vip, wallet, ws
 from app.core.config import settings
 from app.services import trigger_monitor
 
@@ -72,6 +72,7 @@ app.include_router(referral.router, prefix=settings.api_v1_prefix)
 app.include_router(vip.router, prefix=settings.api_v1_prefix)
 app.include_router(rewards.router, prefix=settings.api_v1_prefix)
 app.include_router(subaccounts.router, prefix=settings.api_v1_prefix)
+app.include_router(apikeys.router, prefix=settings.api_v1_prefix)
 app.include_router(ws.router, prefix=settings.api_v1_prefix)
 
 
