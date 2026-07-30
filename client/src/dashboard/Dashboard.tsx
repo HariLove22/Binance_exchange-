@@ -9,6 +9,10 @@ import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
+import { Markets } from "./Markets";
+import { Verification } from "./Verification";
+import { Profile } from "./Profile";
+import { ThemeToggle } from "./ThemeToggle";
 import {
   IDeposit,
   IGear,
@@ -81,8 +85,8 @@ export function Dashboard({ path }: { path: string }) {
           <span className="brand-mark" aria-hidden>◈</span> Novex
         </a>
         <nav className="dash-topnav">
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Buy Crypto</a>
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Markets</a>
+          <a href="#/dashboard/p2p" className={seg === "p2p" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/p2p"); }}>Buy Crypto</a>
+          <a href="#/dashboard/markets" className={seg === "markets" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/markets"); }}>Markets</a>
 
           <div className="topnav-drop" ref={tradeRef}>
             <button
@@ -123,7 +127,10 @@ export function Dashboard({ path }: { path: string }) {
 
         <div className="dash-top-right">
           <button className="icon-btn" aria-label="Search"><ISearch /></button>
-          <button className="dash-deposit"><IDeposit style={{ width: 16, height: 16 }} /> Deposit</button>
+          <ThemeToggle />
+          <button className="dash-deposit" onClick={() => { sessionStorage.setItem("assets_tab", "deposit"); navigate("/dashboard/assets"); }}>
+            <IDeposit style={{ width: 16, height: 16 }} /> Deposit
+          </button>
 
           <div className="user-menu" ref={menuRef}>
             <button className="avatar" onClick={() => setMenuOpen((o) => !o)} aria-label="Account menu">
@@ -135,7 +142,8 @@ export function Dashboard({ path }: { path: string }) {
                   <div className="ud-name">{user.full_name}</div>
                   <div className="ud-email">{user.email}</div>
                 </div>
-                <button className="ud-item" onClick={() => navigate("/dashboard/account")}>Account</button>
+                <button className="ud-item" onClick={() => navigate("/dashboard/profile")}>Profile</button>
+                <button className="ud-item" onClick={() => navigate("/dashboard/account")}>Accounts</button>
                 <button className="ud-item" onClick={() => navigate("/dashboard/settings")}>Settings</button>
                 <button className="ud-item danger" onClick={logout}>Log out</button>
               </div>
@@ -173,10 +181,16 @@ export function Dashboard({ path }: { path: string }) {
             <Orders />
           ) : seg === "p2p" ? (
             <P2P />
+          ) : seg === "markets" ? (
+            <Markets onPick={(s) => { sessionStorage.setItem("trade_symbol", s); navigate("/dashboard/trade"); }} />
           ) : seg === "margin" ? (
             <MarginTrade />
           ) : seg === "assets" ? (
             <Assets />
+          ) : seg === "verification" ? (
+            <Verification />
+          ) : seg === "profile" ? (
+            <Profile />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (

@@ -1,0 +1,12 @@
+.kyc-gate { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 1.6rem 1rem; gap: 0.5rem; }
+.kyc-gate-icon { font-size: 1.8rem; }
+.kyc-gate-title { font-weight: 600; font-size: 1rem; color: #e6efe9; }
+.kyc-gate-body { color: #7c8b83; font-size: 0.82rem; margin: 0; max-width: 300px; line-height: 1.5; }
+.kyc-gate-btn { margin-top: 0.4rem; background: #2bd97c; color: #131a17; border: none; border-radius: 8px; padding: 0.55rem 1.4rem; font: inherit; font-weight: 600; cursor: pointer; }
+
+.kyc-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: grid; place-items: center; z-index: 80; padding: 1rem; }
+.kyc-modal-box { background: #101613; border: 1px solid #1f2c26; border-radius: 12px; padding: 1.6rem; max-width: 360px; text-align: center; }
+.kyc-modal-box h3 { margin: 0.5rem 0 0.3rem; font-size: 1.1rem; }
+.kyc-modal-box p { color: #a7b4ac; font-size: 0.85rem; margin: 0 0 1rem; }
+.kyc-modal-acts { display: flex; gap: 0.6rem; justify-content: center; }
+.kyc-modal-ghost { background: none; border: 1px solid #2b3b33; color: #a7b4ac; border-radius: 8px; padding: 0.55rem 1.2rem; font: inherit; cursor: pointer; }

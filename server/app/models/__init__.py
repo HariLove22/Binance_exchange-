@@ -34,6 +34,7 @@ from app.models.margin import (
     MarginTier,
 )
 from app.models.demo import DemoAccount, DemoHolding
+from app.models.kyc import KycApplication, KycStatus
 from app.models.market import (
     CANCELLABLE_STATUSES,
     Market,
@@ -78,6 +79,8 @@ __all__ = [
     "ChainFamily",
     "DemoAccount",
     "DemoHolding",
+    "KycApplication",
+    "KycStatus",
     "Deposit",
     "DepositAddress",
     "DepositStatus",

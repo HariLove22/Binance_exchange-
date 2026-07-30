@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
+import { navigate } from "../router";
 import "./account.css";
 
 /**
@@ -52,7 +53,7 @@ export function Settings() {
             <div className="acct-row-title">Identity verification (KYC)</div>
             <div className="acct-row-sub">Required for higher limits and fiat withdrawals.</div>
           </div>
-          <span className="acct-soon">Coming soon</span>
+          <button className="acct-primary" style={{ padding: "0.4rem 0.9rem" }} onClick={() => navigate("/dashboard/verification")}>Verify</button>
         </div>
         <div className="acct-row">
           <div>

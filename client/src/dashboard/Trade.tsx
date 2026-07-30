@@ -14,6 +14,7 @@ import {
 import { useTicker, useTickers } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
+import { useKycApproved, KycRequiredNotice } from "./KycGate";
 import "./trade.css";
 
 export const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -30,7 +31,12 @@ export const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
  */
 export function Trade() {
   const [markets, setMarkets] = useState<MarketInfo[]>([]);
-  const [symbol, setSymbol] = useState("ETHUSDT");
+  // Opened from the Markets page? Pick up the symbol it stashed, then clear it.
+  const [symbol, setSymbol] = useState(() => {
+    const picked = sessionStorage.getItem("trade_symbol");
+    if (picked) sessionStorage.removeItem("trade_symbol");
+    return picked || "ETHUSDT";
+  });
   const [interval, setInterval] = useState("1m");
   const [balances, setBalances] = useState<Balance[]>([]);
   const [clickedPrice, setClickedPrice] = useState<string | null>(null);
@@ -63,6 +69,7 @@ export function Trade() {
 
   // Live order book + trades over our WebSocket (only for pairs we run a market for).
   const { book, trades } = useMarketWs(tradeable ? symbol : null);
+  const kycOk = useKycApproved();
 
   return (
     <div className="trade">
@@ -119,9 +126,13 @@ export function Trade() {
           <TradeChart symbol={symbol} interval={interval} />
         </section>
 
-        {/* ── center bottom: order form ── */}
+        {/* ── center bottom: order form (gated on KYC) ── */}
         <section className="g-form tp">
-          {tradeable ? (
+          {!tradeable ? (
+            <ListForTrading symbol={symbol} onListed={loadMarkets} />
+          ) : kycOk === false ? (
+            <KycRequiredNotice />
+          ) : (
             <OrderForm
               market={market}
               symbol={symbol}
@@ -129,8 +140,6 @@ export function Trade() {
               livePrice={ticker?.price ?? null}
               clickedPrice={clickedPrice}
             />
-          ) : (
-            <ListForTrading symbol={symbol} onListed={loadMarkets} />
           )}
         </section>
 

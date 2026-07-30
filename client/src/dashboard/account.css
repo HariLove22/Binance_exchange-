@@ -41,3 +41,10 @@
 .acct-row-title { font-size: 0.92rem; font-weight: 500; }
 .acct-row-sub { font-size: 0.78rem; color: #7c8b83; margin-top: 0.15rem; }
 .acct-soon { font-size: 0.7rem; color: #7c8b83; background: rgba(132,168,150,0.1); padding: 0.25rem 0.6rem; border-radius: 4px; white-space: nowrap; }
+
+/* profile read-view rows */
+.pf-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid #14181c; font-size: 0.88rem; }
+.pf-row:last-of-type { border-bottom: none; }
+.pf-row span { color: #7c8b83; }
+.pf-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.pf-actions .acct-primary { flex: 1; min-width: 130px; }

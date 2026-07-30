@@ -27,7 +27,8 @@ from app.models import (
     OrderType,
     User,
 )
-from app.services import ledger, margin, pubsub
+from app.services import kyc, ledger, margin, pubsub
+from app.services.kyc import KycRequired
 from app.services.margin import MarginError
 from app.services.pricing import usd_price_of
 
@@ -233,6 +234,10 @@ async def repay(body: RepayRequest, user: User = Depends(get_current_user), db: 
 
 @router.post("/order", status_code=status.HTTP_201_CREATED)
 async def place_order(body: MarginOrderRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    try:
+        await kyc.assert_approved(db, user.id)
+    except KycRequired as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     account = await _resolve_account(db, user.id, body.mode, body.symbol if body.mode is MarginMode.ISOLATED else None)
     market = await _market(db, body.symbol)
     try:

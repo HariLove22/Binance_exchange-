@@ -7,7 +7,10 @@ from app.core.config import settings
 
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
+    # SQL echo logs every statement — useful when debugging a query, but it makes every request
+    # (and the 3s trigger monitor) noticeably slower and floods the console. Off by default; opt in
+    # with DB_ECHO=true when you actually need it.
+    echo=settings.db_echo,
     pool_pre_ping=True,
     # Fail fast when Postgres is unreachable. Without connect_timeout, psycopg retries the
     # connection until the OS gives up, so a request against a dead database hangs for minutes

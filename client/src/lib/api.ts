@@ -265,6 +265,17 @@ export const api = {
   changePassword: (body: { current_password: string; new_password: string }) =>
     request<{ message: string }>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
 
+  // kyc
+  kycMe: () => request<KycStatus>("/kyc/me"),
+  kycSubmit: (body: {
+    legal_name: string; date_of_birth: string; country: string; id_type: string; id_number: string;
+    doc_front?: string | null; doc_back?: string | null; selfie?: string | null;
+  }) => request<KycStatus>("/kyc/submit", { method: "POST", body: JSON.stringify(body) }),
+  kycPending: () => request<KycPending[]>("/kyc/admin/pending"),
+  kycDetail: (id: number) => request<KycDetail>(`/kyc/admin/${id}`),
+  kycReview: (id: number, approve: boolean, reason?: string) =>
+    request<KycStatus>(`/kyc/admin/${id}/review`, { method: "POST", body: JSON.stringify({ approve, reason }) }),
+
   // account center
   accountOverview: () => request<AccountOverview>("/account/overview"),
   demoGet: () => request<DemoAccount>("/account/demo"),
@@ -413,6 +424,37 @@ export interface MarginLoanRow {
   accrued_interest: string;
   owed: string;
   hourly_rate: string;
+}
+
+export interface KycStatus {
+  status: "NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED";
+  legal_name?: string | null;
+  country?: string | null;
+  id_type?: string | null;
+  reject_reason?: string | null;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  has_front?: boolean;
+  has_back?: boolean;
+  has_selfie?: boolean;
+}
+
+export interface KycPending {
+  id: number;
+  user_id: number;
+  email: string;
+  legal_name: string;
+  date_of_birth: string;
+  country: string;
+  id_type: string;
+  id_number: string;
+  submitted_at: string;
+}
+
+export interface KycDetail extends KycPending {
+  doc_front?: string | null;
+  doc_back?: string | null;
+  selfie?: string | null;
 }
 
 export interface AccountOverview {

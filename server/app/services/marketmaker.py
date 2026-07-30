@@ -12,6 +12,8 @@ generously (via the deposit flow, so reconciliation stays honest) and refreshed 
 cancel its resting orders, re-quote around the current price.
 """
 
+import asyncio
+import time
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
 
 import httpx
@@ -60,16 +62,48 @@ async def get_market_maker(db: AsyncSession) -> User:
     return mm
 
 
+# In-memory price cache. Binance's /ticker/price with no symbol returns EVERY pair in one response
+# (~a few thousand rows, ~150KB). Fetching that once and serving lookups from memory turns what was
+# one network round-trip *per asset* — the thing that made balances and valuations take seconds —
+# into a single refresh every few seconds shared across all callers.
+_price_cache: dict[str, Decimal] = {}
+_price_cache_at: float = 0.0
+_PRICE_TTL = 5.0  # seconds; prices barely move in 5s and every valuation tolerates that
+_price_lock = asyncio.Lock()
+
+
+async def _refresh_price_cache() -> None:
+    global _price_cache_at
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        resp = await client.get(BINANCE_PRICE_URL)  # no symbol → all pairs at once
+        resp.raise_for_status()
+        fresh: dict[str, Decimal] = {}
+        for row in resp.json():
+            try:
+                fresh[row["symbol"]] = Decimal(row["price"])
+            except (KeyError, ValueError, TypeError):
+                continue
+    _price_cache.clear()
+    _price_cache.update(fresh)
+    _price_cache_at = time.monotonic()
+
+
 async def fetch_reference_price(symbol: str) -> Decimal | None:
-    """Live price from Binance's public feed. None if unreachable — the caller skips the refresh
-    rather than quoting off a stale or zero price."""
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(BINANCE_PRICE_URL, params={"symbol": symbol})
-            resp.raise_for_status()
-            return Decimal(resp.json()["price"])
-    except (httpx.HTTPError, KeyError, ValueError):
-        return None
+    """Live price from Binance's public feed, served from a short-lived in-memory cache.
+
+    A cache hit is a dict lookup (microseconds). On a miss/expiry, ONE batch request refreshes every
+    pair, so N per-asset valuations cost one network call, not N. None if the pair is unknown or the
+    feed is unreachable.
+    """
+    if time.monotonic() - _price_cache_at > _PRICE_TTL:
+        async with _price_lock:
+            # Re-check inside the lock so concurrent callers don't all refetch.
+            if time.monotonic() - _price_cache_at > _PRICE_TTL:
+                try:
+                    await _refresh_price_cache()
+                except (httpx.HTTPError, ValueError):
+                    pass  # keep serving the last known prices rather than failing the request
+    return _price_cache.get(symbol)
 
 
 def _round_to(value: Decimal, step: Decimal, rounding=ROUND_DOWN) -> Decimal:
