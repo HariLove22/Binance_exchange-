@@ -1,0 +1,26 @@
+.vip { max-width: 820px; margin: 0 auto; padding: 1rem 1.2rem 2rem; color: var(--text); }
+.vip-head h1 { font-size: 1.4rem; margin: 0; }
+.vip-sub { color: var(--text-faint); font-size: 0.85rem; margin: 0.3rem 0 1.2rem; }
+.vip-err { color: #f6465d; font-size: 0.85rem; }
+
+.vip-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.3rem; margin-bottom: 1.2rem; }
+.vip-current { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+.vip-badge { background: linear-gradient(135deg, var(--gold), #4fe89b); color: #04170e; font-weight: 700; font-size: 1.1rem; padding: 0.5rem 1.1rem; border-radius: 10px; }
+.vip-fees { display: flex; gap: 1.8rem; }
+.vip-fees div { display: flex; flex-direction: column; gap: 0.2rem; }
+.vip-fees span { font-size: 0.68rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+.vip-fees b { font-size: 1.15rem; font-family: ui-monospace, monospace; }
+
+.vip-progress-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.4rem; }
+.vip-bar { height: 8px; background: var(--surface-3); border-radius: 5px; overflow: hidden; }
+.vip-bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), #4fe89b); border-radius: 5px; transition: width 0.4s; }
+
+.vip-table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.vip-h, .vip-r { display: grid; grid-template-columns: 1.6fr 1.3fr 1fr 1fr; gap: 0.6rem; padding: 0.75rem 1rem; align-items: center; }
+.vip-h { font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.vip-r { border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.vip-r:last-child { border-bottom: none; }
+.vip-r.on { background: rgba(43,217,124,0.06); }
+.vip-r em { font-style: normal; color: var(--gold); font-size: 0.72rem; }
+.num { text-align: right; }
+.mono { font-family: ui-monospace, monospace; }

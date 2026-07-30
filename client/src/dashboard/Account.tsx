@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type AccountOverview, type DemoAccount } from "../lib/api";
+import { useLocale } from "../lib/locale";
 import { navigate } from "../router";
 import "./accounts.css";
 
@@ -14,6 +15,7 @@ export function Account() {
   const [ov, setOv] = useState<AccountOverview | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const { fmt } = useLocale();
 
   const load = useCallback(async () => {
     setErr(null);
@@ -36,7 +38,7 @@ export function Account() {
           <button className="accs-add" onClick={() => setAdding(true)}>+ Add account</button>
           <div className="accs-total">
             <span>Estimated total (real)</span>
-            <b>${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b>
+            <b>{fmt(total)}</b>
           </div>
         </div>
       </div>
@@ -48,7 +50,7 @@ export function Account() {
         <div className="acc-card">
           <div className="acc-top"><span className="acc-icon spot">◈</span><h3>Spot Account</h3></div>
           <p className="acc-desc">Trade and hold crypto with your own funds.</p>
-          <div className="acc-val">${ov ? Number(ov.spot_usd).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}</div>
+          <div className="acc-val">{ov ? fmt(Number(ov.spot_usd)) : "—"}</div>
           <div className="acc-actions">
             <button className="acc-btn" onClick={() => navigate("/dashboard/assets")}>Assets</button>
             <button className="acc-btn primary" onClick={() => navigate("/dashboard/trade")}>Trade</button>
@@ -61,7 +63,7 @@ export function Account() {
           <p className="acc-desc">Trade with leverage from a shared collateral pool.</p>
           {ov?.margin.open ? (
             <>
-              <div className="acc-val">${Number(ov.margin.equity_usd).toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="acc-val-sub">equity</span></div>
+              <div className="acc-val">{fmt(Number(ov.margin.equity_usd))} <span className="acc-val-sub">equity</span></div>
               <div className={`acc-health ${ov.margin.health}`}>
                 {ov.margin.margin_level ? `Margin level ${Number(ov.margin.margin_level).toFixed(2)}` : "No debt"} · {ov.margin.max_leverage}x
               </div>

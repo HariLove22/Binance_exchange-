@@ -606,20 +606,24 @@
 }
 .trade-grid {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 1.25rem;
+  /* Two balanced columns that fill the width, so the order book and form aren't crammed left with
+     empty space to the right. Capped and centred so they don't stretch absurdly wide. */
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 1.5rem;
   align-items: start;
+  max-width: 1080px;
 }
+@media (max-width: 720px) { .trade-grid { grid-template-columns: 1fr; } }
 /* ---------- order form ---------- */
 .of {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-  max-width: 24rem;
+  /* fills its grid column now, no fixed cap */
 }
 .of .of-tabs {
   display: grid;

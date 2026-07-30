@@ -39,6 +39,10 @@ class User(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # A short unique code others use to sign up under this user (referral program). Generated lazily
+    # on first access, so existing accounts get one too.
+    referral_code: Mapped[str | None] = mapped_column(String(12), unique=True, nullable=True)
+
     # Email-verification flag. While verification is disabled, registration sets this True
     # immediately; when enabled, it stays False until the user clicks the emailed link.
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

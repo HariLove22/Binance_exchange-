@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type AuthUser, type Balance, type KycStatus } from "../lib/api";
 import { useTickers } from "../lib/useLive";
+import { useLocale } from "../lib/locale";
 import { navigate } from "../router";
 
 // Assets valued at ~1 USDT without needing a live feed.
@@ -80,6 +81,7 @@ export function Overview({ user }: { user: AuthUser }) {
   const funded = assetCount > 0;
   const { value, pnl24h } = usePortfolio(balances);
   const pnlUp = pnl24h >= 0;
+  const { fmt, currency } = useLocale();
 
   // The three onboarding steps, each done/active/todo from real state. The first not-done step is
   // highlighted as the next action.
@@ -172,15 +174,15 @@ export function Overview({ user }: { user: AuthUser }) {
         <div>
           <div className="balance-label">Est. Total Value ⓘ</div>
           <div className="balance-value">
-            {balances === null ? "…" : value.toFixed(2)}
-            <span className="unit">USDT</span>
+            {balances === null ? "…" : fmt(value)}
+            <span className="unit">{currency.code}</span>
           </div>
           <div className="balance-sub">
             {funded ? (
               <>
                 Today's PnL{" "}
                 <span style={{ color: pnlUp ? "#0ecb81" : "#f6465d" }}>
-                  {pnlUp ? "+" : ""}{pnl24h.toFixed(2)} USDT
+                  {pnlUp ? "+" : ""}{fmt(pnl24h)}
                 </span>{" "}
                 · live
               </>

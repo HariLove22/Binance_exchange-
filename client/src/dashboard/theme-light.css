@@ -147,3 +147,23 @@
 
 /* chart text tweak — the candles keep their up/down colors */
 :root[data-theme="light"] .trade-chart { filter: none; }
+
+/* Profile / Settings (account.css) — .acct hardcodes light text + dark cards */
+:root[data-theme="light"] .acct { color: #12211a; }
+:root[data-theme="light"] .acct-card { background: #ffffff; border-color: #e0e5e2; }
+:root[data-theme="light"] .acct-name,
+:root[data-theme="light"] .acct-meta b,
+:root[data-theme="light"] .acct-row-title,
+:root[data-theme="light"] .pf-row b,
+:root[data-theme="light"] .acct h1,
+:root[data-theme="light"] .acct h2 { color: #12211a; }
+:root[data-theme="light"] .acct-email,
+:root[data-theme="light"] .acct-meta span,
+:root[data-theme="light"] .acct-field span,
+:root[data-theme="light"] .acct-row-sub,
+:root[data-theme="light"] .pf-row span { color: #6a7a71; }
+:root[data-theme="light"] .acct-row,
+:root[data-theme="light"] .pf-row { border-color: #eceeed; }
+:root[data-theme="light"] .acct-badge { background: #eef1f0; color: #46564d; }
+:root[data-theme="light"] .acct-badge.ok { background: rgba(43,217,124,0.15); color: #199f59; }
+:root[data-theme="light"] .acct-field input:disabled { background: #eef1f0; color: #6a7a71; }

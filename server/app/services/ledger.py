@@ -540,6 +540,36 @@ async def margin_repay(
     )
 
 
+async def pay_referral(
+    db: AsyncSession,
+    *,
+    referrer_id: int,
+    asset_id: int,
+    amount: Decimal,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Pay a referrer their commission out of FEE_INCOME: FEE_INCOME -= amount ; referrer += amount.
+
+    Real money leaving the exchange's revenue into the referrer's spendable balance, balanced to zero
+    in the fee asset. Skips silently if FEE_INCOME lacks the funds (nothing to share)."""
+    if amount <= 0:
+        return None
+    fee_income = await get_or_create_account(db, asset_id, AccountType.FEE_INCOME)
+    if fee_income.balance < amount:
+        amount = fee_income.balance
+    if amount <= 0:
+        return None
+    referrer = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, referrer_id)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.REFERRAL,
+        reference=reference,
+        movements=[Movement(fee_income, -amount), Movement(referrer, amount)],
+    )
+
+
 async def collect_fee(
     db: AsyncSession,
     *,

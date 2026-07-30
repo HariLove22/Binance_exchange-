@@ -135,6 +135,7 @@ async def place_order(
     quantity: Decimal,
     price: Decimal | None = None,
     wallet: str = WALLET_SPOT,
+    taker_fee: Decimal | None = None,
 ) -> PlacedOrder:
     if not market.enabled:
         raise TradingError("market is not open for trading")
@@ -149,11 +150,11 @@ async def place_order(
     )
     db.add(order)
     await db.flush()
-    trades = await _activate(db, order, market)
+    trades = await _activate(db, order, market, taker_fee=taker_fee)
     return PlacedOrder(order=order, trades=trades)
 
 
-async def _activate(db: AsyncSession, order: Order, market: Market) -> list[Trade]:
+async def _activate(db: AsyncSession, order: Order, market: Market, taker_fee: Decimal | None = None) -> list[Trade]:
     """Lock funds and match an existing order, then set its terminal/resting status.
 
     Shared by `place_order` and stop-order firing. A stop order fires by having its type
@@ -196,7 +197,7 @@ async def _activate(db: AsyncSession, order: Order, market: Market) -> list[Trad
 
     trades: list[Trade] = []
     for fill in fills:
-        trades.append(await _execute_fill(db, market, taker=order, taker_side=side, fill=fill))
+        trades.append(await _execute_fill(db, market, taker=order, taker_side=side, fill=fill, taker_fee=taker_fee))
 
     order.filled_quantity = filled_qty
     if order.remaining == 0:
@@ -416,18 +417,22 @@ async def sweep_triggers(db: AsyncSession, price_of) -> dict[str, list[int]]:
     return fired
 
 
-async def _execute_fill(db: AsyncSession, market: Market, *, taker: Order, taker_side: OrderSide, fill: _Fill) -> Trade:
+async def _execute_fill(db: AsyncSession, market: Market, *, taker: Order, taker_side: OrderSide, fill: _Fill,
+                        taker_fee: Decimal | None = None) -> Trade:
     maker = fill.maker
     price, qty = fill.price, fill.quantity
     quote_amount = price * qty
 
+    # The taker's rate may be overridden by their VIP tier; the maker keeps the market's maker fee.
+    taker_rate = taker_fee if taker_fee is not None else market.taker_fee
+
     # Identify buyer/seller and who is the taker, to apply the right fee to each side.
     if taker_side is OrderSide.BUY:
         buyer, seller = taker, maker
-        buyer_rate, seller_rate = market.taker_fee, market.maker_fee
+        buyer_rate, seller_rate = taker_rate, market.maker_fee
     else:
         buyer, seller = maker, taker
-        buyer_rate, seller_rate = market.maker_fee, market.taker_fee
+        buyer_rate, seller_rate = market.maker_fee, taker_rate
 
     buyer_fee = qty * buyer_rate            # buyer receives base, pays fee in base
     seller_fee = quote_amount * seller_rate  # seller receives quote, pays fee in quote

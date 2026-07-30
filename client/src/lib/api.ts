@@ -106,6 +106,54 @@ export interface RegisterBody {
   email: string;
   full_name: string;
   password: string;
+  referral_code?: string | null;
+}
+
+export interface ReferralRow {
+  email: string;
+  earned_usd: string;
+  joined: string;
+}
+export interface ReferralSummary {
+  code: string;
+  count: number;
+  total_earned_usd: string;
+  commission_rate: string;
+  referrals: ReferralRow[];
+}
+
+export interface RewardTask {
+  id: string;
+  title: string;
+  description: string;
+  reward: string;
+  completed: boolean;
+  claimed: boolean;
+}
+export interface RewardsResponse {
+  total_claimed: string;
+  reward_asset: string;
+  tasks: RewardTask[];
+}
+
+export interface VipTierRow {
+  level: number;
+  name: string;
+  min_volume: string;
+  maker_pct: string;
+  taker_pct: string;
+}
+export interface VipStatus {
+  level: number;
+  name: string;
+  volume_30d: string;
+  maker_pct: string;
+  taker_pct: string;
+  next_name: string | null;
+  next_min_volume: string | null;
+  to_next: string | null;
+  progress: string;
+  tiers: VipTierRow[];
 }
 export interface LoginBody {
   email: string;
@@ -266,6 +314,11 @@ export const api = {
     request<{ message: string }>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
 
   // kyc
+  referralMe: () => request<ReferralSummary>("/referral/me"),
+  vipMe: () => request<VipStatus>("/vip/me"),
+  rewardsMe: () => request<RewardsResponse>("/rewards/me"),
+  rewardsClaim: (taskId: string) => request<RewardsResponse>("/rewards/claim", { method: "POST", body: JSON.stringify({ task_id: taskId }) }),
+
   kycMe: () => request<KycStatus>("/kyc/me"),
   kycSubmit: (body: {
     legal_name: string; date_of_birth: string; country: string; id_type: string; id_number: string;

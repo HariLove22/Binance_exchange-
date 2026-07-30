@@ -110,6 +110,10 @@ class TransactionKind(str, enum.Enum):
     MARGIN_TRANSFER = "MARGIN_TRANSFER"
     MARGIN_BORROW = "MARGIN_BORROW"
     MARGIN_INTEREST = "MARGIN_INTEREST"
+    # A referrer's cut of a referee's trading fee, paid out of FEE_INCOME.
+    REFERRAL = "REFERRAL"
+    # A promotional reward credited to a user (marketing spend, from EXTERNAL like a deposit).
+    REWARD = "REWARD"
     # Test funds credited by an admin — a distinct kind so it is never mistaken for a real
     # deposit in reporting and every one is trivially findable.
     ADMIN_CREDIT = "ADMIN_CREDIT"

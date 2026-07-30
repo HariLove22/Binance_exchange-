@@ -33,6 +33,8 @@ export function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  // Prefill a referral code from a ?ref= invite link (e.g. #/signup?ref=ABCD2345).
+  const [referral, setReferral] = useState(() => new URLSearchParams(location.hash.split("?")[1] || "").get("ref") ?? "");
   const [agree, setAgree] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
@@ -58,7 +60,7 @@ export function Signup() {
 
     setLoading(true);
     try {
-      const res = await api.register({ email, full_name: name, password });
+      const res = await api.register({ email, full_name: name, password, referral_code: referral.trim() || null });
       if (res.requires_verification) {
         // Only reachable once email verification is enabled server-side.
         setNotice("Account created! Check your email to verify before logging in.");
@@ -139,6 +141,15 @@ export function Signup() {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             error={errors.confirm}
+          />
+
+          <Field
+            id="signup-referral"
+            label="Referral code (optional)"
+            type="text"
+            placeholder="Enter a friend's code"
+            value={referral}
+            onChange={(e) => setReferral(e.target.value.toUpperCase())}
           />
 
           <label className={`checkbox terms ${errors.agree ? "err" : ""}`}>

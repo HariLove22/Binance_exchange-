@@ -5,6 +5,7 @@ Every model module must be imported here. Alembic's autogenerate only sees what 
 `DROP TABLE` for. `alembic/env.py` imports this package for exactly that reason.
 """
 
+from app.models.apikey import ApiKey
 from app.models.asset import (
     AddressModel,
     Asset,
@@ -37,6 +38,8 @@ from app.models.margin import (
 from app.models.demo import DemoAccount, DemoHolding
 from app.models.kyc import KycApplication, KycStatus
 from app.models.futures import FuturesPosition, PositionSide, PositionStatus
+from app.models.referral import Referral
+from app.models.rewards import RewardClaim
 from app.models.market import (
     CANCELLABLE_STATUSES,
     Market,
@@ -77,6 +80,7 @@ __all__ = [
     "PositionStatus",
     "Account",
     "AccountType",
+    "ApiKey",
     "AddressModel",
     "Asset",
     "AssetKind",
@@ -105,6 +109,8 @@ __all__ = [
     "OrderSide",
     "OrderStatus",
     "OrderType",
+    "Referral",
+    "RewardClaim",
     "P2P_OPEN_STATUSES",
     "P2PAd",
     "P2PAdStatus",
