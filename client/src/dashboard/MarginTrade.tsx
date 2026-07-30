@@ -4,6 +4,7 @@ import { useTicker } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
 import { OrderBookPanel, RecentTrades, MarketList, fmtPx, INTERVALS } from "./Trade";
+import { useKycApproved, KycRequiredNotice } from "./KycGate";
 import "./trade.css";
 import "./margin-term.css";
 
@@ -48,6 +49,7 @@ export function MarginTrade() {
   const ticker = useTicker(symbol);
   const up = (ticker?.changePercent ?? 0) >= 0;
   const { book, trades } = useMarketWs(tradeable ? symbol : null);
+  const kycOk = useKycApproved();
 
   const level = account?.margin_level ? Number(account.margin_level) : null;
   const hourlyRate = account?.loans[0]?.hourly_rate ?? "0.000125";
@@ -111,7 +113,9 @@ export function MarginTrade() {
             ))}
             <span className="mgt-steps">Steps: Transfer → Borrow/Trade → Repay</span>
           </div>
-          {noAccount ? (
+          {kycOk === false ? (
+            <KycRequiredNotice />
+          ) : noAccount ? (
             <div className="mgt-open">
               <p>No {mode.toLowerCase()} margin account for this {mode === "ISOLATED" ? "pair" : ""}.</p>
               <OpenInline mode={mode} symbol={symbol} onDone={loadAccount} />

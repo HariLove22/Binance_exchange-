@@ -14,6 +14,7 @@ import {
 import { useTicker, useTickers } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
+import { useKycApproved, KycRequiredNotice } from "./KycGate";
 import "./trade.css";
 
 export const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"];
@@ -68,6 +69,7 @@ export function Trade() {
 
   // Live order book + trades over our WebSocket (only for pairs we run a market for).
   const { book, trades } = useMarketWs(tradeable ? symbol : null);
+  const kycOk = useKycApproved();
 
   return (
     <div className="trade">
@@ -124,9 +126,13 @@ export function Trade() {
           <TradeChart symbol={symbol} interval={interval} />
         </section>
 
-        {/* ── center bottom: order form ── */}
+        {/* ── center bottom: order form (gated on KYC) ── */}
         <section className="g-form tp">
-          {tradeable ? (
+          {!tradeable ? (
+            <ListForTrading symbol={symbol} onListed={loadMarkets} />
+          ) : kycOk === false ? (
+            <KycRequiredNotice />
+          ) : (
             <OrderForm
               market={market}
               symbol={symbol}
@@ -134,8 +140,6 @@ export function Trade() {
               livePrice={ticker?.price ?? null}
               clickedPrice={clickedPrice}
             />
-          ) : (
-            <ListForTrading symbol={symbol} onListed={loadMarkets} />
           )}
         </section>
 

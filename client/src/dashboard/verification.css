@@ -27,3 +27,14 @@
 .kyc-err { color: #f6465d; font-size: 0.82rem; margin: 0.3rem 0; }
 .kyc-submit { background: #2bd97c; color: #131a17; border: none; border-radius: 8px; padding: 0.65rem 1.4rem; font: inherit; font-weight: 600; cursor: pointer; }
 .kyc-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* document uploads */
+.kyc-docs-title { font-size: 0.9rem; margin: 0.4rem 0 0.7rem; color: #e6efe9; }
+.kyc-uploads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 0.9rem; }
+@media (max-width: 560px) { .kyc-uploads { grid-template-columns: 1fr; } }
+.kyc-upload { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 120px; border: 1px dashed #2b3b33; border-radius: 10px; background: #090e0c; cursor: pointer; overflow: hidden; padding: 0.4rem; }
+.kyc-upload:hover { border-color: #2bd97c; }
+.kyc-upload.has { border-style: solid; border-color: #1f2c26; }
+.kyc-upload-ph { color: #7c8b83; font-size: 0.82rem; }
+.kyc-upload-img { max-width: 100%; max-height: 130px; border-radius: 6px; object-fit: contain; }
+.kyc-upload-name { font-size: 0.66rem; color: #2bd97c; margin-top: 0.35rem; }

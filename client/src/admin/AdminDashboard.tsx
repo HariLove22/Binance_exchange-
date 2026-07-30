@@ -6,6 +6,7 @@ import {
   type AdminUserRow,
   type AuthUser,
   type KycPending,
+  type KycDetail,
   type P2PDispute,
   type ReconciliationRow,
 } from "../lib/api";
@@ -48,7 +49,7 @@ export function AdminDashboard({ user }: { user: AuthUser }) {
           P2P Disputes
         </button>
         <button className={tab === "kyc" ? "active" : ""} onClick={() => setTab("kyc")}>
-          KYC Review
+          Identity Verification
         </button>
       </nav>
 
@@ -332,12 +333,12 @@ function P2PDisputes() {
   );
 }
 
-/* -------------------------------------------------------------------- kyc review */
+/* --------------------------------------------------------- identity verification */
 
 function KycReview() {
   const [rows, setRows] = useState<KycPending[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -352,64 +353,112 @@ function KycReview() {
     void load();
   }, [load]);
 
-  async function decide(id: number, approve: boolean) {
-    setBusy(id);
-    setError(null);
-    try {
-      const reason = approve ? undefined : (prompt("Reason for rejection (optional):") ?? undefined);
-      await api.kycReview(id, approve, reason);
-      await load();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : String(e));
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <section className="admin-card wide">
       <div className="admin-card-head">
-        <h2>KYC Review</h2>
+        <h2>Identity Verification</h2>
         <button className="admin-link" onClick={() => void load()}>refresh</button>
       </div>
       <p className="admin-sub">
-        Pending identity submissions. Approving marks the user verified (higher limits); rejecting
-        lets them correct and resubmit. No real documents are stored in this demo.
+        Pending identity submissions. Open one to view the uploaded documents and details, then
+        approve (marks the user verified — trading unlocks) or reject (they correct and resubmit).
       </p>
 
       {error && <p className="admin-error">{error}</p>}
 
       {rows.length === 0 ? (
-        <div className="recon-banner good">No pending KYC applications 🎉</div>
+        <div className="recon-banner good">No pending applications 🎉</div>
       ) : (
         <div className="admin-table dispute">
           <div className="at-h">
             <span>User</span>
             <span>Legal name</span>
-            <span>ID</span>
-            <span>Country / DOB</span>
+            <span>ID type</span>
+            <span>Country</span>
             <span className="num">Review</span>
           </div>
           {rows.map((r) => (
             <div className="at-r" key={r.id}>
               <span className="trunc">{r.email}</span>
               <span>{r.legal_name}</span>
-              <span>
-                <div>{r.id_type.replace(/_/g, " ")}</div>
-                <div className="admin-sub mono">{r.id_number}</div>
-              </span>
-              <span>
-                <div>{r.country}</div>
-                <div className="admin-sub">{r.date_of_birth}</div>
-              </span>
-              <span className="num dispute-acts">
-                <button className="admin-primary sm" disabled={busy === r.id} onClick={() => decide(r.id, true)}>Approve</button>
-                <button className="admin-ghost sm" disabled={busy === r.id} onClick={() => decide(r.id, false)}>Reject</button>
+              <span>{r.id_type.replace(/_/g, " ")}</span>
+              <span>{r.country}</span>
+              <span className="num">
+                <button className="admin-primary sm" onClick={() => setOpenId(r.id)}>Review →</button>
               </span>
             </div>
           ))}
         </div>
       )}
+
+      {openId !== null && <KycDetailModal id={openId} onClose={() => setOpenId(null)} onDone={() => { setOpenId(null); void load(); }} />}
     </section>
+  );
+}
+
+function KycDetailModal({ id, onClose, onDone }: { id: number; onClose: () => void; onDone: () => void }) {
+  const [detail, setDetail] = useState<KycDetail | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.kycDetail(id).then(setDetail).catch((e) => setError(e instanceof ApiError ? e.message : String(e)));
+  }, [id]);
+
+  async function decide(approve: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      const reason = approve ? undefined : (prompt("Reason for rejection (optional):") ?? undefined);
+      await api.kycReview(id, approve, reason);
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="kyc-admin-modal" onClick={onClose}>
+      <div className="kyc-admin-box" onClick={(e) => e.stopPropagation()}>
+        <div className="kyc-admin-head">
+          <h3>Review application</h3>
+          <button className="kyc-admin-x" onClick={onClose}>✕</button>
+        </div>
+        {error && <p className="admin-error">{error}</p>}
+        {!detail ? <p className="admin-sub">loading…</p> : (
+          <>
+            <div className="kyc-admin-fields">
+              <div><span>User</span><b>{detail.email}</b></div>
+              <div><span>Legal name</span><b>{detail.legal_name}</b></div>
+              <div><span>Date of birth</span><b>{detail.date_of_birth}</b></div>
+              <div><span>Country</span><b>{detail.country}</b></div>
+              <div><span>ID type</span><b>{detail.id_type.replace(/_/g, " ")}</b></div>
+              <div><span>ID number</span><b className="mono">{detail.id_number}</b></div>
+            </div>
+            <div className="kyc-admin-docs">
+              <DocView label="ID front" src={detail.doc_front} />
+              <DocView label="ID back" src={detail.doc_back} />
+              <DocView label="Selfie" src={detail.selfie} />
+            </div>
+            <div className="kyc-admin-acts">
+              <button className="admin-ghost" disabled={busy} onClick={() => decide(false)}>Reject</button>
+              <button className="admin-primary" disabled={busy} onClick={() => decide(true)}>{busy ? "…" : "Approve"}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DocView({ label, src }: { label: string; src?: string | null }) {
+  return (
+    <div className="kyc-doc">
+      <div className="kyc-doc-label">{label}</div>
+      {src
+        ? <a href={src} target="_blank" rel="noreferrer"><img src={src} alt={label} className="kyc-doc-img" /></a>
+        : <div className="kyc-doc-none">Not provided</div>}
+    </div>
   );
 }

@@ -27,7 +27,8 @@ from app.models import (
     Trade,
     User,
 )
-from app.services import listing, marketmaker, pubsub, trading
+from app.services import kyc, listing, marketmaker, pubsub, trading
+from app.services.kyc import KycRequired
 from app.services.listing import ListingError
 from app.services.trading import TradingError
 
@@ -37,6 +38,14 @@ router = APIRouter(prefix="/trade", tags=["trade"])
 def _dev_only() -> None:
     if settings.environment.lower() not in {"development", "dev", "local", "test"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "dev-only endpoint")
+
+
+async def _require_kyc(db: AsyncSession, user: User) -> None:
+    """Only verified users may trade. 403 with a clear message the client turns into a KYC prompt."""
+    try:
+        await kyc.assert_approved(db, user.id)
+    except KycRequired as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
 
 
 class OrderRequest(BaseModel):
@@ -101,6 +110,7 @@ async def place_order(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await _require_kyc(db, user)
     market = await _market(db, body.symbol)
     try:
         quantity = Decimal(body.quantity)
@@ -151,6 +161,7 @@ async def place_oco(
 ):
     """Place a one-cancels-other pair (take-profit limit + stop-loss stop). When one leg activates,
     the other is canceled automatically."""
+    await _require_kyc(db, user)
     market = await _market(db, body.symbol)
     try:
         quantity = Decimal(body.quantity)

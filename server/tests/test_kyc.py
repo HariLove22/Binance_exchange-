@@ -18,10 +18,14 @@ async def make_admin(db, email) -> User:
     return u
 
 
+# Any image data URI stands in for an uploaded document (the service checks prefix + size, not pixels).
+FAKE_DOC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+
+
 async def submit(db, user):
     return await kyc.submit(
         db, user_id=user.id, legal_name="Jane Doe", date_of_birth=date(1990, 5, 1),
-        country="India", id_type="PASSPORT", id_number="P1234567",
+        country="India", id_type="PASSPORT", id_number="P1234567", doc_front=FAKE_DOC,
     )
 
 
@@ -42,7 +46,26 @@ class TestSubmit:
         u = await make_user(db, "kyc-bad@example.com")
         with pytest.raises(kyc.KycError, match="ID type"):
             await kyc.submit(db, user_id=u.id, legal_name="Jane Doe", date_of_birth=date(1990, 5, 1),
-                             country="India", id_type="BADTYPE", id_number="P1234567")
+                             country="India", id_type="BADTYPE", id_number="P1234567", doc_front=FAKE_DOC)
+
+    async def test_front_document_required(self, db):
+        u = await make_user(db, "kyc-nodoc@example.com")
+        with pytest.raises(kyc.KycError, match="required"):
+            await kyc.submit(db, user_id=u.id, legal_name="Jane Doe", date_of_birth=date(1990, 5, 1),
+                             country="India", id_type="PASSPORT", id_number="P1234567")
+
+
+class TestGate:
+    async def test_assert_approved(self, db):
+        u = await make_user(db, "kyc-gate@example.com")
+        admin = await make_admin(db, "kyc-gate-admin@example.com")
+        # Not verified → blocked.
+        with pytest.raises(kyc.KycRequired):
+            await kyc.assert_approved(db, u.id)
+        # After submit + approve → allowed.
+        app = await submit(db, u)
+        await kyc.review(db, admin=admin, application_id=app.id, approve=True, reason=None, now=NOW)
+        await kyc.assert_approved(db, u.id)  # no raise
 
 
 class TestReview:

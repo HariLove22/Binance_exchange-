@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type KycStatus } from "../lib/api";
+import { fileToDownscaledDataUrl } from "../lib/image";
 import { navigate } from "../router";
 import "./verification.css";
 
@@ -63,16 +64,23 @@ function KycForm({ onDone }: { onDone: () => void }) {
   const [country, setCountry] = useState("India");
   const [idType, setIdType] = useState("PASSPORT");
   const [idNumber, setIdNumber] = useState("");
+  const [front, setFront] = useState<string | null>(null);
+  const [back, setBack] = useState<string | null>(null);
+  const [selfie, setSelfie] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const ready = legalName.trim().length >= 2 && dob && idNumber.trim().length >= 4;
+  const ready = legalName.trim().length >= 2 && dob && idNumber.trim().length >= 4 && !!front;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      await api.kycSubmit({ legal_name: legalName.trim(), date_of_birth: dob, country, id_type: idType, id_number: idNumber.trim() });
+      await api.kycSubmit({
+        legal_name: legalName.trim(), date_of_birth: dob, country, id_type: idType, id_number: idNumber.trim(),
+        doc_front: front, doc_back: back, selfie,
+      });
+      window.dispatchEvent(new CustomEvent("kyc-changed"));
       onDone();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
@@ -99,9 +107,40 @@ function KycForm({ onDone }: { onDone: () => void }) {
           <input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Document number" maxLength={64} />
         </label>
       </div>
-      <p className="kyc-note">Demo: no documents are uploaded and no real identity check runs. An operator reviews and approves the submission.</p>
+
+      <h3 className="kyc-docs-title">Upload documents</h3>
+      <div className="kyc-uploads">
+        <DocUpload label="ID front" required value={front} onChange={setFront} onErr={setErr} />
+        <DocUpload label="ID back" value={back} onChange={setBack} onErr={setErr} />
+        <DocUpload label="Selfie" value={selfie} onChange={setSelfie} onErr={setErr} />
+      </div>
+
+      <p className="kyc-note">Photos are downscaled in your browser before upload. Demo only — no real identity check runs; an operator reviews and approves the submission.</p>
       {err && <p className="kyc-err">{err}</p>}
       <button className="kyc-submit" disabled={!ready || busy}>{busy ? "…" : "Submit for verification"}</button>
     </form>
+  );
+}
+
+function DocUpload({ label, required, value, onChange, onErr }: {
+  label: string; required?: boolean; value: string | null; onChange: (v: string | null) => void; onErr: (e: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    try { onChange(await fileToDownscaledDataUrl(file)); }
+    catch (err) { onErr(err instanceof Error ? err.message : String(err)); }
+    finally { setLoading(false); }
+  }
+  return (
+    <label className={`kyc-upload ${value ? "has" : ""}`}>
+      {value
+        ? <img src={value} alt={label} className="kyc-upload-img" />
+        : <span className="kyc-upload-ph">{loading ? "…" : `+ ${label}${required ? " *" : ""}`}</span>}
+      <input type="file" accept="image/*" onChange={pick} hidden />
+      {value && <span className="kyc-upload-name">{label} ✓ — change</span>}
+    </label>
   );
 }

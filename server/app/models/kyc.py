@@ -10,7 +10,7 @@ in a real deployment; here it is tracked but not yet enforced.
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -41,6 +41,13 @@ class KycApplication(TimestampMixin, Base):
     country: Mapped[str] = mapped_column(String(56), nullable=False)
     id_type: Mapped[str] = mapped_column(String(32), nullable=False)   # PASSPORT / NATIONAL_ID / DRIVERS_LICENSE
     id_number: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    # Uploaded documents, stored as base64 data URIs (client downscales before upload). Front of the
+    # ID is required; the back and a selfie are optional. Kept out of list/status responses — only
+    # the admin detail view returns them, so the heavy blobs never travel unnecessarily.
+    doc_front: Mapped[str | None] = mapped_column(Text, nullable=True)
+    doc_back: Mapped[str | None] = mapped_column(Text, nullable=True)
+    selfie: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     reject_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
