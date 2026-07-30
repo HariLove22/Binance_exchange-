@@ -2,21 +2,38 @@
    the components' base rules, so this overrides the (mostly hardcoded) dark palette without touching
    each component file. Accent green and the buy/sell reds stay the same in both themes. */
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  /* dashboard.css variables */
+:root[data-theme="light"] { color-scheme: light; }
+
+/* The theme variables are defined locally on .dash / .trade / .admin (not :root), so they must be
+   overridden at those scopes or the local dark values win inside their subtrees. This single block
+   re-themes the whole shell — top bar, sidebar, and every component that uses the variables. */
+:root[data-theme="light"] .dash,
+:root[data-theme="light"] .admin {
   --bg: #f4f6f5;
   --bg-2: #eef1f0;
   --surface: #ffffff;
-  --surface-2: #f2f5f4;
-  --surface-3: #e9edeb;
+  --surface-2: #eef1f0;
+  --surface-3: #e4e9e6;
   --border: #e0e5e2;
   --text: #12211a;
-  --text-dim: #46564d;
+  --text-dim: #3f4f47;
   --text-faint: #6a7a71;
   --line: rgba(20, 40, 30, 0.12);
   --panel: #ffffff;
 }
+:root[data-theme="light"] .trade {
+  --line: rgba(20, 40, 30, 0.14);
+  --panel: #ffffff;
+  color: #12211a;
+}
+/* hardcoded translucent-black inputs in the order form → light */
+:root[data-theme="light"] .of .of-input,
+:root[data-theme="light"] .of .of-total { background: #f7f9f8; }
+/* solid #070b09 inputs inside the spot terminal */
+:root[data-theme="light"] .trade .sym-pick,
+:root[data-theme="light"] .trade .mkt-search input,
+:root[data-theme="light"] .trade .of-input { background: #f7f9f8; }
+:root[data-theme="light"] .trade .chart-loading { background: rgba(240,242,241,0.8); color: #3f4f47; }
 
 :root[data-theme="light"] body,
 :root[data-theme="light"] .dash,
