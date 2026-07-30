@@ -28,7 +28,7 @@ export function Orders() {
       </div>
 
       <div className="trade-grid">
-        <OrderBook pair={pair} tradeable={isTradeable} onPriceClick={setPresetPrice} />
+        <OrderBook pair={pair} tradeable={isTradeable} refreshToken={refreshToken} onPriceClick={setPresetPrice} />
         <OrderForm
           pair={pair}
           presetPrice={presetPrice}

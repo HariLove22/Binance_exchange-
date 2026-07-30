@@ -175,7 +175,15 @@
 .dash-side {
   border-right: 1px solid var(--border);
   padding: 1rem 0.75rem;
-  min-height: calc(100vh - 60px);
+  /* Pin the sidebar under the 60px sticky topbar so it stays put while the page scrolls.
+     `align-self: start` is required: a grid item stretches to the row height by default, and a
+     full-height box has nothing left to slide over, so it never sticks. Its own overflow scroll
+     keeps a long menu usable without dragging the page. */
+  position: sticky;
+  top: 60px;
+  align-self: start;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
 }
 .side-item {
   width: 100%;
@@ -1008,11 +1016,115 @@
 .ob-last {
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--up);
+  color: var(--text);
   font-family: ui-monospace, Menlo, monospace;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
+.ob-last.up { color: var(--up); }
+.ob-last.down { color: var(--down); }
+.ob-last-arrow { font-size: 0.85rem; }
 .ob-spread-label {
   font-size: 0.76rem;
+  color: var(--text-faint);
+}
+
+/* controls row: view filter + price grouping */
+.ob-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 1rem;
+}
+.ob-group {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.76rem;
+  font-family: ui-monospace, Menlo, monospace;
+  cursor: pointer;
+}
+.ob-cum-toggle {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.ob-cum-toggle:hover { color: var(--text); }
+
+/* the user's own resting orders */
+.ob-row.mine { background: rgba(240, 185, 11, 0.08); }
+.ob-side .ob-row .ob-mine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gold, #f0b90b);
+  pointer-events: none;
+}
+
+/* buy/sell pressure bar */
+.ob-ratio {
+  display: flex;
+  height: 1.1rem;
+  margin: 0.4rem 1rem 0.2rem;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+}
+.ob-ratio-buy {
+  background: rgba(14, 203, 129, 0.25);
+  color: var(--up);
+  text-align: left;
+  padding-left: 0.4rem;
+  white-space: nowrap;
+}
+.ob-ratio-sell {
+  background: rgba(246, 70, 93, 0.25);
+  color: var(--down);
+  text-align: right;
+  padding-right: 0.4rem;
+  white-space: nowrap;
+}
+
+/* recent trades */
+.ob-trades {
+  border-top: 1px solid var(--border);
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+}
+.ob-trades-head {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0 1rem 0.3rem;
+}
+.ob-trades-list {
+  max-height: 12rem;
+  overflow-y: auto;
+}
+.ob-trade {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 0.5rem;
+  height: 1.4rem;
+  align-items: center;
+  padding: 0 1rem;
+  font-size: 0.8rem;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.ob-trade.up .ob-price { color: var(--up); }
+.ob-trade.down .ob-price { color: var(--down); }
+.ob-time {
+  text-align: right;
   color: var(--text-faint);
 }
 
