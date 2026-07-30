@@ -70,8 +70,9 @@ export function Profile() {
       <section className="acct-card">
         <h2>Quick actions</h2>
         <div className="pf-actions">
+          <button className="acct-primary" onClick={() => navigate("/dashboard/vip")}>Fee Tier (VIP)</button>
+          <button className="acct-primary" onClick={() => navigate("/dashboard/referral")}>Referral</button>
           <button className="acct-primary" onClick={() => navigate("/dashboard/account")}>Trading Accounts</button>
-          <button className="acct-primary" onClick={() => navigate("/dashboard/assets")}>Assets</button>
           <button className="acct-primary" onClick={() => navigate("/dashboard/settings")}>Security</button>
         </div>
       </section>

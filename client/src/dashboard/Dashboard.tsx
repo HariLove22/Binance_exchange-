@@ -15,6 +15,7 @@ import { Profile } from "./Profile";
 import { ThemeToggle } from "./ThemeToggle";
 import { Search } from "./Search";
 import { Referral } from "./Referral";
+import { Vip } from "./Vip";
 import {
   IDeposit,
   IGear,
@@ -194,6 +195,8 @@ export function Dashboard({ path }: { path: string }) {
             <Profile />
           ) : seg === "referral" ? (
             <Referral />
+          ) : seg === "vip" ? (
+            <Vip />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (

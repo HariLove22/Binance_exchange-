@@ -121,6 +121,26 @@ export interface ReferralSummary {
   commission_rate: string;
   referrals: ReferralRow[];
 }
+
+export interface VipTierRow {
+  level: number;
+  name: string;
+  min_volume: string;
+  maker_pct: string;
+  taker_pct: string;
+}
+export interface VipStatus {
+  level: number;
+  name: string;
+  volume_30d: string;
+  maker_pct: string;
+  taker_pct: string;
+  next_name: string | null;
+  next_min_volume: string | null;
+  to_next: string | null;
+  progress: string;
+  tiers: VipTierRow[];
+}
 export interface LoginBody {
   email: string;
   password: string;
@@ -281,6 +301,7 @@ export const api = {
 
   // kyc
   referralMe: () => request<ReferralSummary>("/referral/me"),
+  vipMe: () => request<VipStatus>("/vip/me"),
 
   kycMe: () => request<KycStatus>("/kyc/me"),
   kycSubmit: (body: {
