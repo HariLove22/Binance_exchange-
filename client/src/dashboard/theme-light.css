@@ -1,0 +1,132 @@
+/* Light theme. Activated by data-theme="light" on <html>. Attribute-scoped selectors out-specify
+   the components' base rules, so this overrides the (mostly hardcoded) dark palette without touching
+   each component file. Accent green and the buy/sell reds stay the same in both themes. */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  /* dashboard.css variables */
+  --bg: #f4f6f5;
+  --bg-2: #eef1f0;
+  --surface: #ffffff;
+  --surface-2: #f2f5f4;
+  --surface-3: #e9edeb;
+  --border: #e0e5e2;
+  --text: #12211a;
+  --text-dim: #46564d;
+  --text-faint: #6a7a71;
+  --line: rgba(20, 40, 30, 0.12);
+  --panel: #ffffff;
+}
+
+:root[data-theme="light"] body,
+:root[data-theme="light"] .dash,
+:root[data-theme="light"] .admin { background: #f4f6f5; color: #12211a; }
+
+/* page wrappers */
+:root[data-theme="light"] .mkt,
+:root[data-theme="light"] .kyc,
+:root[data-theme="light"] .acct,
+:root[data-theme="light"] .accs,
+:root[data-theme="light"] .assets,
+:root[data-theme="light"] .p2p,
+:root[data-theme="light"] .mgn { color: #12211a; }
+
+/* panels / cards / tables / surfaces (dark hex → white) */
+:root[data-theme="light"] .tp,
+:root[data-theme="light"] .mkt-card,
+:root[data-theme="light"] .mkt-table,
+:root[data-theme="light"] .acc-card,
+:root[data-theme="light"] .asset-total,
+:root[data-theme="light"] .asset-wallet,
+:root[data-theme="light"] .bal-table,
+:root[data-theme="light"] .kyc-card,
+:root[data-theme="light"] .kyc-banner.muted,
+:root[data-theme="light"] .aa-box,
+:root[data-theme="light"] .aa-card,
+:root[data-theme="light"] .mgt-box,
+:root[data-theme="light"] .kyc-admin-box,
+:root[data-theme="light"] .kyc-modal-box,
+:root[data-theme="light"] .p2p-postform,
+:root[data-theme="light"] .p2p-more-menu,
+:root[data-theme="light"] .p2p-order-form,
+:root[data-theme="light"] .admin-card,
+:root[data-theme="light"] .step-card,
+:root[data-theme="light"] .profile,
+:root[data-theme="light"] .balance-card,
+:root[data-theme="light"] .mgt-open-row,
+:root[data-theme="light"] .demo-panel {
+  background: #ffffff;
+  border-color: #e0e5e2;
+  color: #12211a;
+}
+
+/* table header strips */
+:root[data-theme="light"] .mkt-h,
+:root[data-theme="light"] .bal-h,
+:root[data-theme="light"] .oo-h5,
+:root[data-theme="light"] .p2p-ads-h,
+:root[data-theme="light"] .at-h,
+:root[data-theme="light"] .ob-cols { background: #f2f5f4; color: #6a7a71; }
+
+/* rows / dividers */
+:root[data-theme="light"] .mkt-row,
+:root[data-theme="light"] .bal-r,
+:root[data-theme="light"] .oo-r5,
+:root[data-theme="light"] .p2p-ad,
+:root[data-theme="light"] .p2p-order,
+:root[data-theme="light"] .at-r,
+:root[data-theme="light"] .pf-row,
+:root[data-theme="light"] .demo-h,
+:root[data-theme="light"] .mgn-loan { border-color: #eceeed; color: #12211a; }
+:root[data-theme="light"] .mkt-row:hover,
+:root[data-theme="light"] .mkt-card-row:hover,
+:root[data-theme="light"] .aa-card:hover,
+:root[data-theme="light"] .ob-row:hover { background: rgba(43,217,124,0.08); }
+
+/* inputs / selects */
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea,
+:root[data-theme="light"] .of-input,
+:root[data-theme="light"] .p2p-inp,
+:root[data-theme="light"] .p2p-amount,
+:root[data-theme="light"] .mkt-search,
+:root[data-theme="light"] .kyc-upload {
+  background: #f7f9f8;
+  border-color: #dbe0dd;
+  color: #12211a;
+}
+:root[data-theme="light"] input::placeholder,
+:root[data-theme="light"] textarea::placeholder { color: #93a29a; }
+
+/* segmented / pill backgrounds */
+:root[data-theme="light"] .p2p-bs,
+:root[data-theme="light"] .mgt-seg,
+:root[data-theme="light"] .mgt-nb,
+:root[data-theme="light"] .demo-seg,
+:root[data-theme="light"] .of-side-toggle button,
+:root[data-theme="light"] .acc-btn,
+:root[data-theme="light"] .p2p-mini,
+:root[data-theme="light"] .mgt-hbtn,
+:root[data-theme="light"] .p2p-chip { background: #eef1f0; color: #46564d; }
+
+/* muted / dim text everywhere */
+:root[data-theme="light"] .dim,
+:root[data-theme="light"] .tp-sub,
+:root[data-theme="light"] .tp-empty,
+:root[data-theme="light"] .mkt-sub,
+:root[data-theme="light"] .mkt-quote,
+:root[data-theme="light"] .kyc-sub,
+:root[data-theme="light"] .acct-email,
+:root[data-theme="light"] .aw-sub,
+:root[data-theme="light"] .admin-sub,
+:root[data-theme="light"] .p2p-adv-meta,
+:root[data-theme="light"] .p2p-sub,
+:root[data-theme="light"] .of-tab-note { color: #6a7a71; }
+
+/* top bar + sidebar already use vars, but a couple of admin bits are hardcoded */
+:root[data-theme="light"] .admin-top,
+:root[data-theme="light"] .admin-tabs { border-color: #e0e5e2; }
+
+/* chart text tweak — the candles keep their up/down colors */
+:root[data-theme="light"] .trade-chart { filter: none; }

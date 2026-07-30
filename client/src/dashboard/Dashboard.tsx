@@ -11,6 +11,8 @@ import { Account } from "./Account";
 import { Settings } from "./Settings";
 import { Markets } from "./Markets";
 import { Verification } from "./Verification";
+import { Profile } from "./Profile";
+import { ThemeToggle } from "./ThemeToggle";
 import {
   IDeposit,
   IGear,
@@ -125,7 +127,10 @@ export function Dashboard({ path }: { path: string }) {
 
         <div className="dash-top-right">
           <button className="icon-btn" aria-label="Search"><ISearch /></button>
-          <button className="dash-deposit"><IDeposit style={{ width: 16, height: 16 }} /> Deposit</button>
+          <ThemeToggle />
+          <button className="dash-deposit" onClick={() => { sessionStorage.setItem("assets_tab", "deposit"); navigate("/dashboard/assets"); }}>
+            <IDeposit style={{ width: 16, height: 16 }} /> Deposit
+          </button>
 
           <div className="user-menu" ref={menuRef}>
             <button className="avatar" onClick={() => setMenuOpen((o) => !o)} aria-label="Account menu">
@@ -137,7 +142,8 @@ export function Dashboard({ path }: { path: string }) {
                   <div className="ud-name">{user.full_name}</div>
                   <div className="ud-email">{user.email}</div>
                 </div>
-                <button className="ud-item" onClick={() => navigate("/dashboard/account")}>Account</button>
+                <button className="ud-item" onClick={() => navigate("/dashboard/profile")}>Profile</button>
+                <button className="ud-item" onClick={() => navigate("/dashboard/account")}>Accounts</button>
                 <button className="ud-item" onClick={() => navigate("/dashboard/settings")}>Settings</button>
                 <button className="ud-item danger" onClick={logout}>Log out</button>
               </div>
@@ -183,6 +189,8 @@ export function Dashboard({ path }: { path: string }) {
             <Assets />
           ) : seg === "verification" ? (
             <Verification />
+          ) : seg === "profile" ? (
+            <Profile />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (

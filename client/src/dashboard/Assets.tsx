@@ -24,8 +24,15 @@ import { FiatSelect } from "./FiatSelect";
  * provider would deliver. Everything the exchange owns — the ledger postings, confirmations,
  * reserve-on-request, refund-on-fail — is real.
  */
+type AssetsTab = "overview" | "spot" | "margin" | "buy" | "convert" | "deposit" | "withdraw";
+
 export function Assets() {
-  const [tab, setTab] = useState<"overview" | "spot" | "margin" | "buy" | "convert" | "deposit" | "withdraw">("overview");
+  // A caller (e.g. the top-bar Deposit button) can stash which tab to open.
+  const [tab, setTab] = useState<AssetsTab>(() => {
+    const t = sessionStorage.getItem("assets_tab") as AssetsTab | null;
+    if (t) sessionStorage.removeItem("assets_tab");
+    return t || "overview";
+  });
 
   const tabs: [typeof tab, string][] = [
     ["overview", "Overview"],
