@@ -36,6 +36,7 @@ from app.models.margin import (
 from app.models.demo import DemoAccount, DemoHolding
 from app.models.kyc import KycApplication, KycStatus
 from app.models.referral import Referral
+from app.models.rewards import RewardClaim
 from app.models.market import (
     CANCELLABLE_STATUSES,
     Market,
@@ -101,6 +102,7 @@ __all__ = [
     "OrderStatus",
     "OrderType",
     "Referral",
+    "RewardClaim",
     "P2P_OPEN_STATUSES",
     "P2PAd",
     "P2PAdStatus",

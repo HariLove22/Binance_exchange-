@@ -122,6 +122,20 @@ export interface ReferralSummary {
   referrals: ReferralRow[];
 }
 
+export interface RewardTask {
+  id: string;
+  title: string;
+  description: string;
+  reward: string;
+  completed: boolean;
+  claimed: boolean;
+}
+export interface RewardsResponse {
+  total_claimed: string;
+  reward_asset: string;
+  tasks: RewardTask[];
+}
+
 export interface VipTierRow {
   level: number;
   name: string;
@@ -302,6 +316,8 @@ export const api = {
   // kyc
   referralMe: () => request<ReferralSummary>("/referral/me"),
   vipMe: () => request<VipStatus>("/vip/me"),
+  rewardsMe: () => request<RewardsResponse>("/rewards/me"),
+  rewardsClaim: (taskId: string) => request<RewardsResponse>("/rewards/claim", { method: "POST", body: JSON.stringify({ task_id: taskId }) }),
 
   kycMe: () => request<KycStatus>("/kyc/me"),
   kycSubmit: (body: {

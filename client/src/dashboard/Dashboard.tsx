@@ -16,6 +16,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { Search } from "./Search";
 import { Referral } from "./Referral";
 import { Vip } from "./Vip";
+import { Rewards } from "./Rewards";
 import {
   IDeposit,
   IGear,
@@ -197,6 +198,8 @@ export function Dashboard({ path }: { path: string }) {
             <Referral />
           ) : seg === "vip" ? (
             <Vip />
+          ) : seg === "rewards" ? (
+            <Rewards />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (
