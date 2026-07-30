@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type KycStatus } from "../lib/api";
 import { fileToDownscaledDataUrl } from "../lib/image";
+import { COUNTRIES } from "../lib/countries";
 import { navigate } from "../router";
 import "./verification.css";
 
@@ -9,8 +10,6 @@ const ID_TYPES = [
   ["NATIONAL_ID", "National ID"],
   ["DRIVERS_LICENSE", "Driver’s License"],
 ] as const;
-
-const COUNTRIES = ["India", "United States", "United Kingdom", "United Arab Emirates", "Singapore", "Germany", "Australia", "Canada", "Other"];
 
 /**
  * Identity verification (KYC). Shows the current status and, when not yet approved or pending, a

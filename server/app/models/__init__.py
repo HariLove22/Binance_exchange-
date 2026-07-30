@@ -5,6 +5,7 @@ Every model module must be imported here. Alembic's autogenerate only sees what 
 `DROP TABLE` for. `alembic/env.py` imports this package for exactly that reason.
 """
 
+from app.models.apikey import ApiKey
 from app.models.asset import (
     AddressModel,
     Asset,
@@ -73,6 +74,7 @@ __all__ = [
     "isolated_wallet",
     "Account",
     "AccountType",
+    "ApiKey",
     "AddressModel",
     "Asset",
     "AssetKind",

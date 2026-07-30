@@ -1,0 +1,20 @@
+.lc-wrap { position: relative; }
+.lc-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; width: 460px; max-width: 92vw;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 16px 40px -12px rgba(0,0,0,0.5); padding: 1rem; z-index: 60;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;
+}
+.lc-title { font-size: 0.9rem; color: var(--text-faint); margin-bottom: 0.6rem; }
+.lc-search {
+  width: 100%; box-sizing: border-box; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font: inherit; font-size: 0.85rem; padding: 0.5rem 0.7rem; margin-bottom: 0.6rem;
+}
+.lc-search:focus { outline: none; border-color: var(--gold); }
+.lc-list { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; }
+.lc-item {
+  text-align: left; background: none; border: none; color: var(--text); font: inherit; font-size: 0.9rem;
+  padding: 0.5rem 0.4rem; border-radius: 7px; cursor: pointer;
+}
+.lc-item:hover { background: var(--surface-2); }
+.lc-item.on { color: var(--gold); font-weight: 600; }

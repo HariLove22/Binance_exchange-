@@ -14,6 +14,7 @@ import { Verification } from "./Verification";
 import { Profile } from "./Profile";
 import { ThemeToggle } from "./ThemeToggle";
 import { Search } from "./Search";
+import { LangCurrency } from "./LangCurrency";
 import { Referral } from "./Referral";
 import { Vip } from "./Vip";
 import { Rewards } from "./Rewards";
@@ -130,6 +131,7 @@ export function Dashboard({ path }: { path: string }) {
 
         <div className="dash-top-right">
           <Search />
+          <LangCurrency />
           <ThemeToggle />
           <button className="dash-deposit" onClick={() => { sessionStorage.setItem("assets_tab", "deposit"); navigate("/dashboard/assets"); }}>
             <IDeposit style={{ width: 16, height: 16 }} /> Deposit
