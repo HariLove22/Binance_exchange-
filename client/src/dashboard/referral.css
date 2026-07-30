@@ -27,3 +27,17 @@
 .num { text-align: right; }
 .mono { font-family: ui-monospace, monospace; }
 .dim { color: var(--text-faint); }
+
+/* hero + how-it-works guide */
+.ref-hero { background: linear-gradient(135deg, rgba(43,217,124,0.14), rgba(43,217,124,0.03)); border: 1px solid rgba(43,217,124,0.25); border-radius: 16px; padding: 1.6rem 1.8rem; margin-bottom: 1.2rem; }
+.ref-hero h1 { font-size: 1.6rem; margin: 0 0 0.4rem; }
+.ref-hero p { color: var(--text-dim); font-size: 0.95rem; margin: 0; max-width: 560px; line-height: 1.6; }
+.ref-hero b { color: var(--gold); }
+.ref-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.4rem; }
+@media (max-width: 720px) { .ref-steps { grid-template-columns: 1fr; } }
+.ref-step { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem; }
+.ref-step-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.7rem; }
+.ref-step-n { width: 28px; height: 28px; border-radius: 50%; background: var(--gold); color: #04170e; font-weight: 700; display: grid; place-items: center; font-size: 0.9rem; }
+.ref-step-icon { font-size: 1.6rem; }
+.ref-step h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+.ref-step p { color: var(--text-faint); font-size: 0.85rem; margin: 0; line-height: 1.55; }

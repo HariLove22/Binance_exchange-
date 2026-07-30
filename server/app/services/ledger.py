@@ -540,6 +540,35 @@ async def margin_repay(
     )
 
 
+async def internal_transfer(
+    db: AsyncSession,
+    *,
+    from_user_id: int,
+    to_user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move AVAILABLE funds from one user to another (e.g. master ↔ sub-account). Zero-sum, on-books."""
+    if amount <= 0:
+        raise LedgerError("transfer amount must be positive")
+    if from_user_id == to_user_id:
+        raise LedgerError("cannot transfer to the same account")
+    src = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, from_user_id)
+    if src.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, src.balance)
+    dst = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, to_user_id)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.ADJUSTMENT,
+        reference=reference,
+        movements=[Movement(src, -amount), Movement(dst, amount)],
+    )
+
+
 async def pay_referral(
     db: AsyncSession,
     *,

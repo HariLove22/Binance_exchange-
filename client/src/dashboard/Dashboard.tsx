@@ -18,6 +18,7 @@ import { LangCurrency } from "./LangCurrency";
 import { Referral } from "./Referral";
 import { Vip } from "./Vip";
 import { Rewards } from "./Rewards";
+import { SubAccounts } from "./SubAccounts";
 import {
   IDeposit,
   IGear,
@@ -202,6 +203,8 @@ export function Dashboard({ path }: { path: string }) {
             <Vip />
           ) : seg === "rewards" ? (
             <Rewards />
+          ) : seg === "subaccounts" ? (
+            <SubAccounts />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (

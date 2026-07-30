@@ -122,6 +122,19 @@ export interface ReferralSummary {
   referrals: ReferralRow[];
 }
 
+export interface SubBalanceRow {
+  asset: string;
+  available: string;
+  locked: string;
+}
+export interface SubAccount {
+  id: number;
+  label: string;
+  created_at: string;
+  value_usd: string;
+  balances: SubBalanceRow[];
+}
+
 export interface RewardTask {
   id: string;
   title: string;
@@ -316,6 +329,10 @@ export const api = {
   // kyc
   referralMe: () => request<ReferralSummary>("/referral/me"),
   vipMe: () => request<VipStatus>("/vip/me"),
+  subAccounts: () => request<SubAccount[]>("/subaccounts"),
+  subCreate: (label: string) => request<SubAccount>("/subaccounts", { method: "POST", body: JSON.stringify({ label }) }),
+  subTransfer: (body: { sub_id: number; asset: string; amount: string; to_sub: boolean }) =>
+    request<SubAccount[]>("/subaccounts/transfer", { method: "POST", body: JSON.stringify(body) }),
   rewardsMe: () => request<RewardsResponse>("/rewards/me"),
   rewardsClaim: (taskId: string) => request<RewardsResponse>("/rewards/claim", { method: "POST", body: JSON.stringify({ task_id: taskId }) }),
 
