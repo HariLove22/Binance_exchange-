@@ -106,6 +106,20 @@ export interface RegisterBody {
   email: string;
   full_name: string;
   password: string;
+  referral_code?: string | null;
+}
+
+export interface ReferralRow {
+  email: string;
+  earned_usd: string;
+  joined: string;
+}
+export interface ReferralSummary {
+  code: string;
+  count: number;
+  total_earned_usd: string;
+  commission_rate: string;
+  referrals: ReferralRow[];
 }
 export interface LoginBody {
   email: string;
@@ -266,6 +280,8 @@ export const api = {
     request<{ message: string }>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
 
   // kyc
+  referralMe: () => request<ReferralSummary>("/referral/me"),
+
   kycMe: () => request<KycStatus>("/kyc/me"),
   kycSubmit: (body: {
     legal_name: string; date_of_birth: string; country: string; id_type: string; id_number: string;

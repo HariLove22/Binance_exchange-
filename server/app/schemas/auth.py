@@ -29,6 +29,8 @@ class RegisterRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
     # Max 72 mirrors bcrypt's byte limit (see core/security.py).
     password: str = Field(max_length=72)
+    # Optional referral code entered at sign-up. Unknown/blank codes are ignored, not rejected.
+    referral_code: str | None = Field(default=None, max_length=12)
 
     @field_validator("full_name")
     @classmethod

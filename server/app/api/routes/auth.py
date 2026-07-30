@@ -23,6 +23,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
+from app.services import referral
 from app.schemas.auth import (
     AuthResponse,
     ChangePasswordRequest,
@@ -57,6 +58,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) ->
     )
     db.add(user)
     try:
+        await db.flush()
+        # Link a referrer if a valid code was supplied (best-effort; a bad code is simply ignored).
+        await referral.link_signup(db, referee=user, code=body.referral_code)
         await db.commit()
     except IntegrityError:
         # Lost the race against a concurrent registration with the same email.

@@ -27,9 +27,10 @@ from app.models import (
     Trade,
     User,
 )
-from app.services import kyc, listing, marketmaker, pubsub, trading
+from app.services import kyc, listing, marketmaker, pubsub, referral, trading
 from app.services.kyc import KycRequired
 from app.services.listing import ListingError
+from app.services.pricing import usd_price_of
 from app.services.trading import TradingError
 
 router = APIRouter(prefix="/trade", tags=["trade"])
@@ -137,11 +138,28 @@ async def place_order(
                 order_type=body.type, quantity=quantity, price=price,
             )
             order, trades = placed.order, placed.trades
+            await _pay_referral_commission(db, user, market, body.side, trades)
     except TradingError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
     pubsub.publish(pubsub.market_channel(market.symbol))  # wake live subscribers
     return _order_response(order, market.symbol, trades)
+
+
+async def _pay_referral_commission(db, user, market, side, trades) -> None:
+    """After a taker fills, pay the taker's referrer a cut of the taker fee they just paid."""
+    if not trades:
+        return
+    filled = sum((t.quantity for t in trades), Decimal(0))
+    cost = sum((t.price * t.quantity for t in trades), Decimal(0))
+    # The taker pays the taker fee on the side they receive: base on a buy, quote on a sell.
+    if side is OrderSide.BUY:
+        fee_asset_id, fee_amount = market.base_asset_id, filled * market.taker_fee
+    else:
+        fee_asset_id, fee_amount = market.quote_asset_id, cost * market.taker_fee
+    asset = await db.get(Asset, fee_asset_id)
+    usd = await usd_price_of(asset.symbol) if asset else None
+    await referral.pay_commission(db, referee_id=user.id, asset_id=fee_asset_id, fee_amount=fee_amount, usd_price=usd)
 
 
 class OCORequest(BaseModel):

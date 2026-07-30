@@ -1,0 +1,29 @@
+.ref { max-width: 900px; margin: 0 auto; padding: 1rem 1.2rem 2rem; color: var(--text); }
+.ref-head h1 { font-size: 1.4rem; margin: 0; }
+.ref-sub { color: var(--text-faint); font-size: 0.85rem; margin: 0.3rem 0 1.2rem; }
+.ref-err { color: #f6465d; font-size: 0.85rem; }
+
+.ref-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.2rem; }
+@media (max-width: 640px) { .ref-stats { grid-template-columns: 1fr; } }
+.ref-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.2rem; }
+.ref-stat span { display: block; font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+.ref-stat b { font-size: 1.6rem; font-family: ui-monospace, monospace; }
+
+.ref-share { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 1.4rem; }
+@media (max-width: 640px) { .ref-share { grid-template-columns: 1fr; } }
+.ref-field label { display: block; font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; }
+.ref-copy { display: flex; align-items: center; gap: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.7rem; }
+.ref-code { font-family: ui-monospace, monospace; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; color: var(--gold); flex: 1; }
+.ref-link { font-size: 0.82rem; color: var(--text-dim); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ref-copy button { background: var(--gold); color: #04170e; border: none; border-radius: 7px; padding: 0.4rem 0.9rem; font: inherit; font-weight: 600; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
+
+.ref-list h2 { font-size: 1.05rem; margin: 0 0 0.7rem; }
+.ref-empty { color: var(--text-faint); font-size: 0.85rem; }
+.ref-table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.ref-h, .ref-r { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.6rem; padding: 0.7rem 1rem; align-items: center; }
+.ref-h { font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.ref-r { border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.ref-r:last-child { border-bottom: none; }
+.num { text-align: right; }
+.mono { font-family: ui-monospace, monospace; }
+.dim { color: var(--text-faint); }

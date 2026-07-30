@@ -14,6 +14,7 @@ import { Verification } from "./Verification";
 import { Profile } from "./Profile";
 import { ThemeToggle } from "./ThemeToggle";
 import { Search } from "./Search";
+import { Referral } from "./Referral";
 import {
   IDeposit,
   IGear,
@@ -191,6 +192,8 @@ export function Dashboard({ path }: { path: string }) {
             <Verification />
           ) : seg === "profile" ? (
             <Profile />
+          ) : seg === "referral" ? (
+            <Referral />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (
