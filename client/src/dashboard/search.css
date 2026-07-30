@@ -1,0 +1,33 @@
+.search-wrap { position: relative; }
+.search-panel {
+  position: absolute; top: calc(100% + 8px); left: 0; width: 380px; max-width: 90vw;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 16px 40px -12px rgba(0,0,0,0.5); padding: 0.9rem; z-index: 60;
+}
+.search-box {
+  display: flex; align-items: center; gap: 0.5rem; background: var(--surface-2);
+  border: 1px solid var(--gold); border-radius: 9px; padding: 0.5rem 0.7rem; margin-bottom: 0.8rem; color: var(--text-faint);
+}
+.search-box svg { width: 16px; height: 16px; flex-shrink: 0; }
+.search-box input { flex: 1; min-width: 0; background: none; border: none; color: var(--text); font: inherit; font-size: 0.9rem; }
+.search-box input:focus { outline: none; }
+.search-clear { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 0.85rem; }
+
+.search-section-title { font-size: 0.72rem; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.4rem; }
+.search-list { display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; }
+.search-empty { color: var(--text-faint); font-size: 0.82rem; padding: 0.8rem 0.2rem; text-align: center; }
+.search-row {
+  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 0.6rem;
+  width: 100%; background: none; border: none; color: var(--text); font: inherit; cursor: pointer;
+  padding: 0.5rem 0.4rem; border-radius: 8px; text-align: left;
+}
+.search-row:hover:not(:disabled) { background: var(--surface-2); }
+.search-row:disabled { opacity: 0.55; cursor: default; }
+.search-rank { width: 1rem; color: var(--text-faint); font-size: 0.8rem; text-align: center; }
+.search-coin { font-weight: 600; font-size: 0.92rem; }
+.search-coin em { font-style: normal; color: var(--text-faint); font-size: 0.72rem; font-weight: 400; }
+.search-vo { margin-left: 0.35rem; font-size: 0.6rem; color: var(--text-faint); background: var(--surface-3); padding: 0.05rem 0.35rem; border-radius: 4px; }
+.search-price { font-size: 0.85rem; font-family: ui-monospace, monospace; }
+.search-chg { font-size: 0.8rem; font-variant-numeric: tabular-nums; min-width: 62px; text-align: right; }
+.search-chg.up { color: var(--up, #0ecb81); }
+.search-chg.down { color: var(--down, #f6465d); }

@@ -13,13 +13,13 @@ import { Markets } from "./Markets";
 import { Verification } from "./Verification";
 import { Profile } from "./Profile";
 import { ThemeToggle } from "./ThemeToggle";
+import { Search } from "./Search";
 import {
   IDeposit,
   IGear,
   IGift,
   IHome,
   IList,
-  ISearch,
   IUser,
   IUsers,
   IUsersBox,
@@ -126,7 +126,7 @@ export function Dashboard({ path }: { path: string }) {
         </nav>
 
         <div className="dash-top-right">
-          <button className="icon-btn" aria-label="Search"><ISearch /></button>
+          <Search />
           <ThemeToggle />
           <button className="dash-deposit" onClick={() => { sessionStorage.setItem("assets_tab", "deposit"); navigate("/dashboard/assets"); }}>
             <IDeposit style={{ width: 16, height: 16 }} /> Deposit
