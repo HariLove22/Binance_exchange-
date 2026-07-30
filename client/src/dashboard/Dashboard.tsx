@@ -7,6 +7,7 @@ import { Orders } from "./Orders";
 import { Trade } from "./Trade";
 import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
+import { Futures } from "./Futures";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
 import { Markets } from "./Markets";
@@ -120,7 +121,7 @@ export function Dashboard({ path }: { path: string }) {
             )}
           </div>
 
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Futures</a>
+          <a href="#/dashboard/futures" className={seg === "futures" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/futures"); }}>Futures</a>
           <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Earn</a>
           <a href="#/dashboard" onClick={(e) => e.preventDefault()}>More</a>
         </nav>
@@ -185,6 +186,8 @@ export function Dashboard({ path }: { path: string }) {
             <Markets onPick={(s) => { sessionStorage.setItem("trade_symbol", s); navigate("/dashboard/trade"); }} />
           ) : seg === "margin" ? (
             <MarginTrade />
+          ) : seg === "futures" ? (
+            <Futures />
           ) : seg === "assets" ? (
             <Assets />
           ) : seg === "verification" ? (

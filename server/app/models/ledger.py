@@ -69,6 +69,9 @@ class AccountType(str, enum.Enum):
     # The margin lending pool, per asset (system-owned). Goes negative by the amount lent out to
     # margin borrowers — its magnitude is the exchange's outstanding margin loans in that asset.
     MARGIN_BORROWED = "MARGIN_BORROWED"
+    # The futures settlement pool, per asset (system-owned). The house side of every position's PnL:
+    # a trader's win is paid from it, a loss is swept into it. Goes negative when traders are net up.
+    FUTURES_POOL = "FUTURES_POOL"
 
 
 # Which wallet an account belongs to. SPOT is the default everything has used until now; MARGIN is
@@ -76,6 +79,8 @@ class AccountType(str, enum.Enum):
 # spot and in margin are different accounts, so margin risk never touches spot funds.
 WALLET_SPOT = "SPOT"
 WALLET_MARGIN = "MARGIN"
+# The futures sub-wallet: margin locked against open positions lives here, ring-fenced from spot.
+WALLET_FUTURES = "FUTURES"
 
 
 def isolated_wallet(symbol: str) -> str:
@@ -88,7 +93,7 @@ USER_ACCOUNT_TYPES = frozenset(
 # May legitimately go negative. EXTERNAL is negative by construction; TDS accrues as a liability;
 # MARGIN_BORROWED is negative by the amount the pool has lent to margin borrowers.
 NEGATIVE_ALLOWED = frozenset(
-    {AccountType.EXTERNAL, AccountType.TDS_PAYABLE, AccountType.MARGIN_BORROWED}
+    {AccountType.EXTERNAL, AccountType.TDS_PAYABLE, AccountType.MARGIN_BORROWED, AccountType.FUTURES_POOL}
 )
 
 
@@ -162,7 +167,7 @@ class Account(TimestampMixin, Base):
         # A negative user balance means we let someone spend money they did not have. The margin
         # pool is the sanctioned exception alongside EXTERNAL/TDS.
         CheckConstraint(
-            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE', 'MARGIN_BORROWED')",
+            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE', 'MARGIN_BORROWED', 'FUTURES_POOL')",
             name="ck_accounts_no_negative_user_balance",
         ),
     )

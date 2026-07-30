@@ -1,0 +1,78 @@
+.fut .fut-sub { color: var(--text-faint); font-size: 0.85rem; margin-left: 0.75rem; }
+
+.fut-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .fut-grid { grid-template-columns: 1fr; }
+}
+
+.fut-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.fut-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.fut-side {
+  padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-dim); font-weight: 700; cursor: pointer;
+}
+.fut-side.long.on { background: rgba(14, 203, 129, 0.18); color: var(--up); border-color: var(--up); }
+.fut-side.short.on { background: rgba(246, 70, 93, 0.18); color: var(--down); border-color: var(--down); }
+
+.fut-field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: var(--text-dim); }
+.fut-field strong { color: var(--gold); }
+.fut-field select, .fut-field input[type="text"], .fut-field input:not([type]) {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.55rem 0.7rem; color: var(--text); font: inherit;
+}
+.fut-field input[type="range"] { accent-color: var(--gold); }
+.fut-lev-marks { display: flex; gap: 0.3rem; }
+.fut-lev-marks button {
+  flex: 1; padding: 0.25rem 0; font-size: 0.72rem; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-faint); cursor: pointer;
+}
+.fut-lev-marks button.on { background: var(--gold); color: #06120c; border-color: var(--gold); font-weight: 700; }
+
+.fut-est { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim); }
+.fut-est strong { color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+.fut-est.dim strong { color: var(--text-faint); }
+
+.fut-submit {
+  padding: 0.8rem; border: none; border-radius: 8px; font: inherit; font-weight: 700;
+  cursor: pointer; color: #06120c;
+}
+.fut-submit.long { background: var(--up); }
+.fut-submit.short { background: var(--down); color: #1a0509; }
+.fut-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.fut-err { color: var(--down); font-size: 0.83rem; }
+
+.fut-positions {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem;
+}
+.fut-positions h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+.fut-empty { color: var(--text-faint); font-size: 0.88rem; padding: 1rem 0; }
+.fut-table-wrap { overflow-x: auto; }
+.fut-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.fut-table th, .fut-table td { padding: 0.5rem 0.6rem; text-align: left; white-space: nowrap; }
+.fut-table th { color: var(--text-faint); font-weight: 500; border-bottom: 1px solid var(--border); }
+.fut-table td { font-family: ui-monospace, Menlo, monospace; border-bottom: 1px solid var(--border); }
+.fut-table .r { text-align: right; }
+.fut-dir.long { color: var(--up); font-weight: 700; }
+.fut-dir.short { color: var(--down); font-weight: 700; }
+.fut-liq { color: var(--gold-2, #fcd535); }
+.fut-table .up { color: var(--up); }
+.fut-table .down { color: var(--down); }
+.fut-roi { font-size: 0.75rem; opacity: 0.8; }
+.fut-close {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; font-size: 0.78rem;
+}
+.fut-close:hover { color: var(--down); border-color: var(--down); }

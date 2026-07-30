@@ -415,7 +415,32 @@ export const api = {
     request<MarginAccount>("/margin/repay", { method: "POST", body: JSON.stringify(body) }),
   marginOrder: (body: { mode?: string; symbol: string; side: "BUY" | "SELL"; type?: "LIMIT" | "MARKET"; quantity: string; price?: string | null; auto_borrow?: boolean }) =>
     request<{ id: number; status: string; filled_quantity: string; quantity: string; wallet: string }>("/margin/order", { method: "POST", body: JSON.stringify(body) }),
+
+  // futures
+  futuresOpen: (body: { symbol: string; side: "LONG" | "SHORT"; leverage: string; quantity: string }) =>
+    request<FuturesPosition>("/futures/position", { method: "POST", body: JSON.stringify(body) }),
+  futuresClose: (id: number) =>
+    request<FuturesPosition>(`/futures/position/${id}/close`, { method: "POST" }),
+  futuresPositions: (includeClosed = false) =>
+    request<FuturesPosition[]>(`/futures/positions?include_closed=${includeClosed}`),
 };
+
+export interface FuturesPosition {
+  id: number;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  leverage: string;
+  size: string;
+  entry_price: string;
+  margin: string;
+  liquidation_price: string;
+  realized_pnl: string;
+  status: string;
+  mark_price: string | null;      // live, from the server snapshot; null once closed
+  unrealized_pnl: string | null;  // live PnL for an open position
+  created_at: string;
+  closed_at: string | null;
+}
 
 export interface MarginLoanRow {
   id: number;
