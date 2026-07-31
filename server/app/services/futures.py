@@ -27,6 +27,33 @@ PriceOf = Callable[[str], Awaitable[Decimal | None]]
 QUOTE = "USDT"                       # margin/settlement asset
 MAX_LEVERAGE = Decimal("100")
 TAKER_FEE = Decimal("0.0004")        # 0.04%, Binance-ish futures taker fee
+MAINTENANCE_MARGIN_RATE = Decimal("0.005")  # 0.5% — liquidate when equity falls below this
+
+
+def liquidation_price(pos) -> Decimal:
+    """Price at which the position's equity hits maintenance margin and it gets liquidated."""
+    mmr = MAINTENANCE_MARGIN_RATE
+    if pos.side is PositionSide.LONG:
+        return (pos.entry_price * pos.size - pos.margin) / (pos.size * (1 - mmr))
+    return (pos.margin + pos.entry_price * pos.size) / (pos.size * (1 + mmr))
+
+
+def should_liquidate(pos, mark: Decimal) -> bool:
+    equity = pos.margin + pos.pnl_at(mark)
+    maintenance = pos.notional(mark) * MAINTENANCE_MARGIN_RATE
+    return equity <= maintenance
+
+
+def position_state(pos, mark: Decimal) -> dict:
+    """Live position metrics for display."""
+    pnl = pos.pnl_at(mark)
+    return {
+        "mark": mark,
+        "unrealized_pnl": pnl,
+        "equity": pos.margin + pnl,
+        "roe": (pnl / pos.margin * 100) if pos.margin else Decimal(0),  # return on margin, %
+        "liquidation_price": liquidation_price(pos),
+    }
 
 
 class FuturesError(Exception):
@@ -129,3 +156,19 @@ async def open_positions(db: AsyncSession, user_id: int) -> list[FuturesPosition
             FuturesPosition.user_id == user_id, FuturesPosition.status == PositionStatus.OPEN
         ).order_by(FuturesPosition.id.desc())
     )).scalars().all())
+
+
+async def sweep_liquidations(db: AsyncSession, price_of: PriceOf) -> list[int]:
+    """Liquidate every open position whose equity has fallen to maintenance margin. Caller commits."""
+    positions = (
+        await db.execute(select(FuturesPosition).where(FuturesPosition.status == PositionStatus.OPEN).with_for_update())
+    ).scalars().all()
+    liquidated: list[int] = []
+    for pos in positions:
+        mark = await price_of(pos.symbol)
+        if mark is None or mark <= 0:
+            continue
+        if should_liquidate(pos, mark):
+            await close_position(db, user_id=pos.user_id, position_id=pos.id, price_of=price_of, liquidation=True)
+            liquidated.append(pos.id)
+    return liquidated

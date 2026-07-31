@@ -93,6 +93,27 @@ class TestShort:
         assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)             # insurance absorbed the shortfall
 
 
+class TestLiquidation:
+    async def test_liquidation_price_and_sweep(self, db):
+        u = await make_user(db, "fut-liq@example.com")
+        a = await usdt(db)
+        await fund_futures(db, u, a, "1000")
+        pos = await futures.open_position(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+                                          size=Decimal("0.1"), leverage=Decimal("10"), price_of=price_book())
+        liq = futures.liquidation_price(pos)   # ~ (60000*0.1 - 600) / (0.1*0.995) ≈ 54271
+        assert Decimal("54000") < liq < Decimal("55000")
+
+        # Above liq → not liquidated.
+        assert await futures.sweep_liquidations(db, price_book(BTCUSDT=Decimal("58000"))) == []
+        assert pos.status is PositionStatus.OPEN
+
+        # Below liq → liquidated, margin gone, trial balance still zero.
+        liquidated = await futures.sweep_liquidations(db, price_book(BTCUSDT=Decimal("54000")))
+        assert pos.id in liquidated
+        assert pos.status is PositionStatus.LIQUIDATED
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+
 class TestGuards:
     async def test_leverage_and_size_validated(self, db):
         u = await make_user(db, "fut-guard@example.com")

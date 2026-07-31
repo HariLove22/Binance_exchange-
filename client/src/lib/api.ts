@@ -122,6 +122,24 @@ export interface ReferralSummary {
   referrals: ReferralRow[];
 }
 
+export interface FuturesPosition {
+  id: number;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  size: string;
+  entry_price: string;
+  leverage: string;
+  margin: string;
+  mark: string | null;
+  unrealized_pnl: string | null;
+  roe: string | null;
+  liquidation_price: string;
+}
+export interface FuturesAccount {
+  balance_usdt: string;
+  positions: FuturesPosition[];
+}
+
 export interface ApiKeyRow {
   id: number;
   label: string;
@@ -357,6 +375,13 @@ export const api = {
   // kyc
   referralMe: () => request<ReferralSummary>("/referral/me"),
   vipMe: () => request<VipStatus>("/vip/me"),
+  futuresAccount: () => request<FuturesAccount>("/futures/account"),
+  futuresTransfer: (amount: string, deposit: boolean) =>
+    request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit }) }),
+  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string }) =>
+    request<{ id: number; entry_price: string; margin: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
+  futuresClose: (id: number) => request<{ status: string; close_price: string; realized_pnl: string }>(`/futures/close/${id}`, { method: "POST" }),
+
   apiKeys: () => request<ApiKeyRow[]>("/apikeys"),
   apiKeyCreate: (body: { label: string; can_trade: boolean; can_withdraw: boolean }) =>
     request<ApiKeyCreated>("/apikeys", { method: "POST", body: JSON.stringify(body) }),

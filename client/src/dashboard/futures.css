@@ -1,0 +1,21 @@
+/* Futures terminal — small deltas over the margin terminal. */
+.fut-form { padding: 0.8rem 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.fut-lev label, .of-field label { font-size: 0.7rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+.fut-lev-row { display: flex; align-items: center; gap: 0.6rem; }
+.fut-lev-row input { flex: 1; accent-color: var(--gold); }
+.fut-lev-val { font-family: ui-monospace, monospace; font-weight: 600; color: var(--gold); min-width: 2.5rem; text-align: right; }
+.fut-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.3rem; }
+.fut-long, .fut-short { border: none; border-radius: 8px; padding: 0.65rem; font: inherit; font-weight: 600; cursor: pointer; }
+.fut-long { background: #0ecb81; color: #04150f; }
+.fut-short { background: #f6465d; color: #fff; }
+.fut-long:disabled, .fut-short:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.fut-h, .fut-r { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr 1.3fr 0.7fr; gap: 0.5rem; padding: 0.5rem 0.9rem; align-items: center; font-size: 0.8rem; }
+.fut-h { font-size: 0.68rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--border); }
+.fut-r { border-bottom: 1px solid var(--border); }
+.fut-side { font-size: 0.66rem; padding: 0.1rem 0.4rem; border-radius: 4px; }
+.fut-side.long { background: rgba(14,203,129,0.15); color: #0ecb81; }
+.fut-side.short { background: rgba(246,70,93,0.15); color: #f6465d; }
+.fut-r .warn { color: #f0b90b; }
+.fut-r em { font-style: normal; font-size: 0.7rem; opacity: 0.8; }
+.up { color: #0ecb81; } .down { color: #f6465d; }

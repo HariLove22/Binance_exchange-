@@ -14,7 +14,7 @@ import asyncio
 import logging
 
 from app.core.db import AsyncSessionLocal
-from app.services import marketmaker, pubsub, trading
+from app.services import futures, marketmaker, pubsub, trading
 
 log = logging.getLogger("trigger_monitor")
 
@@ -26,11 +26,16 @@ POLL_SECONDS = 3.0
 async def _sweep_once() -> None:
     async with AsyncSessionLocal() as db:
         fired = await trading.sweep_triggers(db, marketmaker.fetch_reference_price)
-        if fired:
+        # Same loop liquidates underwater futures positions against the live mark price.
+        liquidated = await futures.sweep_liquidations(db, marketmaker.fetch_reference_price)
+        if fired or liquidated:
             await db.commit()
             for symbol in fired:
                 pubsub.publish(pubsub.market_channel(symbol))  # wake live subscribers
-            log.info("fired stops: %s", fired)
+            if liquidated:
+                log.info("liquidated futures positions: %s", liquidated)
+            if fired:
+                log.info("fired stops: %s", fired)
         else:
             await db.rollback()
 

@@ -7,6 +7,7 @@ import { Orders } from "./Orders";
 import { Trade } from "./Trade";
 import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
+import { FuturesTrade } from "./FuturesTrade";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
 import { Markets } from "./Markets";
@@ -139,7 +140,7 @@ export function Dashboard({ path }: { path: string }) {
             )}
           </div>
 
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Futures</a>
+          <a href="#/dashboard/futures" className={seg === "futures" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/futures"); }}>Futures</a>
           <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Earn</a>
           <a href="#/dashboard" onClick={(e) => e.preventDefault()}>More</a>
         </nav>
@@ -173,8 +174,8 @@ export function Dashboard({ path }: { path: string }) {
       </header>
 
       {/* The trading terminal takes the full width — hide the sidebar there, like Binance. */}
-      <div className={`dash-body ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
-        {seg !== "trade" && seg !== "margin" && (
+      <div className={`dash-body ${seg === "trade" || seg === "margin" || seg === "futures" ? "full" : ""}`}>
+        {seg !== "trade" && seg !== "margin" && seg !== "futures" && (
           <aside className="dash-side">
             {NAV.map((n) => {
               const Icon = n.icon;
@@ -215,7 +216,7 @@ export function Dashboard({ path }: { path: string }) {
           </aside>
         )}
 
-        <main className={`dash-main ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
+        <main className={`dash-main ${seg === "trade" || seg === "margin" || seg === "futures" ? "full" : ""}`}>
           {seg === "" ? (
             <Overview user={user} />
           ) : seg === "trade" ? (
@@ -228,6 +229,8 @@ export function Dashboard({ path }: { path: string }) {
             <Markets onPick={(s) => { sessionStorage.setItem("trade_symbol", s); navigate("/dashboard/trade"); }} />
           ) : seg === "margin" ? (
             <MarginTrade />
+          ) : seg === "futures" ? (
+            <FuturesTrade />
           ) : seg === "assets" ? (
             <Assets />
           ) : seg === "verification" ? (
