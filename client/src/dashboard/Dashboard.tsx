@@ -8,6 +8,7 @@ import { Trade } from "./Trade";
 import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
 import { FuturesTrade } from "./FuturesTrade";
+import { Options } from "./Options";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
 import { Markets } from "./Markets";
@@ -66,6 +67,7 @@ const TRADE_OPTIONS: TradeOption[] = [
   { label: "Spot", desc: "Trade crypto on the order book", to: "/dashboard/trade" },
   { label: "Margin", desc: "Trade with leverage", to: "/dashboard/margin" },
   { label: "P2P", desc: "Buy & sell with bank transfer", to: "/dashboard/p2p" },
+  { label: "Options", desc: "Calls & puts, cash-settled", to: "/dashboard/options" },
   { label: "Convert", desc: "Instant swap — not built yet", tag: "soon" },
   { label: "Demo Trading", desc: "Practice with virtual funds — not built yet", tag: "soon" },
 ];
@@ -231,6 +233,8 @@ export function Dashboard({ path }: { path: string }) {
             <MarginTrade />
           ) : seg === "futures" ? (
             <FuturesTrade />
+          ) : seg === "options" ? (
+            <Options />
           ) : seg === "assets" ? (
             <Assets />
           ) : seg === "verification" ? (

@@ -13,8 +13,10 @@ that dies on a transient DB or network blip would silently strand every stop aft
 import asyncio
 import logging
 
+from datetime import datetime, timezone
+
 from app.core.db import AsyncSessionLocal
-from app.services import futures, marketmaker, pubsub, trading
+from app.services import futures, marketmaker, options, pubsub, trading
 
 log = logging.getLogger("trigger_monitor")
 
@@ -28,12 +30,16 @@ async def _sweep_once() -> None:
         fired = await trading.sweep_triggers(db, marketmaker.fetch_reference_price)
         # Same loop liquidates underwater futures positions against the live mark price.
         liquidated = await futures.sweep_liquidations(db, marketmaker.fetch_reference_price)
-        if fired or liquidated:
+        # And settles options that have expired, at the mark price.
+        settled = await options.sweep_expiries(db, now=datetime.now(timezone.utc), price_of=marketmaker.fetch_reference_price)
+        if fired or liquidated or settled:
             await db.commit()
             for symbol in fired:
                 pubsub.publish(pubsub.market_channel(symbol))  # wake live subscribers
             if liquidated:
                 log.info("liquidated futures positions: %s", liquidated)
+            if settled:
+                log.info("settled options: %s", settled)
             if fired:
                 log.info("fired stops: %s", fired)
         else:

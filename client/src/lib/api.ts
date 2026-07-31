@@ -122,6 +122,32 @@ export interface ReferralSummary {
   referrals: ReferralRow[];
 }
 
+export interface OptionChain {
+  underlying: string;
+  spot: string;
+  expiries: string[];
+  strikes: string[];
+}
+export interface OptionSel {
+  underlying: string;
+  type: "CALL" | "PUT";
+  strike: string;
+  expiry: string;
+  size: string;
+}
+export interface OptionPosition {
+  id: number;
+  underlying: string;
+  type: string;
+  strike: string;
+  size: string;
+  premium_paid: string;
+  expiry: string;
+  status: string;
+  payout: string;
+  mark: string | null;
+}
+
 export interface FuturesPosition {
   id: number;
   symbol: string;
@@ -375,6 +401,11 @@ export const api = {
   // kyc
   referralMe: () => request<ReferralSummary>("/referral/me"),
   vipMe: () => request<VipStatus>("/vip/me"),
+  optionsChain: (underlying: string) => request<OptionChain>(`/options/chain?underlying=${underlying}`),
+  optionsQuote: (body: OptionSel) => request<{ premium_per_unit: string; total_premium: string }>("/options/quote", { method: "POST", body: JSON.stringify(body) }),
+  optionsBuy: (body: OptionSel) => request<{ id: number; premium_paid: string; expiry: string }>("/options/buy", { method: "POST", body: JSON.stringify(body) }),
+  optionsPositions: () => request<OptionPosition[]>("/options/positions"),
+
   futuresAccount: () => request<FuturesAccount>("/futures/account"),
   futuresTransfer: (amount: string, deposit: boolean) =>
     request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit }) }),

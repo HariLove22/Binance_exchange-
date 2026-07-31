@@ -599,6 +599,35 @@ async def pay_referral(
     )
 
 
+async def house_transfer(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    to_house: bool,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move funds between a user and the derivatives house pool (FUTURES_INSURANCE).
+
+    `to_house` True: user pays the house (an option premium). False: the house pays the user (a
+    settlement payout). Balanced to zero; the pool may go negative.
+    """
+    if amount <= 0:
+        return None
+    avail = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=WALLET_SPOT)
+    house = await get_or_create_account(db, asset_id, AccountType.FUTURES_INSURANCE)
+    if to_house and avail.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, avail.balance)
+    delta = -amount if to_house else amount
+    return await post(
+        db, idempotency_key=idempotency_key, kind=TransactionKind.TRADE, reference=reference,
+        movements=[Movement(avail, delta), Movement(house, -delta)],
+    )
+
+
 async def futures_close(
     db: AsyncSession,
     *,
