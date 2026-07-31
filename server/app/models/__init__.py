@@ -17,6 +17,7 @@ from app.models.asset import (
 from app.models.ledger import (
     NEGATIVE_ALLOWED,
     USER_ACCOUNT_TYPES,
+    WALLET_FUTURES,
     WALLET_MARGIN,
     WALLET_SPOT,
     Account,
@@ -36,6 +37,7 @@ from app.models.margin import (
 )
 from app.models.demo import DemoAccount, DemoHolding
 from app.models.kyc import KycApplication, KycStatus
+from app.models.futures import FuturesPosition, PositionSide, PositionStatus
 from app.models.referral import Referral
 from app.models.rewards import RewardClaim
 from app.models.market import (
@@ -103,7 +105,11 @@ __all__ = [
     "OrderSide",
     "OrderStatus",
     "OrderType",
+    "FuturesPosition",
+    "PositionSide",
+    "PositionStatus",
     "Referral",
+    "WALLET_FUTURES",
     "RewardClaim",
     "P2P_OPEN_STATUSES",
     "P2PAd",

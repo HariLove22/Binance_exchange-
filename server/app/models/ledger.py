@@ -69,6 +69,9 @@ class AccountType(str, enum.Enum):
     # The margin lending pool, per asset (system-owned). Goes negative by the amount lent out to
     # margin borrowers — its magnitude is the exchange's outstanding margin loans in that asset.
     MARGIN_BORROWED = "MARGIN_BORROWED"
+    # Futures insurance / PnL counterparty pool (system-owned). Traders' realized profit is paid from
+    # it and their losses paid into it; it may go negative (covered by fees / capital).
+    FUTURES_INSURANCE = "FUTURES_INSURANCE"
 
 
 # Which wallet an account belongs to. SPOT is the default everything has used until now; MARGIN is
@@ -76,6 +79,7 @@ class AccountType(str, enum.Enum):
 # spot and in margin are different accounts, so margin risk never touches spot funds.
 WALLET_SPOT = "SPOT"
 WALLET_MARGIN = "MARGIN"
+WALLET_FUTURES = "FUTURES"
 
 
 def isolated_wallet(symbol: str) -> str:
@@ -88,7 +92,7 @@ USER_ACCOUNT_TYPES = frozenset(
 # May legitimately go negative. EXTERNAL is negative by construction; TDS accrues as a liability;
 # MARGIN_BORROWED is negative by the amount the pool has lent to margin borrowers.
 NEGATIVE_ALLOWED = frozenset(
-    {AccountType.EXTERNAL, AccountType.TDS_PAYABLE, AccountType.MARGIN_BORROWED}
+    {AccountType.EXTERNAL, AccountType.TDS_PAYABLE, AccountType.MARGIN_BORROWED, AccountType.FUTURES_INSURANCE}
 )
 
 

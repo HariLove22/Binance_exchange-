@@ -599,6 +599,45 @@ async def pay_referral(
     )
 
 
+async def futures_close(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    margin: Decimal,
+    pnl: Decimal,
+    fee: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Settle a closed futures position: release margin, apply PnL vs the insurance pool, take the fee.
+
+    The user receives max(0, margin + pnl - fee); the insurance pool nets the rest (it pays profits,
+    absorbs losses). Balanced to zero in the settlement asset by construction.
+    ponytail: user_out is floored at 0 — a loss past the margin is bad debt the pool eats. Liquidation
+    (Stage 2) keeps that from happening in practice.
+    """
+    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id, wallet=wallet)
+    avail = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    insurance = await get_or_create_account(db, asset_id, AccountType.FUTURES_INSURANCE)
+
+    user_out = max(Decimal(0), margin + pnl - fee)
+    insurance_delta = margin - user_out - fee   # makes the whole posting sum to zero
+
+    movements = [Movement(locked, -margin)]
+    if user_out > 0:
+        movements.append(Movement(avail, user_out))
+    if fee > 0:
+        movements.append(Movement(await get_or_create_account(db, asset_id, AccountType.FEE_INCOME), fee))
+    if insurance_delta != 0:
+        movements.append(Movement(insurance, insurance_delta))
+
+    return await post(
+        db, idempotency_key=idempotency_key, kind=TransactionKind.TRADE, reference=reference, movements=movements,
+    )
+
+
 async def collect_fee(
     db: AsyncSession,
     *,

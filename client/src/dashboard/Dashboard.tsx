@@ -46,6 +46,7 @@ const NAV: NavItem[] = [
   {
     key: "account", label: "Account", icon: IUser,
     children: [
+      { key: "account", label: "Trading Accounts" },
       { key: "verification", label: "Identification" },
       { key: "settings", label: "Security" },
       { key: "payment", label: "Payment" },
