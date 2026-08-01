@@ -12,7 +12,7 @@ import enum
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -38,10 +38,14 @@ class FuturesPosition(Base):
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)  # e.g. BTCUSDT
 
     side: Mapped[PositionSide] = mapped_column(str_enum(PositionSide, "position_side"), nullable=False)
-    size: Mapped[Decimal] = mapped_column(MONEY, nullable=False)          # base quantity
+    # Linear (USDT-M): size is base quantity, PnL/margin in USDT. Inverse (COIN-M): size is USD
+    # notional, PnL/margin in the base coin.
+    inverse: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
+    margin_asset: Mapped[str] = mapped_column(String(12), nullable=False, server_default="USDT", default="USDT")
+    size: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     entry_price: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     leverage: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
-    margin: Mapped[Decimal] = mapped_column(MONEY, nullable=False)        # USDT locked
+    margin: Mapped[Decimal] = mapped_column(MONEY, nullable=False)        # in margin_asset
 
     status: Mapped[PositionStatus] = mapped_column(
         str_enum(PositionStatus, "position_status"), nullable=False, default=PositionStatus.OPEN
@@ -59,12 +63,17 @@ class FuturesPosition(Base):
     )
 
     def notional(self, price: Decimal) -> Decimal:
-        return self.size * price
+        """Position notional in the margin asset: USD (linear) or coin (inverse)."""
+        return self.size / price if self.inverse else self.size * price
 
     def pnl_at(self, price: Decimal) -> Decimal:
-        """Unrealized/realized PnL at a given price."""
-        diff = price - self.entry_price
-        return diff * self.size if self.side is PositionSide.LONG else -diff * self.size
+        """Unrealized/realized PnL at a price, in the margin asset (USDT linear / coin inverse)."""
+        if self.inverse:
+            # coin PnL = notional_usd × (1/entry − 1/price)
+            base = self.size * (Decimal(1) / self.entry_price - Decimal(1) / price)
+        else:
+            base = (price - self.entry_price) * self.size
+        return base if self.side is PositionSide.LONG else -base
 
     def __repr__(self) -> str:
         return f"<FuturesPosition {self.side.value} {self.size} {self.symbol} @ {self.entry_price} {self.status.value}>"

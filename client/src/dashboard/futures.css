@@ -19,3 +19,7 @@
 .fut-r .warn { color: #f0b90b; }
 .fut-r em { font-style: normal; font-size: 0.7rem; opacity: 0.8; }
 .up { color: #0ecb81; } .down { color: #f6465d; }
+
+.fut-mode { display: inline-flex; gap: 0; margin-left: 0.6rem; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.fut-mode button { background: none; border: none; color: var(--text-dim); font: inherit; font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.6rem; cursor: pointer; }
+.fut-mode button.on { background: var(--gold); color: #1a1400; }

@@ -33,6 +33,7 @@ def _dec(v: str, field: str) -> Decimal:
 class TransferRequest(BaseModel):
     amount: str
     deposit: bool  # True: spot -> futures
+    asset: str = "USDT"  # margin asset — USDT for USDT-M, a coin (BTC…) for COIN-M
 
 
 class OrderRequest(BaseModel):
@@ -40,12 +41,15 @@ class OrderRequest(BaseModel):
     side: PositionSide
     size: str
     leverage: str
+    inverse: bool = False  # True = COIN-M (coin-margined, inverse); size is USD notional
 
 
 class PositionRow(BaseModel):
     id: int
     symbol: str
     side: str
+    inverse: bool
+    margin_asset: str
     size: str
     entry_price: str
     leverage: str
@@ -58,6 +62,7 @@ class PositionRow(BaseModel):
 
 class AccountResponse(BaseModel):
     balance_usdt: str
+    balances: dict[str, str]  # futures-wallet available balance per asset symbol
     positions: list[PositionRow]
 
 
@@ -67,7 +72,8 @@ async def _positions(db: AsyncSession, user_id: int) -> list[PositionRow]:
         mark = await mark_of(p.symbol)
         st = futures.position_state(p, mark) if mark else None
         rows.append(PositionRow(
-            id=p.id, symbol=p.symbol, side=p.side.value, size=_n(p.size), entry_price=_n(p.entry_price),
+            id=p.id, symbol=p.symbol, side=p.side.value, inverse=p.inverse, margin_asset=p.margin_asset,
+            size=_n(p.size), entry_price=_n(p.entry_price),
             leverage=_n(p.leverage), margin=_n(p.margin),
             mark=_n(mark) if mark else None,
             unrealized_pnl=_n(st["unrealized_pnl"]) if st else None,
@@ -77,26 +83,32 @@ async def _positions(db: AsyncSession, user_id: int) -> list[PositionRow]:
     return rows
 
 
-async def _balance(db: AsyncSession, user_id: int) -> str:
-    for b in await ledger.balances(db, user_id, wallet=WALLET_FUTURES):
-        if b.symbol == "USDT":
-            return _n(b.available)
-    return "0"
+async def _balances(db: AsyncSession, user_id: int) -> dict[str, str]:
+    return {b.symbol: _n(b.available) for b in await ledger.balances(db, user_id, wallet=WALLET_FUTURES)}
+
+
+async def _account(db: AsyncSession, user_id: int) -> AccountResponse:
+    bals = await _balances(db, user_id)
+    return AccountResponse(
+        balance_usdt=bals.get("USDT", "0"), balances=bals, positions=await _positions(db, user_id)
+    )
 
 
 @router.get("/account", response_model=AccountResponse)
 async def account(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return AccountResponse(balance_usdt=await _balance(db, user.id), positions=await _positions(db, user.id))
+    return await _account(db, user.id)
 
 
 @router.post("/transfer", response_model=AccountResponse)
 async def transfer(body: TransferRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
-        await futures.transfer_collateral(db, user_id=user.id, amount=_dec(body.amount, "amount"), deposit=body.deposit)
+        await futures.transfer_collateral(
+            db, user_id=user.id, amount=_dec(body.amount, "amount"), deposit=body.deposit, asset=body.asset,
+        )
     except FuturesError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
-    return AccountResponse(balance_usdt=await _balance(db, user.id), positions=await _positions(db, user.id))
+    return await _account(db, user.id)
 
 
 @router.post("/order", status_code=status.HTTP_201_CREATED)
@@ -108,13 +120,13 @@ async def open_order(body: OrderRequest, user: User = Depends(get_current_user),
     try:
         pos = await futures.open_position(
             db, user_id=user.id, symbol=body.symbol, side=body.side, size=_dec(body.size, "size"),
-            leverage=_dec(body.leverage, "leverage"), price_of=mark_of,
+            leverage=_dec(body.leverage, "leverage"), price_of=mark_of, inverse=body.inverse,
         )
     except FuturesError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
     return {"id": pos.id, "symbol": pos.symbol, "side": pos.side.value, "entry_price": _n(pos.entry_price),
-            "size": _n(pos.size), "margin": _n(pos.margin)}
+            "size": _n(pos.size), "margin": _n(pos.margin), "margin_asset": pos.margin_asset}
 
 
 @router.post("/close/{position_id}")
