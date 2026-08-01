@@ -1605,6 +1605,8 @@
   font-size: .72rem; text-transform: uppercase; letter-spacing: .05em;
   color: var(--text-faint); border-bottom: 1px solid var(--border);
 }
+/* Deposit history: 4 even columns, one rule for head + rows so they can never diverge. */
+.dep-table .at-head, .dep-table .at-row { grid-template-columns: 1fr 1fr 1fr 1fr; }
 .at-row { border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
 .at-row:last-child { border-bottom: none; }
 .at-row:hover { background: rgba(255,255,255,.03); }
