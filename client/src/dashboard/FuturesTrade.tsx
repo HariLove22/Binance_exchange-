@@ -100,6 +100,7 @@ export function FuturesTrade() {
 function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: string; inverse: boolean; balance: number; livePrice: number | null; onDone: () => void }) {
   const [lev, setLev] = useState("10");
   const [pct, setPct] = useState(0);
+  const [cross, setCross] = useState(false);
   const [busy, setBusy] = useState<"LONG" | "SHORT" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const base = symbol.replace(/USDT$/, "");
@@ -118,7 +119,7 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
     if (size <= 0) { setNote("choose a size with the slider"); return; }
     setBusy(side); setNote("");
     try {
-      const o = await api.futuresOrder({ symbol, side, size: sizeStr, leverage: lev, inverse });
+      const o = await api.futuresOrder({ symbol, side, size: sizeStr, leverage: lev, inverse, cross });
       setNote(`${side} opened @ ${trimAmount(o.entry_price)} · margin ${trimAmount(o.margin)} ${o.margin_asset}`);
       setPct(0); onDone();
     } catch (e) { setNote(e instanceof ApiError ? e.message : String(e)); } finally { setBusy(null); }
@@ -126,6 +127,10 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
 
   return (
     <div className="fut-form">
+      <div className="fut-mode fut-margin-mode">
+        <button className={!cross ? "on" : ""} onClick={() => setCross(false)}>Isolated</button>
+        <button className={cross ? "on" : ""} onClick={() => setCross(true)}>Cross</button>
+      </div>
       <div className="fut-lev">
         <label>Leverage</label>
         <div className="fut-lev-row">
@@ -184,7 +189,7 @@ function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () =
           const pnl = Number(p.unrealized_pnl ?? 0);
           return (
             <div className="fut-r" key={p.id}>
-              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`} onClick={() => setLev(p.id, trimAmount(p.leverage))} style={{ cursor: "pointer" }} title="Click to change leverage">{p.side} {trimAmount(p.leverage)}x</span></span>
+              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`} onClick={() => setLev(p.id, trimAmount(p.leverage))} style={{ cursor: "pointer" }} title="Click to change leverage">{p.side} {trimAmount(p.leverage)}x · {p.cross ? "Cross" : "Iso"}</span></span>
               <span className="mono">{trimAmount(p.size)}</span>
               <span className="num mono">{Number(p.entry_price).toFixed(2)}</span>
               <span className="num mono" title={p.last ? `Last (fill) price ${Number(p.last).toFixed(2)} · mark drives PnL/liq` : undefined}>{p.mark ? Number(p.mark).toFixed(2) : "—"}</span>

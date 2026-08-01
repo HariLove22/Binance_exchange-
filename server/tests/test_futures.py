@@ -339,3 +339,27 @@ class TestNetting:
         positions = await futures.open_positions(db, u.id)
         assert len(positions) == 1 and positions[0].side is PositionSide.SHORT and positions[0].size == Decimal("0.2")
         assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+
+class TestCross:
+    async def _open_cross(self, db, email, funds):
+        u = await make_user(db, email)
+        a = await usdt(db)
+        await fund_futures(db, u, a, funds)
+        pos = await futures.open_position(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+                                          size=Decimal("0.1"), leverage=Decimal("10"), price_of=price_book(), cross=True)
+        return u, a, pos  # margin 600, isolated liq ≈ 54271
+
+    async def test_free_balance_cushions_cross(self, db):
+        # 2000 funded → 600 locked, 1400 free. At 54000 an ISOLATED position would liquidate...
+        u, a, pos = await self._open_cross(db, "cross-safe@example.com", "2000")
+        liq = await futures.sweep_liquidations(db, price_book(BTCUSDT=Decimal("54000")))
+        assert liq == [] and pos.status is PositionStatus.OPEN   # ...but cross equity (1400) >> maint
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+    async def test_cross_bucket_liquidates_when_equity_gone(self, db):
+        # Funded exactly the margin (600), no free. At 54000 equity = 0+600-600 = 0 ≤ maintenance.
+        u, a, pos = await self._open_cross(db, "cross-liq@example.com", "600")
+        liq = await futures.sweep_liquidations(db, price_book(BTCUSDT=Decimal("54000")))
+        assert pos.id in liq and pos.status is PositionStatus.LIQUIDATED
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)

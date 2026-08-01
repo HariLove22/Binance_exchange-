@@ -41,6 +41,10 @@ class FuturesPosition(Base):
     # Linear (USDT-M): size is base quantity, PnL/margin in USDT. Inverse (COIN-M): size is USD
     # notional, PnL/margin in the base coin.
     inverse: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
+    # Cross margin: the whole futures wallet (plus other cross positions' equity) backs this position,
+    # and the cross bucket liquidates as a group. Isolated (default): only this position's margin is at
+    # risk and it liquidates on its own.
+    cross: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
     margin_asset: Mapped[str] = mapped_column(String(12), nullable=False, server_default="USDT", default="USDT")
     size: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     entry_price: Mapped[Decimal] = mapped_column(MONEY, nullable=False)

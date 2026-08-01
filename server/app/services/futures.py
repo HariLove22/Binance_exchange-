@@ -145,7 +145,7 @@ def _notional_at(size: Decimal, price: Decimal, inverse: bool) -> Decimal:
 
 async def _new_position(
     db: AsyncSession, *, user_id: int, symbol: str, side: PositionSide, size: Decimal,
-    leverage: Decimal, fill: Decimal, inverse: bool,
+    leverage: Decimal, fill: Decimal, inverse: bool, cross: bool = False,
 ) -> FuturesPosition:
     """Create a fresh position, locking margin = notional / leverage in the futures wallet."""
     margin_asset = await (_asset(db, _base_coin(symbol)) if inverse else _quote_asset(db))
@@ -159,7 +159,7 @@ async def _new_position(
     except (InsufficientFunds, LedgerError) as exc:
         raise FuturesError(str(exc)) from exc
     pos = FuturesPosition(
-        user_id=user_id, symbol=symbol.upper(), side=side, inverse=inverse,
+        user_id=user_id, symbol=symbol.upper(), side=side, inverse=inverse, cross=cross,
         margin_asset=margin_asset.symbol, size=size, entry_price=fill,
         leverage=leverage, margin=margin, status=PositionStatus.OPEN, realized_pnl=Decimal(0),
     )
@@ -170,7 +170,7 @@ async def _new_position(
 
 async def open_position(
     db: AsyncSession, *, user_id: int, symbol: str, side: PositionSide, size: Decimal,
-    leverage: Decimal, price_of: PriceOf, inverse: bool = False,
+    leverage: Decimal, price_of: PriceOf, inverse: bool = False, cross: bool = False,
 ) -> FuturesPosition:
     """Open (or net into) a position at the current fill price. One-way netting per (user, symbol,
     contract): same side adds and averages the entry; the opposite side reduces the position, or
@@ -200,7 +200,7 @@ async def open_position(
 
     if existing is None:
         return await _new_position(db, user_id=user_id, symbol=symbol, side=side, size=size,
-                                   leverage=leverage, fill=fill, inverse=inverse)
+                                   leverage=leverage, fill=fill, inverse=inverse, cross=cross)
 
     if existing.side is side:
         # Add and average the entry, at the position's existing leverage.
@@ -227,7 +227,7 @@ async def open_position(
     if remainder > 0:
         # New order was larger — the position flipped; open the leftover on the new side.
         return await _new_position(db, user_id=user_id, symbol=symbol, side=side, size=remainder,
-                                   leverage=leverage, fill=fill, inverse=inverse)
+                                   leverage=leverage, fill=fill, inverse=inverse, cross=existing.cross)
     return existing
 
 
@@ -413,16 +413,44 @@ async def apply_funding(db: AsyncSession, *, now: datetime, price_of: PriceOf) -
 
 
 async def sweep_liquidations(db: AsyncSession, price_of: PriceOf) -> list[int]:
-    """Liquidate every open position whose equity has fallen to maintenance margin. Caller commits."""
+    """Liquidate positions whose equity has fallen to maintenance margin. Caller commits.
+
+    Isolated positions are checked one by one (own margin, own liq price). Cross positions are checked
+    as a bucket per (user, margin asset): the whole futures balance for that asset plus the bucket's
+    combined margin and unrealized PnL backs them, so a winner cushions a loser — and when the bucket's
+    total equity falls to its total maintenance margin, the whole bucket liquidates together.
+    """
     positions = (
         await db.execute(select(FuturesPosition).where(FuturesPosition.status == PositionStatus.OPEN).with_for_update())
     ).scalars().all()
     liquidated: list[int] = []
-    for pos in positions:
+
+    # Isolated — independent per position.
+    for pos in [p for p in positions if not p.cross]:
         mark = await price_of(pos.symbol)
         if mark is None or mark <= 0:
             continue
         if should_liquidate(pos, mark):
             await close_position(db, user_id=pos.user_id, position_id=pos.id, price_of=price_of, liquidation=True)
             liquidated.append(pos.id)
+
+    # Cross — grouped per (user, margin asset).
+    buckets: dict[tuple[int, str], list[FuturesPosition]] = {}
+    for pos in [p for p in positions if p.cross]:
+        buckets.setdefault((pos.user_id, pos.margin_asset), []).append(pos)
+    for (uid, asset_sym), group in buckets.items():
+        asset = await _asset(db, asset_sym)
+        free = (await ledger.get_or_create_account(db, asset.id, AccountType.AVAILABLE, uid, wallet=WALLET_FUTURES)).balance
+        equity, maint, priced = free, Decimal(0), True
+        for pos in group:
+            mark = await price_of(pos.symbol)
+            if mark is None or mark <= 0:
+                priced = False
+                break
+            equity += pos.margin + pos.pnl_at(mark)
+            maint += pos.notional(mark) * MAINTENANCE_MARGIN_RATE
+        if priced and equity <= maint:
+            for pos in group:
+                await close_position(db, user_id=uid, position_id=pos.id, price_of=price_of, liquidation=True)
+                liquidated.append(pos.id)
     return liquidated

@@ -27,3 +27,6 @@
 /* position action buttons (add/remove margin, partial + full close) */
 .fut-actions { display: flex; gap: 0.25rem; justify-content: flex-end; flex-wrap: wrap; }
 .fut-actions button { padding: 0.15rem 0.4rem; font-size: 0.72rem; }
+
+/* isolated / cross margin-mode toggle on the order form */
+.fut-margin-mode { margin-bottom: 0.6rem; }

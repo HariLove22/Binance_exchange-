@@ -47,6 +47,7 @@ class OrderRequest(BaseModel):
     size: str
     leverage: str
     inverse: bool = False  # True = COIN-M (coin-margined, inverse); size is USD notional
+    cross: bool = False    # True = cross margin (shared bucket); default isolated
 
 
 class PositionRow(BaseModel):
@@ -54,6 +55,7 @@ class PositionRow(BaseModel):
     symbol: str
     side: str
     inverse: bool
+    cross: bool
     margin_asset: str
     size: str
     entry_price: str
@@ -81,7 +83,7 @@ async def _positions(db: AsyncSession, user_id: int) -> list[PositionRow]:
         last = await last_of(p.symbol)
         st = futures.position_state(p, mark) if mark else None
         rows.append(PositionRow(
-            id=p.id, symbol=p.symbol, side=p.side.value, inverse=p.inverse, margin_asset=p.margin_asset,
+            id=p.id, symbol=p.symbol, side=p.side.value, inverse=p.inverse, cross=p.cross, margin_asset=p.margin_asset,
             size=_n(p.size), entry_price=_n(p.entry_price),
             leverage=_n(p.leverage), margin=_n(p.margin),
             mark=_n(mark) if mark else None,
@@ -171,7 +173,7 @@ async def open_order(body: OrderRequest, user: User = Depends(get_current_user),
     try:
         pos = await futures.open_position(
             db, user_id=user.id, symbol=body.symbol, side=body.side, size=_dec(body.size, "size"),
-            leverage=_dec(body.leverage, "leverage"), price_of=last_of, inverse=body.inverse,
+            leverage=_dec(body.leverage, "leverage"), price_of=last_of, inverse=body.inverse, cross=body.cross,
         )
     except FuturesError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
