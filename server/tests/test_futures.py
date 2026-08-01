@@ -301,3 +301,41 @@ class TestFundingInverse:
         # funding = 0.1 * 0.0001 = 0.00001 BTC, long pays.
         assert pos.margin == Decimal("0.00999") and pos.funding_accrued == Decimal("-0.00001")
         assert (await ledger.trial_balance(db))["BTC"] == Decimal(0)
+
+
+class TestNetting:
+    async def _u(self, db, email, funds="5000"):
+        u = await make_user(db, email)
+        a = await usdt(db)
+        await fund_futures(db, u, a, funds)
+        return u, a
+
+    async def _open(self, db, u, side, size, price):
+        return await futures.open_position(db, user_id=u.id, symbol="BTCUSDT", side=side,
+                                           size=Decimal(size), leverage=Decimal("10"),
+                                           price_of=price_book(BTCUSDT=Decimal(price)))
+
+    async def test_same_side_adds_and_averages(self, db):
+        u, a = await self._u(db, "net-add@example.com")
+        await self._open(db, u, PositionSide.LONG, "0.1", "60000")   # margin 600
+        await self._open(db, u, PositionSide.LONG, "0.1", "62000")   # margin 620
+        positions = await futures.open_positions(db, u.id)
+        assert len(positions) == 1                                    # netted, not two rows
+        p = positions[0]
+        assert p.size == Decimal("0.2") and p.entry_price == Decimal("61000") and p.margin == Decimal("1220")
+
+    async def test_opposite_reduces(self, db):
+        u, a = await self._u(db, "net-reduce@example.com")
+        p = await self._open(db, u, PositionSide.LONG, "0.2", "60000")  # margin 1200
+        await self._open(db, u, PositionSide.SHORT, "0.05", "60000")    # reduce by 0.05
+        assert p.side is PositionSide.LONG and p.size == Decimal("0.15") and p.margin == Decimal("900")
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+    async def test_opposite_larger_flips(self, db):
+        u, a = await self._u(db, "net-flip@example.com")
+        longp = await self._open(db, u, PositionSide.LONG, "0.1", "60000")
+        await self._open(db, u, PositionSide.SHORT, "0.3", "60000")     # closes long, opens 0.2 short
+        assert longp.status is PositionStatus.CLOSED
+        positions = await futures.open_positions(db, u.id)
+        assert len(positions) == 1 and positions[0].side is PositionSide.SHORT and positions[0].size == Decimal("0.2")
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)

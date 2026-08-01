@@ -138,11 +138,43 @@ async def transfer_collateral(
         raise FuturesError(str(exc)) from exc
 
 
+def _notional_at(size: Decimal, price: Decimal, inverse: bool) -> Decimal:
+    """Notional in the margin asset: USD for linear (size*price), coin for inverse (size/price)."""
+    return size / price if inverse else size * price
+
+
+async def _new_position(
+    db: AsyncSession, *, user_id: int, symbol: str, side: PositionSide, size: Decimal,
+    leverage: Decimal, fill: Decimal, inverse: bool,
+) -> FuturesPosition:
+    """Create a fresh position, locking margin = notional / leverage in the futures wallet."""
+    margin_asset = await (_asset(db, _base_coin(symbol)) if inverse else _quote_asset(db))
+    margin = _notional_at(size, fill, inverse) / leverage
+    try:
+        await ledger.lock(
+            db, user_id=user_id, asset_id=margin_asset.id, amount=margin, wallet=WALLET_FUTURES,
+            idempotency_key=f"fut-open:{user_id}:{symbol}:{side.value}:{size}:{fill}",
+            reference=f"futures-open {symbol}",
+        )
+    except (InsufficientFunds, LedgerError) as exc:
+        raise FuturesError(str(exc)) from exc
+    pos = FuturesPosition(
+        user_id=user_id, symbol=symbol.upper(), side=side, inverse=inverse,
+        margin_asset=margin_asset.symbol, size=size, entry_price=fill,
+        leverage=leverage, margin=margin, status=PositionStatus.OPEN, realized_pnl=Decimal(0),
+    )
+    db.add(pos)
+    await db.flush()
+    return pos
+
+
 async def open_position(
     db: AsyncSession, *, user_id: int, symbol: str, side: PositionSide, size: Decimal,
     leverage: Decimal, price_of: PriceOf, inverse: bool = False,
 ) -> FuturesPosition:
-    """Open a leveraged position at the current mark price, locking margin in the futures wallet.
+    """Open (or net into) a position at the current fill price. One-way netting per (user, symbol,
+    contract): same side adds and averages the entry; the opposite side reduces the position, or
+    flips it (closing the old and opening the remainder) when the new order is larger.
 
     Linear (USDT-M): size = base qty, margin in USDT. Inverse (COIN-M): size = USD notional,
     margin in the base coin.
@@ -152,33 +184,51 @@ async def open_position(
     if leverage < 1 or leverage > MAX_LEVERAGE:
         raise FuturesError(f"leverage must be between 1x and {MAX_LEVERAGE}x")
 
-    mark = await price_of(symbol)
-    if mark is None or mark <= 0:
+    fill = await price_of(symbol)
+    if fill is None or fill <= 0:
         raise FuturesError(f"no mark price for {symbol}")
 
-    if inverse:
-        margin_asset = await _asset(db, _base_coin(symbol))
-        margin = (size / mark) / leverage          # coin notional / leverage
-    else:
-        margin_asset = await _quote_asset(db)
-        margin = (size * mark) / leverage           # USD notional / leverage
-    try:
-        await ledger.lock(
-            db, user_id=user_id, asset_id=margin_asset.id, amount=margin, wallet=WALLET_FUTURES,
-            idempotency_key=f"fut-open:{user_id}:{symbol}:{side.value}:{size}:{mark}",
-            reference=f"futures-open {symbol}",
+    # ponytail: no row lock — netting is app-level and the demo is single-threaded. Add a partial
+    # unique index on (user, symbol, inverse) WHERE status='OPEN' + SELECT FOR UPDATE if real
+    # concurrency ever races two orders into two positions.
+    existing = (await db.execute(
+        select(FuturesPosition).where(
+            FuturesPosition.user_id == user_id, FuturesPosition.symbol == symbol.upper(),
+            FuturesPosition.inverse == inverse, FuturesPosition.status == PositionStatus.OPEN,
         )
-    except (InsufficientFunds, LedgerError) as exc:
-        raise FuturesError(str(exc)) from exc
+    )).scalar_one_or_none()
 
-    pos = FuturesPosition(
-        user_id=user_id, symbol=symbol.upper(), side=side, inverse=inverse,
-        margin_asset=margin_asset.symbol, size=size, entry_price=mark,
-        leverage=leverage, margin=margin, status=PositionStatus.OPEN, realized_pnl=Decimal(0),
-    )
-    db.add(pos)
-    await db.flush()
-    return pos
+    if existing is None:
+        return await _new_position(db, user_id=user_id, symbol=symbol, side=side, size=size,
+                                   leverage=leverage, fill=fill, inverse=inverse)
+
+    if existing.side is side:
+        # Add and average the entry, at the position's existing leverage.
+        added_margin = _notional_at(size, fill, inverse) / existing.leverage
+        try:
+            asset = await _asset(db, existing.margin_asset)
+            await ledger.lock(db, user_id=user_id, asset_id=asset.id, amount=added_margin, wallet=WALLET_FUTURES,
+                              idempotency_key=f"fut-add:{existing.id}:{size}:{fill}", reference=f"futures-add {symbol}")
+        except (InsufficientFunds, LedgerError) as exc:
+            raise FuturesError(str(exc)) from exc
+        s1, s2 = existing.size, size
+        if inverse:
+            existing.entry_price = (s1 + s2) / (s1 / existing.entry_price + s2 / fill)
+        else:
+            existing.entry_price = (s1 * existing.entry_price + s2 * fill) / (s1 + s2)
+        existing.size = s1 + s2
+        existing.margin += added_margin
+        return existing
+
+    # Opposite side: reduce the existing position by the overlap (realising PnL at the fill price).
+    overlap = min(existing.size, size)
+    await close_position(db, user_id=user_id, position_id=existing.id, price_of=price_of, size=overlap)
+    remainder = size - overlap
+    if remainder > 0:
+        # New order was larger — the position flipped; open the leftover on the new side.
+        return await _new_position(db, user_id=user_id, symbol=symbol, side=side, size=remainder,
+                                   leverage=leverage, fill=fill, inverse=inverse)
+    return existing
 
 
 async def close_position(
