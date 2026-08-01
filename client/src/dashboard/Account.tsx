@@ -24,7 +24,7 @@ export function Account() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const total = ov ? Number(ov.spot_usd) + (ov.margin.open ? Number(ov.margin.equity_usd) : 0) : 0;
+  const total = ov ? Number(ov.spot_usd) + (ov.margin.open ? Number(ov.margin.equity_usd) : 0) + Number(ov.futures?.value_usd ?? 0) : 0;
 
   return (
     <div className="accs">
@@ -85,6 +85,24 @@ export function Account() {
           <div className="acc-actions"><button className="acc-btn" onClick={() => navigate("/dashboard/margin")}>Open per pair</button></div>
         </div>
 
+        {/* Futures — USDⓈ-M & COIN-M (coin-margined) */}
+        <div className="acc-card">
+          <div className="acc-top"><span className="acc-icon fut">⇅</span><h3>Futures</h3><span className="acc-tag">USDⓈ-M · COIN-M</span></div>
+          <p className="acc-desc">Perpetuals with up to 100x. USDT-margined or coin-margined (inverse).</p>
+          {ov?.futures.open ? (
+            <>
+              <div className="acc-val">{fmt(Number(ov.futures.value_usd))} <span className="acc-val-sub">collateral</span></div>
+              <div className="acc-health ok">{ov.futures.positions} open position{ov.futures.positions === 1 ? "" : "s"}</div>
+              <div className="acc-actions"><button className="acc-btn primary" onClick={() => navigate("/dashboard/futures")}>Manage</button></div>
+            </>
+          ) : (
+            <>
+              <div className="acc-val muted">Not funded</div>
+              <div className="acc-actions"><button className="acc-btn primary" onClick={() => navigate("/dashboard/futures")}>Open futures</button></div>
+            </>
+          )}
+        </div>
+
         {/* Demo */}
         <DemoCard exists={ov?.demo.exists ?? false} totalUsd={ov?.demo.total_usd} onChange={load} />
       </div>
@@ -95,7 +113,7 @@ export function Account() {
 type AcctOption = {
   key: string; title: string; icon: string; iconClass: string;
   leverage: string; minDeposit: string; interest: string; collateral: string; fees: string; note: string;
-  kind: "cross-classic" | "cross-pro" | "isolated" | "demo";
+  kind: "cross-classic" | "cross-pro" | "isolated" | "demo" | "futures";
 };
 
 const ACCOUNT_OPTIONS: AcctOption[] = [
@@ -116,6 +134,12 @@ const ACCOUNT_OPTIONS: AcctOption[] = [
     leverage: "Up to 10x (per pair)", minDeposit: "$10 equivalent", interest: "≈0.30% / day (accrued hourly)",
     collateral: "Ring-fenced to one pair", fees: "0.10% maker / taker",
     note: "Losses are limited to a single pair's collateral. Pick a pair.", kind: "isolated",
+  },
+  {
+    key: "futures", title: "Futures — USDⓈ-M & COIN-M", icon: "⇅", iconClass: "fut",
+    leverage: "Up to 100x", minDeposit: "USDT (USDⓈ-M) or coin (COIN-M)", interest: "None · funding N/A",
+    collateral: "USDT-margined, or coin-margined (inverse)", fees: "0.04% taker",
+    note: "Perpetuals against the mark price. COIN-M settles PnL in the base coin.", kind: "futures",
   },
   {
     key: "demo", title: "Demo Trading", icon: "🎮", iconClass: "demo",
@@ -146,7 +170,8 @@ function AddAccountModal({ ov, onClose, onDone }: { ov: AccountOverview | null; 
   async function create(o: AcctOption) {
     setBusy(true); setErr(null);
     try {
-      if (o.kind === "demo") await api.demoCreate();
+      if (o.kind === "futures") { navigate("/dashboard/futures"); onDone(); return; }
+      else if (o.kind === "demo") await api.demoCreate();
       else if (o.kind === "cross-classic") await api.marginOpen({ mode: "CROSS", tier: "CLASSIC", leverage: "3" });
       else if (o.kind === "cross-pro") await api.marginOpen({ mode: "CROSS", tier: "PRO", leverage });
       else await api.marginOpen({ mode: "ISOLATED", symbol: pair, tier: "PRO", leverage });

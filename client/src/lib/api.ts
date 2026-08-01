@@ -625,6 +625,7 @@ export interface AccountOverview {
   spot_usd: string;
   margin: { open: boolean; equity_usd?: string; margin_level?: string | null; health?: string; max_leverage?: string };
   demo: { exists: boolean; total_usd?: string };
+  futures: { open: boolean; value_usd: string; positions: number };
 }
 
 export interface DemoHoldingRow {
