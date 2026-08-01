@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { currentQuery, navigate } from "../router";
 import { useAuth } from "./AuthContext";
 import { api, ApiError } from "../lib/api";
@@ -9,6 +10,7 @@ import { SocialButtons } from "./components/SocialButtons";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function Login() {
+  const { t } = useTranslation();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,8 +25,8 @@ export function Login() {
     setFormError("");
 
     const next: typeof errors = {};
-    if (!EMAIL_RE.test(email)) next.email = "Enter a valid email address";
-    if (!password) next.password = "Enter your password";
+    if (!EMAIL_RE.test(email)) next.email = t("auth.invalidEmail");
+    if (!password) next.password = t("auth.enterPassword");
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -36,7 +38,7 @@ export function Login() {
         navigate("/dashboard");
       }
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      setFormError(err instanceof ApiError ? err.message : t("auth.genericError"));
     } finally {
       setLoading(false);
     }
@@ -46,26 +48,26 @@ export function Login() {
     <AuthShell>
       <div className="auth-form-wrap">
         <header className="auth-head">
-          <h1>Welcome back</h1>
-          <p>Log in to your Novex account to keep trading.</p>
+          <h1>{t("auth.welcomeBack")}</h1>
+          <p>{t("auth.loginSubtitle")}</p>
         </header>
 
         <SocialButtons />
-        <div className="auth-divider"><span>or continue with email</span></div>
+        <div className="auth-divider"><span>{t("auth.orContinueEmail")}</span></div>
 
         <form className="auth-form" onSubmit={onSubmit} noValidate>
           {justRegistered && !formError && (
             <div className="auth-notice ok" role="status">
-              Account created — please log in to continue.
+              {t("auth.accountCreated")}
             </div>
           )}
           {formError && <div className="auth-notice err" role="alert">{formError}</div>}
 
           <Field
             id="login-email"
-            label="Email"
+            label={t("auth.email")}
             type="email"
-            placeholder="you@email.com"
+            placeholder={t("auth.emailPlaceholder")}
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -73,7 +75,7 @@ export function Login() {
           />
           <Field
             id="login-password"
-            label="Password"
+            label={t("auth.password")}
             type="password"
             placeholder="••••••••"
             autoComplete="current-password"
@@ -85,20 +87,20 @@ export function Login() {
           <div className="auth-row">
             <label className="checkbox">
               <input type="checkbox" defaultChecked />
-              <span>Remember me</span>
+              <span>{t("auth.rememberMe")}</span>
             </label>
             <a className="auth-link" href="#/login" onClick={(e) => e.preventDefault()}>
-              Forgot password?
+              {t("auth.forgotPassword")}
             </a>
           </div>
 
           <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
-            {loading ? "Logging in…" : "Log in"}
+            {loading ? t("auth.loggingIn") : t("auth.login")}
           </button>
         </form>
 
         <p className="auth-alt">
-          New to Novex?{" "}
+          {t("auth.newToNovex")}{" "}
           <a
             className="auth-link strong"
             href="#/signup"
@@ -107,7 +109,7 @@ export function Login() {
               navigate("/signup");
             }}
           >
-            Create an account
+            {t("auth.createAccount")}
           </a>
         </p>
       </div>

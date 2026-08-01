@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "dashboard": "डैशबोर्ड",
+    "assets": "एसेट्स",
+    "orders": "ऑर्डर",
+    "rewards": "रिवॉर्ड्स हब",
+    "referral": "रेफ़रल",
+    "account": "खाता",
+    "subaccounts": "सब अकाउंट",
+    "settings": "सेटिंग्स"
+  },
+  "topnav": {
+    "buyCrypto": "क्रिप्टो खरीदें",
+    "markets": "मार्केट",
+    "trade": "ट्रेड",
+    "futures": "फ्यूचर्स",
+    "earn": "कमाएँ",
+    "more": "और"
+  },
+  "tradeMenu": {
+    "spot": "स्पॉट",
+    "spotDesc": "ऑर्डर बुक पर क्रिप्टो ट्रेड करें",
+    "margin": "मार्जिन",
+    "marginDesc": "लीवरेज के साथ ट्रेड करें",
+    "p2p": "पी2पी",
+    "p2pDesc": "बैंक ट्रांसफ़र से खरीदें-बेचें",
+    "options": "ऑप्शंस",
+    "optionsDesc": "कॉल और पुट, कैश-सेटल्ड",
+    "convert": "कन्वर्ट",
+    "convertDesc": "इंस्टेंट स्वैप — अभी नहीं बना",
+    "demo": "डेमो ट्रेडिंग",
+    "demoDesc": "वर्चुअल फंड से अभ्यास — अभी नहीं बना",
+    "soon": "जल्द"
+  },
+  "userMenu": {
+    "profile": "प्रोफ़ाइल",
+    "accounts": "खाते",
+    "settings": "सेटिंग्स",
+    "logout": "लॉग आउट"
+  },
+  "common": {
+    "deposit": "डिपॉज़िट"
+  },
+  "auth": {
+    "welcomeBack": "वापसी पर स्वागत है",
+    "loginSubtitle": "ट्रेडिंग जारी रखने के लिए अपने Novex खाते में लॉग इन करें।",
+    "orContinueEmail": "या ईमेल से जारी रखें",
+    "accountCreated": "खाता बन गया — जारी रखने के लिए लॉग इन करें।",
+    "email": "ईमेल",
+    "password": "पासवर्ड",
+    "emailPlaceholder": "you@email.com",
+    "rememberMe": "मुझे याद रखें",
+    "forgotPassword": "पासवर्ड भूल गए?",
+    "loggingIn": "लॉग इन हो रहा है…",
+    "login": "लॉग इन",
+    "newToNovex": "Novex पर नए हैं?",
+    "createAccount": "खाता बनाएँ",
+    "invalidEmail": "एक मान्य ईमेल पता दर्ज करें",
+    "enterPassword": "अपना पासवर्ड दर्ज करें",
+    "genericError": "कुछ गड़बड़ हो गई। कृपया फिर से प्रयास करें।"
+  }
+}

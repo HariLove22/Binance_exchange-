@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import i18n from "../i18n";
 
 /**
  * Locale: the user's display currency and language, persisted across sessions.
@@ -93,7 +94,8 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => { document.documentElement.setAttribute("lang", language); }, [language]);
 
   const setCurrency = (code: string) => { const c = findCurrency(code); localStorage.setItem(CUR_KEY, c.code); setCur(c); };
-  const setLanguage = (code: string) => { localStorage.setItem(LANG_KEY, code); setLang(code); };
+  // Also drive i18next so every t() re-renders in the new language instantly.
+  const setLanguage = (code: string) => { localStorage.setItem(LANG_KEY, code); setLang(code); void i18n.changeLanguage(code); };
 
   const fromUsd = (usd: number) => usd * currency.perUsd;
   const fmt = (usd: number, opts?: Intl.NumberFormatOptions) =>

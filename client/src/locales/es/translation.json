@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "assets": "Activos",
+    "orders": "Órdenes",
+    "rewards": "Centro de recompensas",
+    "referral": "Referidos",
+    "account": "Cuenta",
+    "subaccounts": "Subcuentas",
+    "settings": "Ajustes"
+  },
+  "topnav": {
+    "buyCrypto": "Comprar cripto",
+    "markets": "Mercados",
+    "trade": "Operar",
+    "futures": "Futuros",
+    "earn": "Ganar",
+    "more": "Más"
+  },
+  "tradeMenu": {
+    "spot": "Spot",
+    "spotDesc": "Opera cripto en el libro de órdenes",
+    "margin": "Margen",
+    "marginDesc": "Opera con apalancamiento",
+    "p2p": "P2P",
+    "p2pDesc": "Compra y vende con transferencia bancaria",
+    "options": "Opciones",
+    "optionsDesc": "Calls y puts, liquidadas en efectivo",
+    "convert": "Convertir",
+    "convertDesc": "Intercambio instantáneo — aún no disponible",
+    "demo": "Trading demo",
+    "demoDesc": "Practica con fondos virtuales — aún no disponible",
+    "soon": "pronto"
+  },
+  "userMenu": {
+    "profile": "Perfil",
+    "accounts": "Cuentas",
+    "settings": "Ajustes",
+    "logout": "Cerrar sesión"
+  },
+  "common": {
+    "deposit": "Depositar"
+  },
+  "auth": {
+    "welcomeBack": "Bienvenido de nuevo",
+    "loginSubtitle": "Inicia sesión en tu cuenta de Novex para seguir operando.",
+    "orContinueEmail": "o continúa con el correo",
+    "accountCreated": "Cuenta creada: inicia sesión para continuar.",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "emailPlaceholder": "tu@correo.com",
+    "rememberMe": "Recordarme",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "loggingIn": "Iniciando sesión…",
+    "login": "Iniciar sesión",
+    "newToNovex": "¿Nuevo en Novex?",
+    "createAccount": "Crear una cuenta",
+    "invalidEmail": "Introduce un correo válido",
+    "enterPassword": "Introduce tu contraseña",
+    "genericError": "Algo salió mal. Inténtalo de nuevo."
+  }
+}

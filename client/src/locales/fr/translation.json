@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "assets": "Actifs",
+    "orders": "Ordres",
+    "rewards": "Centre de récompenses",
+    "referral": "Parrainage",
+    "account": "Compte",
+    "subaccounts": "Sous-comptes",
+    "settings": "Paramètres"
+  },
+  "topnav": {
+    "buyCrypto": "Acheter des cryptos",
+    "markets": "Marchés",
+    "trade": "Trader",
+    "futures": "Futures",
+    "earn": "Gagner",
+    "more": "Plus"
+  },
+  "tradeMenu": {
+    "spot": "Spot",
+    "spotDesc": "Tradez des cryptos sur le carnet d'ordres",
+    "margin": "Marge",
+    "marginDesc": "Tradez avec effet de levier",
+    "p2p": "P2P",
+    "p2pDesc": "Achetez et vendez par virement bancaire",
+    "options": "Options",
+    "optionsDesc": "Calls et puts, réglés en espèces",
+    "convert": "Convertir",
+    "convertDesc": "Échange instantané — pas encore disponible",
+    "demo": "Trading démo",
+    "demoDesc": "Entraînez-vous avec des fonds virtuels — pas encore disponible",
+    "soon": "bientôt"
+  },
+  "userMenu": {
+    "profile": "Profil",
+    "accounts": "Comptes",
+    "settings": "Paramètres",
+    "logout": "Se déconnecter"
+  },
+  "common": {
+    "deposit": "Dépôt"
+  },
+  "auth": {
+    "welcomeBack": "Bon retour",
+    "loginSubtitle": "Connectez-vous à votre compte Novex pour continuer à trader.",
+    "orContinueEmail": "ou continuez avec l'e-mail",
+    "accountCreated": "Compte créé — veuillez vous connecter pour continuer.",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "emailPlaceholder": "vous@email.com",
+    "rememberMe": "Se souvenir de moi",
+    "forgotPassword": "Mot de passe oublié ?",
+    "loggingIn": "Connexion…",
+    "login": "Se connecter",
+    "newToNovex": "Nouveau sur Novex ?",
+    "createAccount": "Créer un compte",
+    "invalidEmail": "Saisissez une adresse e-mail valide",
+    "enterPassword": "Saisissez votre mot de passe",
+    "genericError": "Une erreur s'est produite. Veuillez réessayer."
+  }
+}
