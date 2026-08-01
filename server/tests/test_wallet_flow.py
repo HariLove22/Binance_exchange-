@@ -20,6 +20,7 @@ from app.models import (
     Deposit,
     DepositStatus,
     User,
+    WALLET_FUNDING,
     Withdrawal,
     WithdrawalStatus,
 )
@@ -53,7 +54,8 @@ async def make_network(db, symbol="TKN", scale=8, decimals=8, fee="1", min_wd="0
 
 
 async def balance(db, user_id, symbol) -> object:
-    return {b.symbol: b for b in await ledger.balances(db, user_id)}.get(symbol)
+    # Deposits/withdrawals now live in the FUNDING (main) wallet.
+    return {b.symbol: b for b in await ledger.balances(db, user_id, wallet=WALLET_FUNDING)}.get(symbol)
 
 
 class TestDepositAddress:
@@ -165,7 +167,7 @@ class TestWithdrawalFlow:
         assert b.available == Decimal("59")
         # Reserved funds are held in PENDING_WITHDRAWAL, still counted in the user's total? No —
         # `balances` only surfaces AVAILABLE and LOCKED, not PENDING_WITHDRAWAL, so available fell.
-        acct = await ledger.get_or_create_account(db, net.asset_id, AccountType.PENDING_WITHDRAWAL, user.id)
+        acct = await ledger.get_or_create_account(db, net.asset_id, AccountType.PENDING_WITHDRAWAL, user.id, wallet=WALLET_FUNDING)
         assert acct.balance == Decimal("41")
 
     async def test_cannot_withdraw_more_than_available(self, db):
@@ -188,7 +190,7 @@ class TestWithdrawalFlow:
         assert w.status is WithdrawalStatus.CONFIRMED
 
         # Pending drained; available unchanged (already debited at reserve).
-        pending = await ledger.get_or_create_account(db, net.asset_id, AccountType.PENDING_WITHDRAWAL, user.id)
+        pending = await ledger.get_or_create_account(db, net.asset_id, AccountType.PENDING_WITHDRAWAL, user.id, wallet=WALLET_FUNDING)
         assert pending.balance == Decimal(0)
         fee_income = await ledger.get_or_create_account(db, net.asset_id, AccountType.FEE_INCOME)
         assert fee_income.balance == Decimal("1")

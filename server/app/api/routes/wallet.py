@@ -24,6 +24,7 @@ from app.models import (
     Deposit,
     DepositStatus,
     User,
+    WALLET_FUNDING,
     WALLET_FUTURES,
     WALLET_MARGIN,
     WALLET_SPOT,
@@ -63,7 +64,9 @@ class BalanceResponse(BaseModel):
 
 
 # User-facing wallets that funds can be freely moved between (same user, own money).
-TRANSFER_WALLETS = {"SPOT": WALLET_SPOT, "FUNDING": WALLET_SPOT, "MARGIN": WALLET_MARGIN, "FUTURES": WALLET_FUTURES}
+TRANSFER_WALLETS = {
+    "FUNDING": WALLET_FUNDING, "SPOT": WALLET_SPOT, "MARGIN": WALLET_MARGIN, "FUTURES": WALLET_FUTURES,
+}
 
 
 @router.get("/balances", response_model=list[BalanceResponse])

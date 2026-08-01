@@ -110,6 +110,7 @@ async def request_withdrawal(
             total=total,
             idempotency_key=f"withdrawal-reserve:{withdrawal.id}",
             reference=f"withdrawal={withdrawal.id}",
+            wallet=ledger.WALLET_FUNDING,  # withdrawals leave from the main (Funding) wallet
         )
     except InsufficientFunds as exc:
         raise WithdrawalError(str(exc)) from exc
@@ -146,6 +147,7 @@ async def confirm_withdrawal(db: AsyncSession, withdrawal: Withdrawal) -> Withdr
         fee=withdrawal.fee,
         idempotency_key=f"withdrawal-settle:{withdrawal.id}",
         reference=f"withdrawal={withdrawal.id}",
+        wallet=ledger.WALLET_FUNDING,
     )
     if settle is not None:
         withdrawal.settle_txn_id = settle.id
@@ -168,6 +170,7 @@ async def fail_withdrawal(db: AsyncSession, withdrawal: Withdrawal, reason: str)
         total=withdrawal.amount + withdrawal.fee,
         idempotency_key=f"withdrawal-refund:{withdrawal.id}",
         reference=f"withdrawal={withdrawal.id}",
+        wallet=ledger.WALLET_FUNDING,
     )
     if refund is not None:
         withdrawal.settle_txn_id = refund.id

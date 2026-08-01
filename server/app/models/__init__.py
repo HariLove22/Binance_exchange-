@@ -17,6 +17,7 @@ from app.models.asset import (
 from app.models.ledger import (
     NEGATIVE_ALLOWED,
     USER_ACCOUNT_TYPES,
+    WALLET_FUNDING,
     WALLET_FUTURES,
     WALLET_MARGIN,
     WALLET_SPOT,
@@ -74,6 +75,7 @@ __all__ = [
     "USER_ACCOUNT_TYPES",
     "WALLET_MARGIN",
     "WALLET_SPOT",
+    "WALLET_FUNDING",
     "isolated_wallet",
     "Account",
     "AccountType",

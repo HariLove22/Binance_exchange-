@@ -26,7 +26,7 @@ export function Account() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const total = ov ? Number(ov.spot_usd) + (ov.margin.open ? Number(ov.margin.equity_usd) : 0) + Number(ov.futures?.value_usd ?? 0) : 0;
+  const total = ov ? Number(ov.funding_usd ?? 0) + Number(ov.spot_usd) + (ov.margin.open ? Number(ov.margin.equity_usd) : 0) + Number(ov.futures?.value_usd ?? 0) : 0;
 
   return (
     <div className="accs">
@@ -50,6 +50,17 @@ export function Account() {
       {err && <p className="accs-err">{err}</p>}
 
       <div className="accs-grid">
+        {/* Funding — the main wallet where deposits/withdrawals live */}
+        <div className="acc-card">
+          <div className="acc-top"><span className="acc-icon funding">🏦</span><h3>Funding</h3><span className="acc-tag">Main</span></div>
+          <p className="acc-desc">Your main wallet. Deposits, withdrawals & P2P land here — transfer to trade.</p>
+          <div className="acc-val">{ov ? fmt(Number(ov.funding_usd ?? 0)) : "—"}</div>
+          <div className="acc-actions">
+            <button className="acc-btn" onClick={() => navigate("/dashboard/assets")}>Deposit</button>
+            <button className="acc-btn primary" onClick={() => setTransferring(true)}>Transfer</button>
+          </div>
+        </div>
+
         {/* Spot */}
         <div className="acc-card">
           <div className="acc-top"><span className="acc-icon spot">◈</span><h3>Spot Account</h3></div>

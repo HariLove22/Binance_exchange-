@@ -1724,6 +1724,7 @@
 .aw-icon.spot { background: rgba(43,217,124,0.15); color: #2bd97c; }
 .aw-icon.margin { background: rgba(14,203,129,0.15); color: #0ecb81; }
 .aw-icon.demo { background: rgba(148,163,184,0.14); }
+.aw-icon.funding { background: rgba(88,166,255,0.15); }
 .aw-name { font-weight: 600; font-size: 0.95rem; }
 .aw-val { font-size: 1.35rem; font-weight: 600; font-family: ui-monospace, monospace; }
 .aw-val.muted { font-size: 1rem; color: #7c8b83; font-weight: 400; }

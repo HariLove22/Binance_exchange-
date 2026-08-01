@@ -624,6 +624,7 @@ export interface KycDetail extends KycPending {
 }
 
 export interface AccountOverview {
+  funding_usd: string;
   spot_usd: string;
   margin: { open: boolean; equity_usd?: string; margin_level?: string | null; health?: string; max_leverage?: string };
   demo: { exists: boolean; total_usd?: string };

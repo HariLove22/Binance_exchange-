@@ -21,6 +21,7 @@ from app.models import (
     MarginMode,
     OrderSide,
     User,
+    WALLET_FUNDING,
     WALLET_FUTURES,
 )
 from app.services import demo, futures, ledger, margin
@@ -50,10 +51,9 @@ async def _spot_usd(db: AsyncSession, user_id: int) -> Decimal:
     return total
 
 
-async def _futures_usd(db: AsyncSession, user_id: int) -> Decimal:
-    """USD value of the futures wallet (free + margin locked, across USDT and coin collateral)."""
+async def _wallet_usd(db: AsyncSession, user_id: int, wallet: str) -> Decimal:
     total = Decimal(0)
-    for b in await ledger.balances(db, user_id, wallet=WALLET_FUTURES):
+    for b in await ledger.balances(db, user_id, wallet=wallet):
         px = await usd_price_of(b.symbol)
         if px is not None:
             total += b.total * px
@@ -82,6 +82,7 @@ class FuturesSummary(BaseModel):
 
 
 class Overview(BaseModel):
+    funding_usd: str
     spot_usd: str
     margin: MarginSummary
     demo: DemoSummary
@@ -127,11 +128,13 @@ async def overview(user: User = Depends(get_current_user), db: AsyncSession = De
     else:
         d = DemoSummary(exists=True, total_usd=(await demo.portfolio(db, dacct, usd_price_of))["total_usd"].__str__())
 
-    fut_usd = await _futures_usd(db, user.id)
+    fut_usd = await _wallet_usd(db, user.id, WALLET_FUTURES)
     fut_positions = len(await futures.open_positions(db, user.id))
     f = FuturesSummary(open=(fut_usd > 0 or fut_positions > 0), value_usd=_n(fut_usd), positions=fut_positions)
 
-    return Overview(spot_usd=_n(spot), margin=m, demo=d, futures=f)
+    funding = await _wallet_usd(db, user.id, WALLET_FUNDING)
+
+    return Overview(funding_usd=_n(funding), spot_usd=_n(spot), margin=m, demo=d, futures=f)
 
 
 # --- demo -----------------------------------------------------------------------------------------

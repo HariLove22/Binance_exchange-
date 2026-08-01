@@ -25,7 +25,7 @@ import { FiatSelect } from "./FiatSelect";
  * provider would deliver. Everything the exchange owns — the ledger postings, confirmations,
  * reserve-on-request, refund-on-fail — is real.
  */
-type AssetsTab = "overview" | "spot" | "margin" | "buy" | "convert" | "deposit" | "withdraw";
+type AssetsTab = "overview" | "funding" | "spot" | "margin" | "buy" | "convert" | "deposit" | "withdraw";
 
 export function Assets() {
   // A caller (e.g. the top-bar Deposit button) can stash which tab to open.
@@ -37,6 +37,7 @@ export function Assets() {
 
   const tabs: [typeof tab, string][] = [
     ["overview", "Overview"],
+    ["funding", "Funding"],
     ["spot", "Spot"],
     ["margin", "Margin"],
     ["buy", "Buy Crypto"],
@@ -54,7 +55,8 @@ export function Assets() {
       </div>
 
       {tab === "overview" && <AssetsOverview onGoto={setTab} />}
-      {tab === "spot" && <Balances />}
+      {tab === "funding" && <Balances wallet="FUNDING" title="Funding (Main)" />}
+      {tab === "spot" && <Balances wallet="SPOT" title="Spot" />}
       {tab === "margin" && <MarginBalances />}
       {tab === "buy" && <BuyCrypto />}
       {tab === "convert" && <Convert />}
@@ -66,7 +68,7 @@ export function Assets() {
 
 /* ----------------------------------------------------------------- overview */
 
-function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) {
+function AssetsOverview({ onGoto }: { onGoto: (t: "funding" | "spot" | "margin") => void }) {
   const [ov, setOv] = useState<AccountOverview | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const { fmt } = useLocale();
@@ -75,10 +77,12 @@ function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) 
     api.accountOverview().then(setOv).catch((e) => setErr(e instanceof ApiError ? e.message : String(e)));
   }, []);
 
+  const funding = ov ? Number(ov.funding_usd ?? 0) : 0;
   const spot = ov ? Number(ov.spot_usd) : 0;
   const marginEq = ov?.margin.open ? Number(ov.margin.equity_usd) : 0;
+  const futures = ov ? Number(ov.futures?.value_usd ?? 0) : 0;
   const demo = ov?.demo.exists ? Number(ov.demo.total_usd) : 0;
-  const total = spot + marginEq;
+  const total = funding + spot + marginEq + futures;
 
   return (
     <div className="asset-ov">
@@ -90,10 +94,16 @@ function AssetsOverview({ onGoto }: { onGoto: (t: "spot" | "margin") => void }) 
       {err && <p className="asset-err">{err}</p>}
 
       <div className="asset-wallets">
+        <button className="asset-wallet" onClick={() => onGoto("funding")}>
+          <div className="aw-top"><span className="aw-icon funding">🏦</span><span className="aw-name">Funding (Main)</span></div>
+          <div className="aw-val">{fmt(funding)}</div>
+          <div className="aw-sub">Deposits, withdrawals & P2P — transfer to trade</div>
+        </button>
+
         <button className="asset-wallet" onClick={() => onGoto("spot")}>
           <div className="aw-top"><span className="aw-icon spot">◈</span><span className="aw-name">Spot Wallet</span></div>
           <div className="aw-val">{fmt(spot)}</div>
-          <div className="aw-sub">Your main trading & holding wallet</div>
+          <div className="aw-sub">Spot trading wallet</div>
         </button>
 
         <button className="asset-wallet" onClick={() => onGoto("margin")}>
@@ -338,18 +348,18 @@ function BuyCrypto() {
 
 /* ------------------------------------------------------------------ balances */
 
-function Balances() {
+function Balances({ wallet = "SPOT", title = "Spot" }: { wallet?: string; title?: string } = {}) {
   const [balances, setBalances] = useState<Balance[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setBalances(await api.balances());
+      setBalances(await api.balances(wallet));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     }
-  }, []);
+  }, [wallet]);
   useEffect(() => void load(), [load]);
 
   const has = balances && balances.length > 0;
@@ -357,7 +367,7 @@ function Balances() {
   return (
     <>
       <div className="assets-head">
-        <h2>Spot</h2>
+        <h2>{title}</h2>
         <button className="btn-outline-d" onClick={() => void load()}>
           Refresh
         </button>

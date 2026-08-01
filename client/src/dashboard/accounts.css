@@ -46,6 +46,7 @@
 .acc-icon.iso { background: rgba(25,201,166,0.18); color: #7fe3d0; }
 .acc-icon.demo { background: rgba(132,168,150,0.14); }
 .acc-icon.fut { background: rgba(240,185,11,0.15); color: var(--gold, #f0b90b); }
+.acc-icon.funding { background: rgba(88,166,255,0.15); }
 .acc-tag { margin-left: auto; font-size: 0.62rem; background: rgba(43,217,124,0.15); color: #2bd97c; padding: 0.15rem 0.45rem; border-radius: 4px; text-transform: uppercase; }
 .acc-desc { color: #7c8b83; font-size: 0.8rem; margin: 0 0 0.8rem; flex: 1; }
 .acc-val { font-size: 1.4rem; font-weight: 600; font-family: ui-monospace, monospace; }

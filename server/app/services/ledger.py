@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     NEGATIVE_ALLOWED,
+    WALLET_FUNDING,
     WALLET_SPOT,
     Account,
     AccountType,
@@ -165,6 +166,7 @@ async def credit(
     kind: TransactionKind,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
     """Move funds into a user's AVAILABLE balance from EXTERNAL.
 
@@ -175,7 +177,7 @@ async def credit(
     if amount <= 0:
         raise LedgerError("credit amount must be positive")
 
-    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
     external = await get_or_create_account(db, asset_id, AccountType.EXTERNAL)
     return await post(
         db,
@@ -258,6 +260,7 @@ async def reserve_withdrawal(
     total: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
     """Move funds out of AVAILABLE into PENDING_WITHDRAWAL: AVAILABLE -> PENDING_WITHDRAWAL.
 
@@ -269,8 +272,8 @@ async def reserve_withdrawal(
     if total <= 0:
         raise LedgerError("withdrawal total must be positive")
 
-    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
-    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id, wallet=wallet)
     if available.balance < total:
         asset = await db.get(Asset, asset_id)
         raise InsufficientFunds(asset.symbol if asset else str(asset_id), total, available.balance)
@@ -293,6 +296,7 @@ async def settle_withdrawal(
     fee: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
     """Finalise a confirmed withdrawal: the amount leaves the system, the fee becomes revenue.
 
@@ -302,7 +306,7 @@ async def settle_withdrawal(
     if amount <= 0 or fee < 0:
         raise LedgerError("bad settle amounts")
 
-    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id)
+    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id, wallet=wallet)
     external = await get_or_create_account(db, asset_id, AccountType.EXTERNAL)
     movements = [Movement(pending, -(amount + fee)), Movement(external, amount)]
     if fee > 0:
@@ -326,13 +330,14 @@ async def refund_withdrawal(
     total: Decimal,
     idempotency_key: str,
     reference: str | None = None,
+    wallet: str = WALLET_SPOT,
 ) -> LedgerTransaction | None:
     """Return a failed or cancelled withdrawal's funds: PENDING_WITHDRAWAL -> AVAILABLE."""
     if total <= 0:
         raise LedgerError("refund total must be positive")
 
-    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id)
-    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id)
+    pending = await get_or_create_account(db, asset_id, AccountType.PENDING_WITHDRAWAL, user_id, wallet=wallet)
+    available = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
     return await post(
         db,
         idempotency_key=idempotency_key,

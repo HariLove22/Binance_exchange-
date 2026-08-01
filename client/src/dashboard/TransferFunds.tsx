@@ -12,8 +12,8 @@ const WALLETS = [
 
 /** Universal internal transfer — move any asset between your own wallets (Spot ⇄ Margin ⇄ Futures). */
 export function TransferModal({ onClose, onDone }: { onClose: () => void; onDone?: () => void }) {
-  const [from, setFrom] = useState("SPOT");
-  const [to, setTo] = useState("FUTURES");
+  const [from, setFrom] = useState("FUNDING");
+  const [to, setTo] = useState("SPOT");
   const [asset, setAsset] = useState("USDT");
   const [amount, setAmount] = useState("");
   const [bals, setBals] = useState<Balance[]>([]);

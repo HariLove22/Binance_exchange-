@@ -77,6 +77,9 @@ class AccountType(str, enum.Enum):
 # Which wallet an account belongs to. SPOT is the default everything has used until now; MARGIN is
 # the cross-margin sub-wallet; isolated margin uses "MARGIN:{symbol}". A user's spendable USDT in
 # spot and in margin are different accounts, so margin risk never touches spot funds.
+# FUNDING is the main wallet: external money (deposits, withdrawals, on-ramp) lives here. To trade you
+# transfer from FUNDING into a trading wallet (SPOT / MARGIN / FUTURES). Trading never touches FUNDING.
+WALLET_FUNDING = "FUNDING"
 WALLET_SPOT = "SPOT"
 WALLET_MARGIN = "MARGIN"
 WALLET_FUTURES = "FUTURES"

@@ -169,6 +169,7 @@ async def credit_if_confirmed(db: AsyncSession, deposit: Deposit) -> Deposit:
         # constraint uses, so a credit is exactly-once from both directions.
         idempotency_key=f"deposit:{deposit.asset_network_id}:{deposit.tx_hash}:{deposit.vout}",
         reference=f"tx={deposit.tx_hash}",
+        wallet=ledger.WALLET_FUNDING,  # external money lands in the main (Funding) wallet
     )
     deposit.status = DepositStatus.CREDITED
     if txn is not None:
