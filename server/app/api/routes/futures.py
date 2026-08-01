@@ -1,153 +1,128 @@
-"""Futures endpoints: open and close leveraged positions, and list your positions.
-
-Positions settle against the mark price — the live reference price, the same feed spot stops use.
-Opening/closing runs in one request and one transaction; on any error nothing moves.
-"""
+"""Perpetual futures endpoints: collateral, open/close positions, account with live PnL."""
 
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.config import settings
 from app.core.db import get_db
-from app.models import AccountType, FuturesPosition, PositionSide, PositionStatus, User
-from app.services import futures, ledger, marketmaker
+from app.models import PositionSide, User, WALLET_FUTURES
+from app.services import futures, kyc, ledger, marketmaker
 from app.services.futures import FuturesError
+from app.services.kyc import KycRequired
 
 router = APIRouter(prefix="/futures", tags=["futures"])
 
-# USDT asset id — the quote every market settles in. Seeded first, so id 1 in every environment.
-USDT_ASSET_ID = 1
-FAUCET_USDT = Decimal("10000")
+# Mark price for a perp symbol is the live index from the public feed.
+mark_of = marketmaker.fetch_reference_price
 
 
-@router.post("/faucet", status_code=status.HTTP_201_CREATED)
-async def faucet(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Dev-only: credit the caller 10,000 test USDT to their spot wallet, so futures can be tried
-    without a real deposit. A no-op stand-in for funding; refuses to run outside development."""
-    if settings.environment.lower() not in {"development", "dev", "local", "test"}:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "faucet is dev-only")
-    import uuid
-
-    await ledger.credit(db, user_id=user.id, asset_id=USDT_ASSET_ID, amount=FAUCET_USDT,
-                        kind=ledger.TransactionKind.ADMIN_CREDIT, idempotency_key=f"faucet:{user.id}:{uuid.uuid4()}")
-    await db.commit()
-    bal = await ledger.get_or_create_account(db, USDT_ASSET_ID, AccountType.AVAILABLE, user.id)
-    return {"credited": f"{FAUCET_USDT:f}", "available": f"{bal.balance:f}"}
+def _n(d: Decimal) -> str:
+    return f"{d.normalize():f}"
 
 
-class OpenRequest(BaseModel):
+def _dec(v: str, field: str) -> Decimal:
+    try:
+        return Decimal(v)
+    except InvalidOperation:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"bad number in {field}") from None
+
+
+class TransferRequest(BaseModel):
+    amount: str
+    deposit: bool  # True: spot -> futures
+
+
+class OrderRequest(BaseModel):
     symbol: str
     side: PositionSide
+    size: str
     leverage: str
-    quantity: str
 
 
-class PositionOut(BaseModel):
+class PositionRow(BaseModel):
     id: int
     symbol: str
     side: str
-    leverage: str
     size: str
     entry_price: str
+    leverage: str
     margin: str
-    liquidation_price: str
-    realized_pnl: str
-    status: str
-    mark_price: str | None
+    mark: str | None
     unrealized_pnl: str | None
-    created_at: str
-    closed_at: str | None
+    roe: str | None
+    liquidation_price: str
 
 
-def _fmt(v: Decimal) -> str:
-    return f"{v.normalize():f}"
+class AccountResponse(BaseModel):
+    balance_usdt: str
+    positions: list[PositionRow]
 
 
-def _position_out(pos: FuturesPosition, mark: Decimal | None) -> PositionOut:
-    upnl = (
-        futures.unrealized_pnl(pos.side, pos.entry_price, mark, pos.size)
-        if mark is not None and pos.status is PositionStatus.OPEN
-        else None
-    )
-    return PositionOut(
-        id=pos.id, symbol=pos.symbol, side=pos.side.value, leverage=_fmt(pos.leverage),
-        size=_fmt(pos.size), entry_price=_fmt(pos.entry_price), margin=_fmt(pos.margin),
-        liquidation_price=_fmt(pos.liquidation_price), realized_pnl=_fmt(pos.realized_pnl),
-        status=pos.status.value, mark_price=_fmt(mark) if mark is not None else None,
-        unrealized_pnl=_fmt(upnl) if upnl is not None else None,
-        created_at=pos.created_at.isoformat(), closed_at=pos.closed_at.isoformat() if pos.closed_at else None,
-    )
+async def _positions(db: AsyncSession, user_id: int) -> list[PositionRow]:
+    rows: list[PositionRow] = []
+    for p in await futures.open_positions(db, user_id):
+        mark = await mark_of(p.symbol)
+        st = futures.position_state(p, mark) if mark else None
+        rows.append(PositionRow(
+            id=p.id, symbol=p.symbol, side=p.side.value, size=_n(p.size), entry_price=_n(p.entry_price),
+            leverage=_n(p.leverage), margin=_n(p.margin),
+            mark=_n(mark) if mark else None,
+            unrealized_pnl=_n(st["unrealized_pnl"]) if st else None,
+            roe=_n(st["roe"]) if st else None,
+            liquidation_price=_n(futures.liquidation_price(p)),
+        ))
+    return rows
 
 
-async def _mark(symbol: str) -> Decimal:
-    price = await marketmaker.fetch_reference_price(symbol.upper())
-    if price is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"no reference price for {symbol}")
-    return price
+async def _balance(db: AsyncSession, user_id: int) -> str:
+    for b in await ledger.balances(db, user_id, wallet=WALLET_FUTURES):
+        if b.symbol == "USDT":
+            return _n(b.available)
+    return "0"
 
 
-@router.post("/position", response_model=PositionOut, status_code=status.HTTP_201_CREATED)
-async def open_position(
-    body: OpenRequest,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+@router.get("/account", response_model=AccountResponse)
+async def account(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return AccountResponse(balance_usdt=await _balance(db, user.id), positions=await _positions(db, user.id))
+
+
+@router.post("/transfer", response_model=AccountResponse)
+async def transfer(body: TransferRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
-        leverage = Decimal(body.leverage)
-        quantity = Decimal(body.quantity)
-    except InvalidOperation:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "bad number") from None
+        await futures.transfer_collateral(db, user_id=user.id, amount=_dec(body.amount, "amount"), deposit=body.deposit)
+    except FuturesError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    await db.commit()
+    return AccountResponse(balance_usdt=await _balance(db, user.id), positions=await _positions(db, user.id))
 
-    mark = await _mark(body.symbol)
+
+@router.post("/order", status_code=status.HTTP_201_CREATED)
+async def open_order(body: OrderRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    try:
+        await kyc.assert_approved(db, user.id)
+    except KycRequired as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     try:
         pos = await futures.open_position(
-            db, user_id=user.id, symbol=body.symbol, side=body.side,
-            leverage=leverage, quantity=quantity, mark_price=mark,
+            db, user_id=user.id, symbol=body.symbol, side=body.side, size=_dec(body.size, "size"),
+            leverage=_dec(body.leverage, "leverage"), price_of=mark_of,
         )
     except FuturesError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
-    return _position_out(pos, mark)
+    return {"id": pos.id, "symbol": pos.symbol, "side": pos.side.value, "entry_price": _n(pos.entry_price),
+            "size": _n(pos.size), "margin": _n(pos.margin)}
 
 
-@router.post("/position/{position_id}/close", response_model=PositionOut)
-async def close_position(
-    position_id: int,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    pos = await db.get(FuturesPosition, position_id)
-    if pos is None or pos.user_id != user.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "position not found")
-
-    mark = await _mark(pos.symbol)
+@router.post("/close/{position_id}")
+async def close(position_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
-        await futures.close_position(db, position=pos, mark_price=mark)
+        pos = await futures.close_position(db, user_id=user.id, position_id=position_id, price_of=mark_of)
     except FuturesError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     await db.commit()
-    return _position_out(pos, mark)
-
-
-@router.get("/positions", response_model=list[PositionOut])
-async def list_positions(
-    include_closed: bool = Query(default=False),
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    q = select(FuturesPosition).where(FuturesPosition.user_id == user.id)
-    if not include_closed:
-        q = q.where(FuturesPosition.status == PositionStatus.OPEN)
-    positions = list((await db.execute(q.order_by(FuturesPosition.id.desc()))).scalars().all())
-
-    # One reference-price fetch per distinct open symbol, for a live PnL snapshot.
-    marks: dict[str, Decimal | None] = {}
-    for p in positions:
-        if p.status is PositionStatus.OPEN and p.symbol not in marks:
-            marks[p.symbol] = await marketmaker.fetch_reference_price(p.symbol)
-    return [_position_out(p, marks.get(p.symbol)) for p in positions]
+    return {"id": pos.id, "status": pos.status.value, "close_price": _n(pos.close_price or Decimal(0)),
+            "realized_pnl": _n(pos.realized_pnl)}

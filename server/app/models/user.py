@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -42,6 +42,13 @@ class User(Base):
     # A short unique code others use to sign up under this user (referral program). Generated lazily
     # on first access, so existing accounts get one too.
     referral_code: Mapped[str | None] = mapped_column(String(12), unique=True, nullable=True)
+
+    # Set on a sub-account: the master user who created and manages it. A sub-account is a real user
+    # (own balances, own ledger accounts) that cannot log in independently — the master moves funds
+    # in and out. NULL for a normal top-level account.
+    parent_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
 
     # Email-verification flag. While verification is disabled, registration sets this True
     # immediately; when enabled, it stays False until the user clicks the emailed link.

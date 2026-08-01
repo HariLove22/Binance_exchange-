@@ -6,13 +6,22 @@ Demo. The demo endpoints run a risk-free sandbox — virtual funds, live prices,
 
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
-from app.models import MarginMode, OrderSide, User
+from app.models import (
+    Account,
+    Asset,
+    LedgerEntry,
+    LedgerTransaction,
+    MarginMode,
+    OrderSide,
+    User,
+)
 from app.services import demo, ledger, margin
 from app.services.demo import DemoError
 from app.services.pricing import usd_price_of
@@ -140,6 +149,90 @@ async def reset_demo(user: User = Depends(get_current_user), db: AsyncSession = 
     await demo.reset_account(db, account)
     await db.commit()
     return await _demo_response(db, account)
+
+
+# --- statement & reports --------------------------------------------------------------------------
+
+class StatementRow(BaseModel):
+    time: str
+    kind: str
+    asset: str
+    amount: str  # signed: + credit, - debit
+
+
+@router.get("/statement", response_model=list[StatementRow])
+async def statement(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(100, le=500),
+):
+    """Recent ledger movements on the user's accounts — a plain account statement."""
+    rows = (
+        await db.execute(
+            select(LedgerEntry.amount, LedgerTransaction.kind, LedgerTransaction.created_at, Asset.symbol)
+            .join(Account, Account.id == LedgerEntry.account_id)
+            .join(LedgerTransaction, LedgerTransaction.id == LedgerEntry.transaction_id)
+            .join(Asset, Asset.id == LedgerEntry.asset_id)
+            .where(Account.user_id == user.id)
+            .order_by(LedgerEntry.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        StatementRow(time=created.isoformat(), kind=kind.value, asset=sym, amount=f"{amount.normalize():f}")
+        for amount, kind, created, sym in rows
+    ]
+
+
+class ReportsResponse(BaseModel):
+    deposits_usd: str
+    withdrawals_usd: str
+    rewards_usd: str
+    referral_usd: str
+    trades: int
+    net_flow_usd: str
+
+
+@router.get("/reports", response_model=ReportsResponse)
+async def reports(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """A financial summary: deposits, withdrawals, rewards, referral earnings, and trade count."""
+    from app.models import Order, Trade, TransactionKind
+
+    # Sum the user's credit entries by transaction kind, valued in USD.
+    rows = (
+        await db.execute(
+            select(LedgerTransaction.kind, Asset.symbol, LedgerEntry.amount)
+            .join(Account, Account.id == LedgerEntry.account_id)
+            .join(LedgerTransaction, LedgerTransaction.id == LedgerEntry.transaction_id)
+            .join(Asset, Asset.id == LedgerEntry.asset_id)
+            .where(Account.user_id == user.id)
+        )
+    ).all()
+
+    totals: dict[str, Decimal] = {}
+    price_cache: dict[str, Decimal] = {}
+    for kind, sym, amount in rows:
+        if sym not in price_cache:
+            price_cache[sym] = (await usd_price_of(sym)) or Decimal(0)
+        usd = amount * price_cache[sym]
+        totals[kind.value] = totals.get(kind.value, Decimal(0)) + usd
+
+    def pos(kind: str) -> Decimal:
+        return max(Decimal(0), totals.get(kind, Decimal(0)))
+
+    deposits = pos(TransactionKind.DEPOSIT.value) + pos(TransactionKind.ADMIN_CREDIT.value)
+    withdrawals = -min(Decimal(0), totals.get(TransactionKind.WITHDRAWAL.value, Decimal(0)))
+    rewards = pos(TransactionKind.REWARD.value)
+    referral = pos(TransactionKind.REFERRAL.value)
+
+    trade_count = (await db.execute(
+        select(Trade.id).join(Order, Order.id == Trade.taker_order_id).where(Order.user_id == user.id)
+    )).all()
+
+    return ReportsResponse(
+        deposits_usd=_n(deposits), withdrawals_usd=_n(withdrawals), rewards_usd=_n(rewards),
+        referral_usd=_n(referral), trades=len(trade_count), net_flow_usd=_n(deposits - withdrawals),
+    )
 
 
 @router.post("/demo/trade", response_model=DemoResponse)

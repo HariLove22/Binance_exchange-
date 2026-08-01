@@ -7,7 +7,8 @@ import { Orders } from "./Orders";
 import { Trade } from "./Trade";
 import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
-import { Futures } from "./Futures";
+import { FuturesTrade } from "./FuturesTrade";
+import { Options } from "./Options";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
 import { Markets } from "./Markets";
@@ -19,6 +20,8 @@ import { LangCurrency } from "./LangCurrency";
 import { Referral } from "./Referral";
 import { Vip } from "./Vip";
 import { Rewards } from "./Rewards";
+import { SubAccounts } from "./SubAccounts";
+import { ApiManagement, Statement, Reports, Payment } from "./AccountSections";
 import {
   IDeposit,
   IGear,
@@ -32,7 +35,8 @@ import {
 } from "./icons";
 import "./dashboard.css";
 
-type NavItem = { key: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> };
+type NavChild = { key: string; label: string };
+type NavItem = { key: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>>; children?: NavChild[] };
 
 // key is the path segment after /dashboard ("" = the overview root).
 const NAV: NavItem[] = [
@@ -41,7 +45,18 @@ const NAV: NavItem[] = [
   { key: "orders", label: "Orders", icon: IList },
   { key: "rewards", label: "Rewards Hub", icon: IGift },
   { key: "referral", label: "Referral", icon: IUsers },
-  { key: "account", label: "Account", icon: IUser },
+  {
+    key: "account", label: "Account", icon: IUser,
+    children: [
+      { key: "account", label: "Trading Accounts" },
+      { key: "verification", label: "Identification" },
+      { key: "settings", label: "Security" },
+      { key: "payment", label: "Payment" },
+      { key: "api", label: "API Management" },
+      { key: "statement", label: "Account Statement" },
+      { key: "reports", label: "Financial Reports" },
+    ],
+  },
   { key: "subaccounts", label: "Sub Accounts", icon: IUsersBox },
   { key: "settings", label: "Settings", icon: IGear },
 ];
@@ -52,6 +67,7 @@ const TRADE_OPTIONS: TradeOption[] = [
   { label: "Spot", desc: "Trade crypto on the order book", to: "/dashboard/trade" },
   { label: "Margin", desc: "Trade with leverage", to: "/dashboard/margin" },
   { label: "P2P", desc: "Buy & sell with bank transfer", to: "/dashboard/p2p" },
+  { label: "Options", desc: "Calls & puts, cash-settled", to: "/dashboard/options" },
   { label: "Convert", desc: "Instant swap — not built yet", tag: "soon" },
   { label: "Demo Trading", desc: "Practice with virtual funds — not built yet", tag: "soon" },
 ];
@@ -66,6 +82,7 @@ export function Dashboard({ path }: { path: string }) {
   const seg = segmentOf(path);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
+  const [accOpen, setAccOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const tradeRef = useRef<HTMLDivElement>(null);
 
@@ -159,11 +176,34 @@ export function Dashboard({ path }: { path: string }) {
       </header>
 
       {/* The trading terminal takes the full width — hide the sidebar there, like Binance. */}
-      <div className={`dash-body ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
-        {seg !== "trade" && seg !== "margin" && (
+      <div className={`dash-body ${seg === "trade" || seg === "margin" || seg === "futures" ? "full" : ""}`}>
+        {seg !== "trade" && seg !== "margin" && seg !== "futures" && (
           <aside className="dash-side">
             {NAV.map((n) => {
               const Icon = n.icon;
+              if (n.children) {
+                const childActive = n.children.some((c) => c.key === seg);
+                const open = accOpen || childActive;
+                return (
+                  <div key={n.key} className="side-group">
+                    <button className={`side-item ${childActive ? "active" : ""}`} onClick={() => setAccOpen((o) => !o)}>
+                      <Icon />
+                      {n.label}
+                      <span className={`side-caret ${open ? "open" : ""}`}>⌄</span>
+                    </button>
+                    {open && (
+                      <div className="side-sub">
+                        {n.children.map((c) => (
+                          <button key={c.key} className={`side-subitem ${c.key === seg ? "active" : ""}`}
+                                  onClick={() => navigate(`/dashboard/${c.key}`)}>
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               return (
                 <button
                   key={n.key || "home"}
@@ -178,7 +218,7 @@ export function Dashboard({ path }: { path: string }) {
           </aside>
         )}
 
-        <main className={`dash-main ${seg === "trade" || seg === "margin" ? "full" : ""}`}>
+        <main className={`dash-main ${seg === "trade" || seg === "margin" || seg === "futures" ? "full" : ""}`}>
           {seg === "" ? (
             <Overview user={user} />
           ) : seg === "trade" ? (
@@ -192,7 +232,9 @@ export function Dashboard({ path }: { path: string }) {
           ) : seg === "margin" ? (
             <MarginTrade />
           ) : seg === "futures" ? (
-            <Futures />
+            <FuturesTrade />
+          ) : seg === "options" ? (
+            <Options />
           ) : seg === "assets" ? (
             <Assets />
           ) : seg === "verification" ? (
@@ -205,6 +247,16 @@ export function Dashboard({ path }: { path: string }) {
             <Vip />
           ) : seg === "rewards" ? (
             <Rewards />
+          ) : seg === "subaccounts" ? (
+            <SubAccounts />
+          ) : seg === "api" ? (
+            <ApiManagement />
+          ) : seg === "statement" ? (
+            <Statement />
+          ) : seg === "reports" ? (
+            <Reports />
+          ) : seg === "payment" ? (
+            <Payment />
           ) : seg === "account" ? (
             <Account />
           ) : seg === "settings" ? (

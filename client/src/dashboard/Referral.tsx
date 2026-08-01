@@ -24,9 +24,18 @@ export function Referral() {
 
   return (
     <div className="ref">
-      <div className="ref-head">
-        <h1>Referral</h1>
-        <p className="ref-sub">Invite friends and earn {data ? Number(data.commission_rate).toFixed(0) : "20"}% of their trading fees, forever.</p>
+      <div className="ref-hero">
+        <h1>Refer friends, earn together 🎉</h1>
+        <p>Share your link and earn <b>{data ? Number(data.commission_rate).toFixed(0) : "20"}%</b> of every friend's trading fees — for life. The more they trade, the more you earn.</p>
+      </div>
+
+      <div className="ref-steps">
+        <GuideStep n={1} title="Share your link"
+          body="Copy your unique referral code or link and send it to friends." icon="🔗" />
+        <GuideStep n={2} title="Friends sign up & trade"
+          body="They join with your code and start trading on Spot or Margin." icon="👥" />
+        <GuideStep n={3} title={`Earn ${data ? Number(data.commission_rate).toFixed(0) : "20"}% forever`}
+          body="You get a cut of their trading fees, credited straight to your wallet." icon="💰" />
       </div>
 
       {err && <p className="ref-err">{err}</p>}
@@ -76,4 +85,14 @@ export function Referral() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="ref-stat"><span>{label}</span><b>{value}</b></div>;
+}
+
+function GuideStep({ n, title, body, icon }: { n: number; title: string; body: string; icon: string }) {
+  return (
+    <div className="ref-step">
+      <div className="ref-step-top"><span className="ref-step-n">{n}</span><span className="ref-step-icon">{icon}</span></div>
+      <h3>{title}</h3>
+      <p>{body}</p>
+    </div>
+  );
 }

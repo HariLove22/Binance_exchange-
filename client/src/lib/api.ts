@@ -122,6 +122,91 @@ export interface ReferralSummary {
   referrals: ReferralRow[];
 }
 
+export interface OptionChain {
+  underlying: string;
+  spot: string;
+  expiries: string[];
+  strikes: string[];
+}
+export interface OptionSel {
+  underlying: string;
+  type: "CALL" | "PUT";
+  strike: string;
+  expiry: string;
+  size: string;
+}
+export interface OptionPosition {
+  id: number;
+  underlying: string;
+  type: string;
+  strike: string;
+  size: string;
+  premium_paid: string;
+  expiry: string;
+  status: string;
+  payout: string;
+  mark: string | null;
+}
+
+export interface FuturesPosition {
+  id: number;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  size: string;
+  entry_price: string;
+  leverage: string;
+  margin: string;
+  mark: string | null;
+  unrealized_pnl: string | null;
+  roe: string | null;
+  liquidation_price: string;
+}
+export interface FuturesAccount {
+  balance_usdt: string;
+  positions: FuturesPosition[];
+}
+
+export interface ApiKeyRow {
+  id: number;
+  label: string;
+  key: string;
+  can_read: boolean;
+  can_trade: boolean;
+  can_withdraw: boolean;
+  created_at: string;
+  last_used_at: string | null;
+}
+export interface ApiKeyCreated extends ApiKeyRow {
+  secret: string;
+}
+export interface StatementRow {
+  time: string;
+  kind: string;
+  asset: string;
+  amount: string;
+}
+export interface AccountReports {
+  deposits_usd: string;
+  withdrawals_usd: string;
+  rewards_usd: string;
+  referral_usd: string;
+  trades: number;
+  net_flow_usd: string;
+}
+
+export interface SubBalanceRow {
+  asset: string;
+  available: string;
+  locked: string;
+}
+export interface SubAccount {
+  id: number;
+  label: string;
+  created_at: string;
+  value_usd: string;
+  balances: SubBalanceRow[];
+}
+
 export interface RewardTask {
   id: string;
   title: string;
@@ -316,6 +401,29 @@ export const api = {
   // kyc
   referralMe: () => request<ReferralSummary>("/referral/me"),
   vipMe: () => request<VipStatus>("/vip/me"),
+  optionsChain: (underlying: string) => request<OptionChain>(`/options/chain?underlying=${underlying}`),
+  optionsQuote: (body: OptionSel) => request<{ premium_per_unit: string; total_premium: string }>("/options/quote", { method: "POST", body: JSON.stringify(body) }),
+  optionsBuy: (body: OptionSel) => request<{ id: number; premium_paid: string; expiry: string }>("/options/buy", { method: "POST", body: JSON.stringify(body) }),
+  optionsPositions: () => request<OptionPosition[]>("/options/positions"),
+
+  futuresAccount: () => request<FuturesAccount>("/futures/account"),
+  futuresTransfer: (amount: string, deposit: boolean) =>
+    request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit }) }),
+  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string }) =>
+    request<{ id: number; entry_price: string; margin: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
+  futuresClose: (id: number) => request<{ status: string; close_price: string; realized_pnl: string }>(`/futures/close/${id}`, { method: "POST" }),
+
+  apiKeys: () => request<ApiKeyRow[]>("/apikeys"),
+  apiKeyCreate: (body: { label: string; can_trade: boolean; can_withdraw: boolean }) =>
+    request<ApiKeyCreated>("/apikeys", { method: "POST", body: JSON.stringify(body) }),
+  apiKeyRevoke: (id: number) => request<void>(`/apikeys/${id}`, { method: "DELETE" }),
+  accountStatement: () => request<StatementRow[]>("/account/statement"),
+  accountReports: () => request<AccountReports>("/account/reports"),
+
+  subAccounts: () => request<SubAccount[]>("/subaccounts"),
+  subCreate: (label: string) => request<SubAccount>("/subaccounts", { method: "POST", body: JSON.stringify({ label }) }),
+  subTransfer: (body: { sub_id: number; asset: string; amount: string; to_sub: boolean }) =>
+    request<SubAccount[]>("/subaccounts/transfer", { method: "POST", body: JSON.stringify(body) }),
   rewardsMe: () => request<RewardsResponse>("/rewards/me"),
   rewardsClaim: (taskId: string) => request<RewardsResponse>("/rewards/claim", { method: "POST", body: JSON.stringify({ task_id: taskId }) }),
 
@@ -468,34 +576,7 @@ export const api = {
     request<MarginAccount>("/margin/repay", { method: "POST", body: JSON.stringify(body) }),
   marginOrder: (body: { mode?: string; symbol: string; side: "BUY" | "SELL"; type?: "LIMIT" | "MARKET"; quantity: string; price?: string | null; auto_borrow?: boolean }) =>
     request<{ id: number; status: string; filled_quantity: string; quantity: string; wallet: string }>("/margin/order", { method: "POST", body: JSON.stringify(body) }),
-
-  // futures
-  futuresOpen: (body: { symbol: string; side: "LONG" | "SHORT"; leverage: string; quantity: string }) =>
-    request<FuturesPosition>("/futures/position", { method: "POST", body: JSON.stringify(body) }),
-  futuresClose: (id: number) =>
-    request<FuturesPosition>(`/futures/position/${id}/close`, { method: "POST" }),
-  futuresPositions: (includeClosed = false) =>
-    request<FuturesPosition[]>(`/futures/positions?include_closed=${includeClosed}`),
-  futuresFaucet: () =>
-    request<{ credited: string; available: string }>("/futures/faucet", { method: "POST" }),
 };
-
-export interface FuturesPosition {
-  id: number;
-  symbol: string;
-  side: "LONG" | "SHORT";
-  leverage: string;
-  size: string;
-  entry_price: string;
-  margin: string;
-  liquidation_price: string;
-  realized_pnl: string;
-  status: string;
-  mark_price: string | null;      // live, from the server snapshot; null once closed
-  unrealized_pnl: string | null;  // live PnL for an open position
-  created_at: string;
-  closed_at: string | null;
-}
 
 export interface MarginLoanRow {
   id: number;

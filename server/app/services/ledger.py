@@ -540,6 +540,35 @@ async def margin_repay(
     )
 
 
+async def internal_transfer(
+    db: AsyncSession,
+    *,
+    from_user_id: int,
+    to_user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move AVAILABLE funds from one user to another (e.g. master ↔ sub-account). Zero-sum, on-books."""
+    if amount <= 0:
+        raise LedgerError("transfer amount must be positive")
+    if from_user_id == to_user_id:
+        raise LedgerError("cannot transfer to the same account")
+    src = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, from_user_id)
+    if src.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, src.balance)
+    dst = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, to_user_id)
+    return await post(
+        db,
+        idempotency_key=idempotency_key,
+        kind=TransactionKind.ADJUSTMENT,
+        reference=reference,
+        movements=[Movement(src, -amount), Movement(dst, amount)],
+    )
+
+
 async def pay_referral(
     db: AsyncSession,
     *,
@@ -567,6 +596,74 @@ async def pay_referral(
         kind=TransactionKind.REFERRAL,
         reference=reference,
         movements=[Movement(fee_income, -amount), Movement(referrer, amount)],
+    )
+
+
+async def house_transfer(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    amount: Decimal,
+    to_house: bool,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move funds between a user and the derivatives house pool (FUTURES_INSURANCE).
+
+    `to_house` True: user pays the house (an option premium). False: the house pays the user (a
+    settlement payout). Balanced to zero; the pool may go negative.
+    """
+    if amount <= 0:
+        return None
+    avail = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=WALLET_SPOT)
+    house = await get_or_create_account(db, asset_id, AccountType.FUTURES_INSURANCE)
+    if to_house and avail.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, avail.balance)
+    delta = -amount if to_house else amount
+    return await post(
+        db, idempotency_key=idempotency_key, kind=TransactionKind.TRADE, reference=reference,
+        movements=[Movement(avail, delta), Movement(house, -delta)],
+    )
+
+
+async def futures_close(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_id: int,
+    margin: Decimal,
+    pnl: Decimal,
+    fee: Decimal,
+    wallet: str,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Settle a closed futures position: release margin, apply PnL vs the insurance pool, take the fee.
+
+    The user receives max(0, margin + pnl - fee); the insurance pool nets the rest (it pays profits,
+    absorbs losses). Balanced to zero in the settlement asset by construction.
+    ponytail: user_out is floored at 0 — a loss past the margin is bad debt the pool eats. Liquidation
+    (Stage 2) keeps that from happening in practice.
+    """
+    locked = await get_or_create_account(db, asset_id, AccountType.LOCKED, user_id, wallet=wallet)
+    avail = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, user_id, wallet=wallet)
+    insurance = await get_or_create_account(db, asset_id, AccountType.FUTURES_INSURANCE)
+
+    user_out = max(Decimal(0), margin + pnl - fee)
+    insurance_delta = margin - user_out - fee   # makes the whole posting sum to zero
+
+    movements = [Movement(locked, -margin)]
+    if user_out > 0:
+        movements.append(Movement(avail, user_out))
+    if fee > 0:
+        movements.append(Movement(await get_or_create_account(db, asset_id, AccountType.FEE_INCOME), fee))
+    if insurance_delta != 0:
+        movements.append(Movement(insurance, insurance_delta))
+
+    return await post(
+        db, idempotency_key=idempotency_key, kind=TransactionKind.TRADE, reference=reference, movements=movements,
     )
 
 

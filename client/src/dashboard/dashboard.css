@@ -1867,3 +1867,12 @@
 .bal-r { border-bottom: 1px solid #121a16; }
 .asset-empty { padding: 1.4rem; text-align: center; color: #7c8b83; font-size: 0.85rem; }
 .asset-err { color: #f6465d; font-size: 0.82rem; padding: 0.4rem 0; }
+
+/* sidebar expandable group */
+.side-group { display: flex; flex-direction: column; }
+.side-caret { margin-left: auto; font-size: 0.9rem; transition: transform 0.2s; color: var(--text-faint); }
+.side-caret.open { transform: rotate(180deg); }
+.side-sub { display: flex; flex-direction: column; margin: 0.1rem 0 0.2rem; }
+.side-subitem { text-align: left; background: none; border: none; color: var(--text-faint); font: inherit; font-size: 0.86rem; padding: 0.5rem 0.85rem 0.5rem 2.6rem; border-radius: 8px; cursor: pointer; }
+.side-subitem:hover { background: var(--surface-2); color: var(--text); }
+.side-subitem.active { background: var(--surface-2); color: var(--gold); font-weight: 600; }

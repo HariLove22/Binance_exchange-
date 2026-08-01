@@ -69,9 +69,9 @@ class AccountType(str, enum.Enum):
     # The margin lending pool, per asset (system-owned). Goes negative by the amount lent out to
     # margin borrowers — its magnitude is the exchange's outstanding margin loans in that asset.
     MARGIN_BORROWED = "MARGIN_BORROWED"
-    # The futures settlement pool, per asset (system-owned). The house side of every position's PnL:
-    # a trader's win is paid from it, a loss is swept into it. Goes negative when traders are net up.
-    FUTURES_POOL = "FUTURES_POOL"
+    # Futures insurance / PnL counterparty pool (system-owned). Traders' realized profit is paid from
+    # it and their losses paid into it; it may go negative (covered by fees / capital).
+    FUTURES_INSURANCE = "FUTURES_INSURANCE"
 
 
 # Which wallet an account belongs to. SPOT is the default everything has used until now; MARGIN is
@@ -93,7 +93,7 @@ USER_ACCOUNT_TYPES = frozenset(
 # May legitimately go negative. EXTERNAL is negative by construction; TDS accrues as a liability;
 # MARGIN_BORROWED is negative by the amount the pool has lent to margin borrowers.
 NEGATIVE_ALLOWED = frozenset(
-    {AccountType.EXTERNAL, AccountType.TDS_PAYABLE, AccountType.MARGIN_BORROWED, AccountType.FUTURES_POOL}
+    {AccountType.EXTERNAL, AccountType.TDS_PAYABLE, AccountType.MARGIN_BORROWED, AccountType.FUTURES_INSURANCE}
 )
 
 
@@ -171,7 +171,7 @@ class Account(TimestampMixin, Base):
         # A negative user balance means we let someone spend money they did not have. The margin
         # pool is the sanctioned exception alongside EXTERNAL/TDS.
         CheckConstraint(
-            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE', 'MARGIN_BORROWED', 'FUTURES_POOL')",
+            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE', 'MARGIN_BORROWED', 'FUTURES_INSURANCE')",
             name="ck_accounts_no_negative_user_balance",
         ),
     )

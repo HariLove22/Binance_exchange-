@@ -1,0 +1,40 @@
+.sa { max-width: 960px; margin: 0 auto; padding: 1rem 1.2rem 2rem; color: var(--text); }
+.sa-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+.sa-head h1 { font-size: 1.4rem; margin: 0; }
+.sa-sub { color: var(--text-faint); font-size: 0.85rem; margin: 0.3rem 0 0; }
+.sa-head-right { display: flex; align-items: center; gap: 1.2rem; }
+.sa-add { background: var(--gold); color: #04170e; border: none; border-radius: 8px; padding: 0.55rem 1rem; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sa-total { text-align: right; }
+.sa-total span { display: block; font-size: 0.7rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+.sa-total b { font-size: 1.4rem; font-family: ui-monospace, monospace; }
+.sa-err { color: #f6465d; font-size: 0.85rem; }
+.sa-empty { border: 1px dashed var(--border); border-radius: 12px; padding: 1.6rem; text-align: center; }
+
+.sa-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.sa-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem; }
+.sa-card-top { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.8rem; }
+.sa-avatar { width: 38px; height: 38px; border-radius: 10px; background: var(--surface-3); display: grid; place-items: center; font-weight: 700; color: var(--gold); }
+.sa-id { flex: 1; }
+.sa-label { font-weight: 600; font-size: 0.95rem; }
+.sa-meta { font-size: 0.72rem; color: var(--text-faint); }
+.sa-val { font-family: ui-monospace, monospace; font-weight: 600; }
+.sa-bals { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 1.5rem; margin-bottom: 0.9rem; }
+.sa-bal { font-size: 0.76rem; background: var(--surface-2); padding: 0.2rem 0.5rem; border-radius: 6px; font-family: ui-monospace, monospace; }
+.dim { color: var(--text-faint); font-size: 0.8rem; }
+.sa-xfer-btn { width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font: inherit; font-size: 0.85rem; padding: 0.5rem; border-radius: 8px; cursor: pointer; }
+
+.sa-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: grid; place-items: center; z-index: 60; padding: 1rem; }
+.sa-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 380px; padding: 1.3rem; }
+.sa-box-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.sa-box-h h3 { margin: 0; font-size: 1rem; }
+.sa-box-h button { background: none; border: none; color: var(--text-faint); font-size: 1rem; cursor: pointer; }
+.sa-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.72rem; color: var(--text-faint); margin-bottom: 0.9rem; }
+.sa-field input, .sa-frow input, .sa-frow select { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font: inherit; font-size: 0.9rem; padding: 0.55rem 0.7rem; }
+.sa-seg { display: flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; margin-bottom: 0.9rem; }
+.sa-seg button { flex: 1; background: none; border: none; color: var(--text-faint); font: inherit; font-size: 0.82rem; padding: 0.45rem; border-radius: 6px; cursor: pointer; }
+.sa-seg button.on { background: var(--surface-3); color: var(--text); }
+.sa-frow { display: flex; gap: 0.5rem; margin-bottom: 0.9rem; }
+.sa-frow select { min-width: 90px; }
+.sa-frow input { flex: 1; min-width: 0; }
+.sa-primary { width: 100%; background: var(--gold); color: #04170e; border: none; border-radius: 8px; padding: 0.6rem; font: inherit; font-weight: 600; cursor: pointer; }
+.sa-primary:disabled { opacity: 0.5; cursor: not-allowed; }
