@@ -19,6 +19,17 @@
   flex-direction: column;
   gap: 0.9rem;
 }
+.fut-balance {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  font-size: 0.82rem; color: var(--text-dim);
+  padding-bottom: 0.6rem; border-bottom: 1px solid var(--border);
+}
+.fut-balance strong { color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+.fut-faucet {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--gold-2, #fcd535);
+  border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.74rem; cursor: pointer; white-space: nowrap;
+}
+.fut-faucet:hover { border-color: var(--gold); }
 .fut-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .fut-side {
   padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border);

@@ -476,6 +476,8 @@ export const api = {
     request<FuturesPosition>(`/futures/position/${id}/close`, { method: "POST" }),
   futuresPositions: (includeClosed = false) =>
     request<FuturesPosition[]>(`/futures/positions?include_closed=${includeClosed}`),
+  futuresFaucet: () =>
+    request<{ credited: string; available: string }>("/futures/faucet", { method: "POST" }),
 };
 
 export interface FuturesPosition {

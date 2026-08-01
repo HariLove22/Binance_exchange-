@@ -12,12 +12,32 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.core.db import get_db
-from app.models import FuturesPosition, PositionSide, PositionStatus, User
-from app.services import futures, marketmaker
+from app.models import AccountType, FuturesPosition, PositionSide, PositionStatus, User
+from app.services import futures, ledger, marketmaker
 from app.services.futures import FuturesError
 
 router = APIRouter(prefix="/futures", tags=["futures"])
+
+# USDT asset id — the quote every market settles in. Seeded first, so id 1 in every environment.
+USDT_ASSET_ID = 1
+FAUCET_USDT = Decimal("10000")
+
+
+@router.post("/faucet", status_code=status.HTTP_201_CREATED)
+async def faucet(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Dev-only: credit the caller 10,000 test USDT to their spot wallet, so futures can be tried
+    without a real deposit. A no-op stand-in for funding; refuses to run outside development."""
+    if settings.environment.lower() not in {"development", "dev", "local", "test"}:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "faucet is dev-only")
+    import uuid
+
+    await ledger.credit(db, user_id=user.id, asset_id=USDT_ASSET_ID, amount=FAUCET_USDT,
+                        kind=ledger.TransactionKind.ADMIN_CREDIT, idempotency_key=f"faucet:{user.id}:{uuid.uuid4()}")
+    await db.commit()
+    bal = await ledger.get_or_create_account(db, USDT_ASSET_ID, AccountType.AVAILABLE, user.id)
+    return {"credited": f"{FAUCET_USDT:f}", "available": f"{bal.balance:f}"}
 
 
 class OpenRequest(BaseModel):

@@ -24,10 +24,25 @@ export function Futures() {
   const [positions, setPositions] = useState<FuturesPosition[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [usdt, setUsdt] = useState<string | null>(null);
+
+  const loadBalance = () =>
+    api.balances().then((b) => setUsdt(b.find((x) => x.asset === "USDT")?.available ?? "0")).catch(() => {});
 
   useEffect(() => {
     api.marketSymbols().then(setMarkets).catch(() => {});
+    loadBalance();
   }, []);
+
+  async function faucet() {
+    setError("");
+    try {
+      await api.futuresFaucet();
+      loadBalance();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Faucet failed");
+    }
+  }
 
   // Poll open positions for live PnL (server returns mark + unrealized PnL).
   useEffect(() => {
@@ -55,6 +70,7 @@ export function Futures() {
       await api.futuresOpen({ symbol, side, leverage: String(leverage), quantity });
       setQuantity("");
       setPositions(await api.futuresPositions());
+      loadBalance();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not open position");
     } finally {
@@ -67,6 +83,7 @@ export function Futures() {
     try {
       await api.futuresClose(id);
       setPositions(await api.futuresPositions());
+      loadBalance();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not close position");
     }
@@ -81,6 +98,10 @@ export function Futures() {
 
       <div className="fut-grid">
         <form className="fut-form" onSubmit={open}>
+          <div className="fut-balance">
+            <span>Futures margin (USDT): <strong>{usdt === null ? "…" : Number(usdt).toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong></span>
+            <button type="button" className="fut-faucet" onClick={faucet}>+ 10,000 test USDT</button>
+          </div>
           <div className="fut-sides">
             <button type="button" className={`fut-side long ${side === "LONG" ? "on" : ""}`} onClick={() => setSide("LONG")}>
               Long
