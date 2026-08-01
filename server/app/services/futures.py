@@ -33,6 +33,11 @@ MAINTENANCE_MARGIN_RATE = Decimal("0.005")  # 0.5% — liquidate when equity fal
 def liquidation_price(pos) -> Decimal:
     """Price at which the position's equity hits maintenance margin and it gets liquidated."""
     mmr = MAINTENANCE_MARGIN_RATE
+    if pos.inverse:
+        if pos.side is PositionSide.LONG:
+            return pos.size * (1 + mmr) / (pos.margin + pos.size / pos.entry_price)
+        denom = pos.size / pos.entry_price - pos.margin
+        return pos.size * (1 - mmr) / denom if denom > 0 else Decimal(0)
     if pos.side is PositionSide.LONG:
         return (pos.entry_price * pos.size - pos.margin) / (pos.size * (1 - mmr))
     return (pos.margin + pos.entry_price * pos.size) / (pos.size * (1 + mmr))
@@ -60,23 +65,38 @@ class FuturesError(Exception):
     """A futures action was refused. Safe to surface to a caller."""
 
 
-async def _quote_asset(db: AsyncSession) -> Asset:
-    a = (await db.execute(select(Asset).where(Asset.symbol == QUOTE))).scalar_one_or_none()
+async def _asset(db: AsyncSession, symbol: str) -> Asset:
+    a = (await db.execute(select(Asset).where(Asset.symbol == symbol))).scalar_one_or_none()
     if a is None:
-        raise FuturesError(f"{QUOTE} is not listed")
+        raise FuturesError(f"{symbol} is not listed")
     return a
 
 
-async def transfer_collateral(db: AsyncSession, *, user_id: int, amount: Decimal, deposit: bool) -> None:
-    """Move USDT margin between the spot wallet and the futures wallet."""
+async def _quote_asset(db: AsyncSession) -> Asset:
+    return await _asset(db, QUOTE)
+
+
+def _base_coin(symbol: str) -> str:
+    """Strip the quote suffix off a symbol: BTCUSDT/BTCUSD -> BTC."""
+    s = symbol.upper()
+    for q in ("USDT", "USDC", "USD"):
+        if s.endswith(q) and len(s) > len(q):
+            return s[: -len(q)]
+    return s
+
+
+async def transfer_collateral(
+    db: AsyncSession, *, user_id: int, amount: Decimal, deposit: bool, asset: str = QUOTE,
+) -> None:
+    """Move margin (USDT for USDT-M, or a coin for COIN-M) between the spot and futures wallets."""
     if amount <= 0:
         raise FuturesError("amount must be positive")
-    quote = await _quote_asset(db)
+    coll = await _asset(db, asset.upper())
     src, dst = (WALLET_SPOT, WALLET_FUTURES) if deposit else (WALLET_FUTURES, WALLET_SPOT)
     try:
         await ledger.transfer_wallet(
-            db, user_id=user_id, asset_id=quote.id, amount=amount, from_wallet=src, to_wallet=dst,
-            idempotency_key=f"fut-xfer:{user_id}:{'in' if deposit else 'out'}:{amount}",
+            db, user_id=user_id, asset_id=coll.id, amount=amount, from_wallet=src, to_wallet=dst,
+            idempotency_key=f"fut-xfer:{user_id}:{coll.symbol}:{'in' if deposit else 'out'}:{amount}",
             reference="futures-collateral",
         )
     except InsufficientFunds as exc:
@@ -85,9 +105,13 @@ async def transfer_collateral(db: AsyncSession, *, user_id: int, amount: Decimal
 
 async def open_position(
     db: AsyncSession, *, user_id: int, symbol: str, side: PositionSide, size: Decimal,
-    leverage: Decimal, price_of: PriceOf,
+    leverage: Decimal, price_of: PriceOf, inverse: bool = False,
 ) -> FuturesPosition:
-    """Open a leveraged position at the current mark price, locking margin in the futures wallet."""
+    """Open a leveraged position at the current mark price, locking margin in the futures wallet.
+
+    Linear (USDT-M): size = base qty, margin in USDT. Inverse (COIN-M): size = USD notional,
+    margin in the base coin.
+    """
     if size <= 0:
         raise FuturesError("size must be positive")
     if leverage < 1 or leverage > MAX_LEVERAGE:
@@ -97,12 +121,15 @@ async def open_position(
     if mark is None or mark <= 0:
         raise FuturesError(f"no mark price for {symbol}")
 
-    quote = await _quote_asset(db)
-    notional = size * mark
-    margin = notional / leverage
+    if inverse:
+        margin_asset = await _asset(db, _base_coin(symbol))
+        margin = (size / mark) / leverage          # coin notional / leverage
+    else:
+        margin_asset = await _quote_asset(db)
+        margin = (size * mark) / leverage           # USD notional / leverage
     try:
         await ledger.lock(
-            db, user_id=user_id, asset_id=quote.id, amount=margin, wallet=WALLET_FUTURES,
+            db, user_id=user_id, asset_id=margin_asset.id, amount=margin, wallet=WALLET_FUTURES,
             idempotency_key=f"fut-open:{user_id}:{symbol}:{side.value}:{size}:{mark}",
             reference=f"futures-open {symbol}",
         )
@@ -110,7 +137,8 @@ async def open_position(
         raise FuturesError(str(exc)) from exc
 
     pos = FuturesPosition(
-        user_id=user_id, symbol=symbol.upper(), side=side, size=size, entry_price=mark,
+        user_id=user_id, symbol=symbol.upper(), side=side, inverse=inverse,
+        margin_asset=margin_asset.symbol, size=size, entry_price=mark,
         leverage=leverage, margin=margin, status=PositionStatus.OPEN, realized_pnl=Decimal(0),
     )
     db.add(pos)
@@ -134,11 +162,13 @@ async def close_position(
     if mark is None or mark <= 0:
         raise FuturesError(f"no mark price for {pos.symbol}")
 
-    pnl = pos.pnl_at(mark)
-    fee = pos.notional(mark) * TAKER_FEE
-    quote = await _quote_asset(db)
+    # Quantize to the money scale (18dp) so inverse division dust can't unbalance the ledger.
+    q = Decimal(1).scaleb(-18)
+    pnl = pos.pnl_at(mark).quantize(q)
+    fee = (pos.notional(mark) * TAKER_FEE).quantize(q)
+    margin_asset = await _asset(db, pos.margin_asset)
     await ledger.futures_close(
-        db, user_id=user_id, asset_id=quote.id, margin=pos.margin, pnl=pnl, fee=fee, wallet=WALLET_FUTURES,
+        db, user_id=user_id, asset_id=margin_asset.id, margin=pos.margin, pnl=pnl, fee=fee, wallet=WALLET_FUTURES,
         idempotency_key=f"fut-close:{pos.id}:{mark}",
         reference=f"futures-close {pos.symbol}",
     )

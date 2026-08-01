@@ -152,6 +152,8 @@ export interface FuturesPosition {
   id: number;
   symbol: string;
   side: "LONG" | "SHORT";
+  inverse: boolean;
+  margin_asset: string;
   size: string;
   entry_price: string;
   leverage: string;
@@ -163,6 +165,7 @@ export interface FuturesPosition {
 }
 export interface FuturesAccount {
   balance_usdt: string;
+  balances: Record<string, string>;
   positions: FuturesPosition[];
 }
 
@@ -407,10 +410,10 @@ export const api = {
   optionsPositions: () => request<OptionPosition[]>("/options/positions"),
 
   futuresAccount: () => request<FuturesAccount>("/futures/account"),
-  futuresTransfer: (amount: string, deposit: boolean) =>
-    request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit }) }),
-  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string }) =>
-    request<{ id: number; entry_price: string; margin: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
+  futuresTransfer: (amount: string, deposit: boolean, asset = "USDT") =>
+    request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit, asset }) }),
+  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string; inverse?: boolean }) =>
+    request<{ id: number; entry_price: string; margin: string; margin_asset: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
   futuresClose: (id: number) => request<{ status: string; close_price: string; realized_pnl: string }>(`/futures/close/${id}`, { method: "POST" }),
 
   apiKeys: () => request<ApiKeyRow[]>("/apikeys"),

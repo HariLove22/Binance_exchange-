@@ -33,11 +33,18 @@ async def fbal(db, user_id, asset_id, wallet=WALLET_FUTURES, at=AccountType.AVAI
     return (await ledger.get_or_create_account(db, asset_id, at, user_id, wallet=wallet)).balance
 
 
+async def btc(db) -> Asset:
+    a = Asset(symbol="BTC", name="Bitcoin", kind=AssetKind.CRYPTO, scale=8)
+    db.add(a)
+    await db.flush()
+    return a
+
+
 async def fund_futures(db, user, asset, amount):
     """Credit spot then move to the futures wallet."""
     await ledger.credit(db, user_id=user.id, asset_id=asset.id, amount=Decimal(amount),
-                        kind=ledger.TransactionKind.DEPOSIT, idempotency_key=f"seed:{user.id}:{amount}")
-    await futures.transfer_collateral(db, user_id=user.id, amount=Decimal(amount), deposit=True)
+                        kind=ledger.TransactionKind.DEPOSIT, idempotency_key=f"seed:{user.id}:{asset.symbol}:{amount}")
+    await futures.transfer_collateral(db, user_id=user.id, amount=Decimal(amount), deposit=True, asset=asset.symbol)
 
 
 class TestLong:
@@ -112,6 +119,45 @@ class TestLiquidation:
         assert pos.id in liquidated
         assert pos.status is PositionStatus.LIQUIDATED
         assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+
+class TestInverse:
+    """COIN-M (coin-margined, inverse): margin + PnL in BTC; size is USD notional."""
+
+    async def test_open_and_close_profit(self, db):
+        u = await make_user(db, "coinm-win@example.com")
+        b = await btc(db)
+        await fund_futures(db, u, b, "1")   # 1 BTC collateral
+        # $6000 notional, 10x, entry 60000 → margin = (6000/60000)/10 = 0.01 BTC.
+        pos = await futures.open_position(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+                                          size=Decimal("6000"), leverage=Decimal("10"),
+                                          price_of=price_book(), inverse=True)
+        assert pos.inverse and pos.margin_asset == "BTC" and pos.margin == Decimal("0.01")
+        assert await fbal(db, u.id, b.id, at=AccountType.LOCKED) == Decimal("0.01")
+
+        # Close at 61000: inverse PnL = 6000*(1/60000 - 1/61000) > 0, settled in BTC.
+        expect = Decimal("6000") * (Decimal(1) / Decimal("60000") - Decimal(1) / Decimal("61000"))
+        assert pos.pnl_at(Decimal("61000")) == expect and expect > 0
+        await futures.close_position(db, user_id=u.id, position_id=pos.id,
+                                     price_of=price_book(BTCUSDT=Decimal("61000")))
+        assert pos.status is PositionStatus.CLOSED
+        assert await fbal(db, u.id, b.id, at=AccountType.LOCKED) == Decimal("0")
+        assert (await ledger.trial_balance(db))["BTC"] == Decimal(0)
+
+    async def test_short_inverse_and_liquidation(self, db):
+        u = await make_user(db, "coinm-liq@example.com")
+        b = await btc(db)
+        await fund_futures(db, u, b, "1")
+        pos = await futures.open_position(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.SHORT,
+                                          size=Decimal("6000"), leverage=Decimal("10"),
+                                          price_of=price_book(), inverse=True)
+        liq = futures.liquidation_price(pos)                 # short liquidates above entry
+        assert liq > Decimal("60000")
+        # liq_price and should_liquidate must agree: just past liq → liquidated.
+        assert futures.should_liquidate(pos, liq + Decimal("100"))
+        liquidated = await futures.sweep_liquidations(db, price_book(BTCUSDT=liq + Decimal("100")))
+        assert pos.id in liquidated and pos.status is PositionStatus.LIQUIDATED
+        assert (await ledger.trial_balance(db))["BTC"] == Decimal(0)
 
 
 class TestGuards:
