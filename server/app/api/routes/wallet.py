@@ -6,6 +6,7 @@ custody edge is simulated while everything around it is real. The `/dev/*` endpo
 the chain events a real provider would deliver, and refuse to run outside development.
 """
 
+import time
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -17,7 +18,17 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.db import get_db
-from app.models import Asset, AssetNetwork, Deposit, DepositStatus, User, Withdrawal
+from app.models import (
+    Asset,
+    AssetNetwork,
+    Deposit,
+    DepositStatus,
+    User,
+    WALLET_FUTURES,
+    WALLET_MARGIN,
+    WALLET_SPOT,
+    Withdrawal,
+)
 from app.services import convert as convert_service
 from app.services import deposits as deposit_service
 from app.services import ledger
@@ -51,14 +62,70 @@ class BalanceResponse(BaseModel):
     total: str
 
 
+# User-facing wallets that funds can be freely moved between (same user, own money).
+TRANSFER_WALLETS = {"SPOT": WALLET_SPOT, "FUNDING": WALLET_SPOT, "MARGIN": WALLET_MARGIN, "FUTURES": WALLET_FUTURES}
+
+
 @router.get("/balances", response_model=list[BalanceResponse])
-async def balances(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def balances(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    wallet: str = Query(WALLET_SPOT),
+):
     return [
         BalanceResponse(
             asset=b.symbol, scale=b.scale,
             available=_fmt(b.available, b.scale), locked=_fmt(b.locked, b.scale), total=_fmt(b.total, b.scale),
         )
-        for b in await ledger.balances(db, user.id)
+        for b in await ledger.balances(db, user.id, wallet=TRANSFER_WALLETS.get(wallet.upper(), wallet))
+    ]
+
+
+# --- internal transfer between the user's own wallets -----------------------------------------
+
+class TransferRequest(BaseModel):
+    asset: str
+    amount: str
+    from_wallet: str  # SPOT | MARGIN | FUTURES
+    to_wallet: str
+
+
+@router.post("/transfer", response_model=list[BalanceResponse])
+async def transfer(body: TransferRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Move your own funds between wallets (Spot ⇄ Margin ⇄ Futures). Same asset, same user."""
+    src = TRANSFER_WALLETS.get(body.from_wallet.upper())
+    dst = TRANSFER_WALLETS.get(body.to_wallet.upper())
+    if src is None or dst is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "wallet must be SPOT, MARGIN, or FUTURES")
+    if src == dst:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "source and destination wallets are the same")
+    try:
+        amount = Decimal(body.amount)
+    except InvalidOperation:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "bad amount") from None
+    if amount <= 0:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "amount must be positive")
+
+    asset = (await db.execute(select(Asset).where(Asset.symbol == body.asset.upper()))).scalar_one_or_none()
+    if asset is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{body.asset} is not listed")
+    stamp = int(time.time() * 1000)  # so repeated same-amount transfers aren't collapsed by idempotency
+    try:
+        await ledger.transfer_wallet(
+            db, user_id=user.id, asset_id=asset.id, amount=amount, from_wallet=src, to_wallet=dst,
+            idempotency_key=f"xfer:{user.id}:{asset.symbol}:{src}:{dst}:{amount}:{stamp}",
+            reference=f"transfer {body.from_wallet.upper()}->{body.to_wallet.upper()}",
+        )
+    except ledger.InsufficientFunds as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    except ledger.LedgerError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    await db.commit()
+    # Return the destination wallet's balances so the UI can refresh.
+    return [
+        BalanceResponse(asset=b.symbol, scale=b.scale,
+                        available=_fmt(b.available, b.scale), locked=_fmt(b.locked, b.scale), total=_fmt(b.total, b.scale))
+        for b in await ledger.balances(db, user.id, wallet=dst)
     ]
 
 

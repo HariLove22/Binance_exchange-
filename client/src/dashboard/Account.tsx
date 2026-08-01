@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type AccountOverview, type DemoAccount } from "../lib/api";
 import { useLocale } from "../lib/locale";
 import { navigate } from "../router";
+import { TransferModal } from "./TransferFunds";
 import "./accounts.css";
 
 const DEMO_COINS = ["BTC", "ETH", "BNB", "SOL", "XRP"];
@@ -15,6 +16,7 @@ export function Account() {
   const [ov, setOv] = useState<AccountOverview | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const { fmt } = useLocale();
 
   const load = useCallback(async () => {
@@ -29,12 +31,14 @@ export function Account() {
   return (
     <div className="accs">
       {adding && <AddAccountModal ov={ov} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
+      {transferring && <TransferModal onClose={() => setTransferring(false)} onDone={load} />}
       <div className="accs-head">
         <div>
           <h1>Accounts</h1>
           <p className="accs-sub">Your trading accounts and their estimated value.</p>
         </div>
         <div className="accs-head-right">
+          <button className="accs-add" onClick={() => setTransferring(true)}>⇅ Transfer</button>
           <button className="accs-add" onClick={() => setAdding(true)}>+ Add account</button>
           <div className="accs-total">
             <span>Estimated total (real)</span>

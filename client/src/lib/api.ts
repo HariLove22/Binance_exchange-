@@ -448,7 +448,9 @@ export const api = {
   demoTrade: (body: { base: string; side: "BUY" | "SELL"; quantity: string }) =>
     request<DemoAccount>("/account/demo/trade", { method: "POST", body: JSON.stringify(body) }),
 
-  balances: () => request<Balance[]>("/wallet/balances"),
+  balances: (wallet?: string) => request<Balance[]>(`/wallet/balances${wallet ? `?wallet=${wallet}` : ""}`),
+  walletTransfer: (body: { asset: string; amount: string; from_wallet: string; to_wallet: string }) =>
+    request<Balance[]>("/wallet/transfer", { method: "POST", body: JSON.stringify(body) }),
   networks: (asset?: string) =>
     request<WalletNetwork[]>(`/wallet/networks${asset ? `?asset=${asset}` : ""}`),
   depositAddress: (assetNetworkId: number) =>
