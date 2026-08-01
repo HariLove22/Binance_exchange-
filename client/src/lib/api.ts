@@ -158,10 +158,13 @@ export interface FuturesPosition {
   entry_price: string;
   leverage: string;
   margin: string;
-  mark: string | null;
+  mark: string | null;   // smoothed mark price — drives PnL/liquidation
+  last: string | null;   // raw last/index price — where fills happen
   unrealized_pnl: string | null;
   roe: string | null;
   liquidation_price: string;
+  funding_accrued: string;
+  funding_rate: string;
 }
 export interface FuturesAccount {
   balance_usdt: string;
@@ -414,7 +417,15 @@ export const api = {
     request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit, asset }) }),
   futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string; inverse?: boolean }) =>
     request<{ id: number; entry_price: string; margin: string; margin_asset: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
-  futuresClose: (id: number) => request<{ status: string; close_price: string; realized_pnl: string }>(`/futures/close/${id}`, { method: "POST" }),
+  futuresClose: (id: number, size?: string) =>
+    request<{ status: string; close_price: string; realized_pnl: string; size: string }>(
+      `/futures/close/${id}${size ? `?size=${size}` : ""}`, { method: "POST" }),
+  futuresAdjustMargin: (id: number, amount: string, add: boolean) =>
+    request<{ margin: string; liquidation_price: string }>(`/futures/position/${id}/margin`, { method: "POST", body: JSON.stringify({ amount, add }) }),
+  futuresSetLeverage: (id: number, leverage: string) =>
+    request<{ leverage: string; margin: string; liquidation_price: string }>(`/futures/position/${id}/leverage`, { method: "POST", body: JSON.stringify({ leverage }) }),
+  futuresDevSetup: () => request<{ credited: string; kyc: string }>("/futures/dev/setup", { method: "POST" }),
+  futuresApplyFunding: () => request<{ funded: number; rate: string }>("/futures/dev/apply-funding", { method: "POST" }),
 
   apiKeys: () => request<ApiKeyRow[]>("/apikeys"),
   apiKeyCreate: (body: { label: string; can_trade: boolean; can_withdraw: boolean }) =>

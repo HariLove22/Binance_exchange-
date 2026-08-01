@@ -23,3 +23,7 @@
 .fut-mode { display: inline-flex; gap: 0; margin-left: 0.6rem; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
 .fut-mode button { background: none; border: none; color: var(--text-dim); font: inherit; font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.6rem; cursor: pointer; }
 .fut-mode button.on { background: var(--gold); color: #1a1400; }
+
+/* position action buttons (add/remove margin, partial + full close) */
+.fut-actions { display: flex; gap: 0.25rem; justify-content: flex-end; flex-wrap: wrap; }
+.fut-actions button { padding: 0.15rem 0.4rem; font-size: 0.72rem; }

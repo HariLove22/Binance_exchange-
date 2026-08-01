@@ -53,6 +53,12 @@ class FuturesPosition(Base):
     close_price: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     realized_pnl: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal(0))
 
+    # Perpetual funding: at each interval longs pay shorts (or vice versa) via the insurance pool.
+    # last_funding_at advances one interval each time funding is charged; funding_accrued is the
+    # running net paid(-)/received(+) for display.
+    last_funding_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    funding_accrued: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal(0), server_default="0")
+
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

@@ -63,6 +63,8 @@ export function FuturesTrade() {
           ) : <span className="tk-loading">connecting…</span>}
           <div className="tk-spacer" />
           <div className="mgt-ml"><span>Futures Balance</span><b>{acct ? (inverse ? `${trimAmount(String(coinBal))} ${base}` : `${usdtBal.toFixed(2)} USDT`) : "—"}</b></div>
+          {/* Dev only: one click to fund spot + auto-approve KYC so a position can be opened instantly. */}
+          <button className="mgt-hbtn" title="Dev: credit 50k USDT + approve KYC" onClick={() => { void api.futuresDevSetup().then(loadAcct).catch(() => {}); }}>Dev fund</button>
           <button className="mgt-hbtn" onClick={() => setXfer(true)}>Transfer</button>
         </div>
 
@@ -151,15 +153,29 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
 
 function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null);
-  async function close(id: number) {
+  async function run(fn: () => Promise<unknown>) {
     setErr(null);
-    try { await api.futuresClose(id); onDone(); }
+    try { await fn(); onDone(); }
     catch (e) { setErr(e instanceof ApiError ? e.message : String(e)); }
+  }
+  // ponytail: prompt() for amounts — dev-grade, swap for inline inputs when the UX matters.
+  function adjustMargin(id: number, add: boolean) {
+    const v = window.prompt(`${add ? "Add" : "Remove"} margin (USDT)`);
+    if (v && Number(v) > 0) void run(() => api.futuresAdjustMargin(id, v, add));
+  }
+  function setLev(id: number, cur: string) {
+    const v = window.prompt("New leverage (1–100x)", cur);
+    if (v && Number(v) >= 1) void run(() => api.futuresSetLeverage(id, v));
   }
   const positions = acct?.positions ?? [];
   return (
     <>
-      <div className="oo-tabs"><button className="on">Positions ({positions.length})</button></div>
+      <div className="oo-tabs">
+        <button className="on">Positions ({positions.length})</button>
+        {/* Dev: charge one 8h funding interval now instead of waiting — longs pay shorts. */}
+        <button className="mgt-hbtn" style={{ marginLeft: "auto" }} title="Dev: charge one funding interval now"
+                onClick={() => { void api.futuresApplyFunding().then(onDone).catch(() => {}); }}>Charge funding (dev)</button>
+      </div>
       {err && <p className="mgt-err">{err}</p>}
       <div className="oo-table">
         <div className="fut-h"><span>Symbol</span><span>Size</span><span className="num">Entry</span><span className="num">Mark</span><span className="num">Liq. Price</span><span className="num">PnL (ROE)</span><span></span></div>
@@ -168,13 +184,18 @@ function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () =
           const pnl = Number(p.unrealized_pnl ?? 0);
           return (
             <div className="fut-r" key={p.id}>
-              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`}>{p.side} {trimAmount(p.leverage)}x</span></span>
+              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`} onClick={() => setLev(p.id, trimAmount(p.leverage))} style={{ cursor: "pointer" }} title="Click to change leverage">{p.side} {trimAmount(p.leverage)}x</span></span>
               <span className="mono">{trimAmount(p.size)}</span>
               <span className="num mono">{Number(p.entry_price).toFixed(2)}</span>
-              <span className="num mono">{p.mark ? Number(p.mark).toFixed(2) : "—"}</span>
+              <span className="num mono" title={p.last ? `Last (fill) price ${Number(p.last).toFixed(2)} · mark drives PnL/liq` : undefined}>{p.mark ? Number(p.mark).toFixed(2) : "—"}</span>
               <span className="num mono warn">{Number(p.liquidation_price).toFixed(2)}</span>
-              <span className={`num mono ${pnl >= 0 ? "up" : "down"}`}>{pnl >= 0 ? "+" : ""}{p.inverse ? `${trimAmount(p.unrealized_pnl ?? "0")} ${p.margin_asset}` : pnl.toFixed(2)} <em>({Number(p.roe ?? 0).toFixed(1)}%)</em></span>
-              <span className="num"><button className="cancel" onClick={() => close(p.id)}>Close</button></span>
+              <span className={`num mono ${pnl >= 0 ? "up" : "down"}`}>{pnl >= 0 ? "+" : ""}{p.inverse ? `${trimAmount(p.unrealized_pnl ?? "0")} ${p.margin_asset}` : pnl.toFixed(2)} <em>({Number(p.roe ?? 0).toFixed(1)}%)</em>{Number(p.funding_accrued) !== 0 && <em title="Funding paid(-)/received(+)"> · fund {Number(p.funding_accrued) >= 0 ? "+" : ""}{Number(p.funding_accrued).toFixed(4)}</em>}</span>
+              <span className="num fut-actions">
+                <button className="cancel" title="Add margin" onClick={() => adjustMargin(p.id, true)}>+M</button>
+                <button className="cancel" title="Remove margin" onClick={() => adjustMargin(p.id, false)}>−M</button>
+                <button className="cancel" title="Close half" onClick={() => run(() => api.futuresClose(p.id, trimAmount(String(Number(p.size) / 2))))}>½</button>
+                <button className="cancel" onClick={() => run(() => api.futuresClose(p.id))}>Close</button>
+              </span>
             </div>
           );
         })}
