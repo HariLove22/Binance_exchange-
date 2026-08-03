@@ -35,7 +35,9 @@ async def _sweep_once() -> None:
         settled = await options.sweep_expiries(db, now=datetime.now(timezone.utc), price_of=marketmaker.fetch_reference_price)
         # And charges perpetual funding to positions whose 8h interval is due (on the mark price).
         funded = await futures.apply_funding(db, now=datetime.now(timezone.utc), price_of=futures.mark_price)
-        if fired or liquidated or settled or funded:
+        # And fills resting futures LIMIT orders the last price has reached.
+        fut_filled = await futures.sweep_orders(db, futures.last_price)
+        if fired or liquidated or settled or funded or fut_filled:
             await db.commit()
             for symbol in fired:
                 pubsub.publish(pubsub.market_channel(symbol))  # wake live subscribers
@@ -47,6 +49,8 @@ async def _sweep_once() -> None:
                 log.info("settled options: %s", settled)
             if fired:
                 log.info("fired stops: %s", fired)
+            if fut_filled:
+                log.info("filled futures limit orders: %s", fut_filled)
         else:
             await db.rollback()
 

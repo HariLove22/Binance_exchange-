@@ -5,7 +5,7 @@ locked in the FUTURES wallet on open and released with PnL on close. Mark price 
 module stays offline in tests.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Awaitable, Callable
 
@@ -15,6 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import (
     AccountType,
     Asset,
+    FuturesOrder,
+    FuturesOrderStatus,
+    FuturesOrderType,
     FuturesPosition,
     PositionSide,
     PositionStatus,
@@ -454,3 +457,78 @@ async def sweep_liquidations(db: AsyncSession, price_of: PriceOf) -> list[int]:
                 await close_position(db, user_id=uid, position_id=pos.id, price_of=price_of, liquidation=True)
                 liquidated.append(pos.id)
     return liquidated
+
+
+# --- resting orders (limit; stop/TP-SL come in Phase B) ------------------------------------------
+
+async def place_limit_order(
+    db: AsyncSession, *, user_id: int, symbol: str, side: PositionSide, size: Decimal,
+    leverage: Decimal, price: Decimal, inverse: bool = False, cross: bool = False,
+) -> FuturesOrder:
+    """Rest a LIMIT order. It fills — opening the position at its price — when the last price reaches
+    it: a LONG when price falls to the limit, a SHORT when it rises to it. Margin is locked at fill,
+    not at placement."""
+    if size <= 0 or price <= 0:
+        raise FuturesError("size and price must be positive")
+    if leverage < 1 or leverage > MAX_LEVERAGE:
+        raise FuturesError(f"leverage must be between 1x and {MAX_LEVERAGE}x")
+    order = FuturesOrder(
+        user_id=user_id, symbol=symbol.upper(), side=side, order_type=FuturesOrderType.LIMIT,
+        size=size, price=price, leverage=leverage, inverse=inverse, cross=cross,
+        reduce_only=False, status=FuturesOrderStatus.PENDING,
+    )
+    db.add(order)
+    await db.flush()
+    return order
+
+
+async def cancel_order(db: AsyncSession, *, user_id: int, order_id: int) -> FuturesOrder:
+    order = (await db.execute(select(FuturesOrder).where(FuturesOrder.id == order_id))).scalar_one_or_none()
+    if order is None or order.user_id != user_id:
+        raise FuturesError("order not found")
+    if order.status is not FuturesOrderStatus.PENDING:
+        raise FuturesError("order is not open")
+    order.status = FuturesOrderStatus.CANCELLED
+    await db.flush()
+    return order
+
+
+async def open_orders(db: AsyncSession, user_id: int) -> list[FuturesOrder]:
+    return list((await db.execute(
+        select(FuturesOrder).where(
+            FuturesOrder.user_id == user_id, FuturesOrder.status == FuturesOrderStatus.PENDING
+        ).order_by(FuturesOrder.id.desc())
+    )).scalars().all())
+
+
+def _limit_crossed(side: PositionSide, last: Decimal, price: Decimal) -> bool:
+    """A buy (LONG) fills when the price falls to the limit; a sell (SHORT) when it rises to it."""
+    return last <= price if side is PositionSide.LONG else last >= price
+
+
+async def sweep_orders(db: AsyncSession, price_of: PriceOf) -> list[int]:
+    """Fill every resting LIMIT order the price has reached, opening it at the order's price. Caller
+    commits. An order whose fill fails (e.g. not enough margin yet) is left PENDING to retry."""
+    orders = (await db.execute(
+        select(FuturesOrder).where(FuturesOrder.status == FuturesOrderStatus.PENDING)
+    )).scalars().all()
+    filled: list[int] = []
+    for o in orders:
+        if o.order_type is not FuturesOrderType.LIMIT:
+            continue  # stop / take-profit handled in Phase B
+        last = await price_of(o.symbol)
+        if last is None or last <= 0 or not _limit_crossed(o.side, last, o.price):
+            continue
+
+        async def _at(_sym: str, _p: Decimal = o.price) -> Decimal:
+            return _p  # fill at the limit price
+
+        try:
+            await open_position(db, user_id=o.user_id, symbol=o.symbol, side=o.side, size=o.size,
+                                leverage=o.leverage, price_of=_at, inverse=o.inverse, cross=o.cross)
+        except FuturesError:
+            continue  # leave PENDING — retries next sweep once fundable
+        o.status = FuturesOrderStatus.FILLED
+        o.filled_at = datetime.now(timezone.utc)
+        filled.append(o.id)
+    return filled

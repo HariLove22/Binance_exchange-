@@ -172,6 +172,17 @@ export interface FuturesAccount {
   balances: Record<string, string>;
   positions: FuturesPosition[];
 }
+export interface FuturesOpenOrder {
+  id: number;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  order_type: string;
+  size: string;
+  price: string;
+  leverage: string;
+  inverse: boolean;
+  cross: boolean;
+}
 
 export interface ApiKeyRow {
   id: number;
@@ -416,7 +427,7 @@ export const api = {
   futuresAccount: () => request<FuturesAccount>("/futures/account"),
   futuresTransfer: (amount: string, deposit: boolean, asset = "USDT") =>
     request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit, asset }) }),
-  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string; inverse?: boolean; cross?: boolean }) =>
+  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string; inverse?: boolean; cross?: boolean; type?: "MARKET" | "LIMIT"; price?: string }) =>
     request<{ id: number; entry_price: string; margin: string; margin_asset: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
   futuresClose: (id: number, size?: string) =>
     request<{ status: string; close_price: string; realized_pnl: string; size: string }>(
@@ -427,6 +438,8 @@ export const api = {
     request<{ leverage: string; margin: string; liquidation_price: string }>(`/futures/position/${id}/leverage`, { method: "POST", body: JSON.stringify({ leverage }) }),
   futuresDevSetup: () => request<{ credited: string; kyc: string }>("/futures/dev/setup", { method: "POST" }),
   futuresApplyFunding: () => request<{ funded: number; rate: string }>("/futures/dev/apply-funding", { method: "POST" }),
+  futuresOpenOrders: () => request<FuturesOpenOrder[]>("/futures/orders"),
+  futuresCancelOrder: (id: number) => request<{ status: string }>(`/futures/order/${id}`, { method: "DELETE" }),
 
   apiKeys: () => request<ApiKeyRow[]>("/apikeys"),
   apiKeyCreate: (body: { label: string; can_trade: boolean; can_withdraw: boolean }) =>

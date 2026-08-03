@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import AccountType, Asset, AssetKind, PositionSide, PositionStatus, WALLET_FUTURES
+from app.models import AccountType, Asset, AssetKind, FuturesOrderStatus, PositionSide, PositionStatus, WALLET_FUTURES
 from app.services import futures, ledger
 from tests.test_trading import make_user
 
@@ -363,3 +363,42 @@ class TestCross:
         liq = await futures.sweep_liquidations(db, price_book(BTCUSDT=Decimal("54000")))
         assert pos.id in liq and pos.status is PositionStatus.LIQUIDATED
         assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+
+class TestLimitOrders:
+    async def _u(self, db, email):
+        u = await make_user(db, email)
+        a = await usdt(db)
+        await fund_futures(db, u, a, "2000")
+        return u, a
+
+    async def test_long_limit_fills_when_price_drops(self, db):
+        u, a = await self._u(db, "lim-long@example.com")
+        o = await futures.place_limit_order(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+                                            size=Decimal("0.1"), leverage=Decimal("10"), price=Decimal("58000"))
+        assert o.status is FuturesOrderStatus.PENDING
+        # Above the limit → no fill.
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("60000"))) == []
+        assert o.status is FuturesOrderStatus.PENDING
+        # Price drops to/below 58000 → fills, opening the position AT the limit price.
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("57000"))) == [o.id]
+        assert o.status is FuturesOrderStatus.FILLED
+        positions = await futures.open_positions(db, u.id)
+        assert len(positions) == 1 and positions[0].entry_price == Decimal("58000")
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+    async def test_short_limit_fills_when_price_rises(self, db):
+        u, a = await self._u(db, "lim-short@example.com")
+        o = await futures.place_limit_order(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.SHORT,
+                                            size=Decimal("0.1"), leverage=Decimal("10"), price=Decimal("62000"))
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("60000"))) == []
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("63000"))) == [o.id]
+        assert (await futures.open_positions(db, u.id))[0].entry_price == Decimal("62000")
+
+    async def test_cancel(self, db):
+        u, a = await self._u(db, "lim-cancel@example.com")
+        o = await futures.place_limit_order(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+                                            size=Decimal("0.1"), leverage=Decimal("10"), price=Decimal("58000"))
+        await futures.cancel_order(db, user_id=u.id, order_id=o.id)
+        assert o.status is FuturesOrderStatus.CANCELLED
+        assert await futures.open_orders(db, u.id) == []

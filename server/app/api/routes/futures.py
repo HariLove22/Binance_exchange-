@@ -48,6 +48,8 @@ class OrderRequest(BaseModel):
     leverage: str
     inverse: bool = False  # True = COIN-M (coin-margined, inverse); size is USD notional
     cross: bool = False    # True = cross margin (shared bucket); default isolated
+    type: str = "MARKET"   # MARKET fills now; LIMIT rests at `price`
+    price: str | None = None  # required for LIMIT
 
 
 class PositionRow(BaseModel):
@@ -170,7 +172,20 @@ async def open_order(body: OrderRequest, user: User = Depends(get_current_user),
         await kyc.assert_approved(db, user.id)
     except KycRequired as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
+
     try:
+        if body.type.upper() == "LIMIT":
+            if body.price is None:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "limit order needs a price")
+            order = await futures.place_limit_order(
+                db, user_id=user.id, symbol=body.symbol, side=body.side, size=_dec(body.size, "size"),
+                leverage=_dec(body.leverage, "leverage"), price=_dec(body.price, "price"),
+                inverse=body.inverse, cross=body.cross,
+            )
+            await db.commit()
+            return {"id": order.id, "type": "LIMIT", "status": order.status.value,
+                    "symbol": order.symbol, "side": order.side.value, "price": _n(order.price), "size": _n(order.size)}
+
         pos = await futures.open_position(
             db, user_id=user.id, symbol=body.symbol, side=body.side, size=_dec(body.size, "size"),
             leverage=_dec(body.leverage, "leverage"), price_of=last_of, inverse=body.inverse, cross=body.cross,
@@ -180,6 +195,37 @@ async def open_order(body: OrderRequest, user: User = Depends(get_current_user),
     await db.commit()
     return {"id": pos.id, "symbol": pos.symbol, "side": pos.side.value, "entry_price": _n(pos.entry_price),
             "size": _n(pos.size), "margin": _n(pos.margin), "margin_asset": pos.margin_asset}
+
+
+class OpenOrderRow(BaseModel):
+    id: int
+    symbol: str
+    side: str
+    order_type: str
+    size: str
+    price: str
+    leverage: str
+    inverse: bool
+    cross: bool
+
+
+@router.get("/orders", response_model=list[OpenOrderRow])
+async def list_orders(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return [
+        OpenOrderRow(id=o.id, symbol=o.symbol, side=o.side.value, order_type=o.order_type.value,
+                     size=_n(o.size), price=_n(o.price), leverage=_n(o.leverage), inverse=o.inverse, cross=o.cross)
+        for o in await futures.open_orders(db, user.id)
+    ]
+
+
+@router.delete("/order/{order_id}")
+async def cancel_order(order_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    try:
+        o = await futures.cancel_order(db, user_id=user.id, order_id=order_id)
+    except FuturesError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    await db.commit()
+    return {"id": o.id, "status": o.status.value}
 
 
 @router.post("/close/{position_id}")

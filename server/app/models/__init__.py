@@ -37,7 +37,14 @@ from app.models.margin import (
 )
 from app.models.demo import DemoAccount, DemoHolding
 from app.models.kyc import KycApplication, KycStatus
-from app.models.futures import FuturesPosition, PositionSide, PositionStatus
+from app.models.futures import (
+    FuturesOrder,
+    FuturesOrderStatus,
+    FuturesOrderType,
+    FuturesPosition,
+    PositionSide,
+    PositionStatus,
+)
 from app.models.options import OptionPosition, OptionStatus, OptionType
 from app.models.referral import Referral
 from app.models.rewards import RewardClaim
@@ -77,6 +84,9 @@ __all__ = [
     "WALLET_SPOT",
     "isolated_wallet",
     "FuturesPosition",
+    "FuturesOrder",
+    "FuturesOrderStatus",
+    "FuturesOrderType",
     "PositionSide",
     "PositionStatus",
     "Account",

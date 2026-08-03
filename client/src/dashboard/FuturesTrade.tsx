@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, trimAmount, type FuturesAccount, type MarketInfo } from "../lib/api";
+import { api, ApiError, trimAmount, type FuturesAccount, type FuturesOpenOrder, type MarketInfo } from "../lib/api";
 import { useTicker } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
@@ -101,10 +101,13 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
   const [lev, setLev] = useState("10");
   const [pct, setPct] = useState(0);
   const [cross, setCross] = useState(false);
+  const [otype, setOtype] = useState<"MARKET" | "LIMIT">("MARKET");
+  const [limitPrice, setLimitPrice] = useState("");
   const [busy, setBusy] = useState<"LONG" | "SHORT" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const base = symbol.replace(/USDT$/, "");
-  const price = livePrice ?? 0;
+  // A LIMIT order sizes off its limit price; a market order off the live price.
+  const price = otype === "LIMIT" && Number(limitPrice) > 0 ? Number(limitPrice) : (livePrice ?? 0);
   const leverage = Number(lev) || 1;
   // COIN-M: balance is in coin; size = USD notional, margin in coin. USDT-M: size = base qty, margin USDT.
   const marginUnit = inverse ? base : "USDT";
@@ -117,10 +120,14 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
 
   async function submit(side: "LONG" | "SHORT") {
     if (size <= 0) { setNote("choose a size with the slider"); return; }
+    if (otype === "LIMIT" && !(Number(limitPrice) > 0)) { setNote("enter a limit price"); return; }
     setBusy(side); setNote("");
     try {
-      const o = await api.futuresOrder({ symbol, side, size: sizeStr, leverage: lev, inverse, cross });
-      setNote(`${side} opened @ ${trimAmount(o.entry_price)} · margin ${trimAmount(o.margin)} ${o.margin_asset}`);
+      const o = await api.futuresOrder({ symbol, side, size: sizeStr, leverage: lev, inverse, cross,
+                                         type: otype, price: otype === "LIMIT" ? limitPrice : undefined });
+      setNote(otype === "LIMIT"
+        ? `${side} limit resting @ ${trimAmount(limitPrice)}`
+        : `${side} opened @ ${trimAmount(o.entry_price)} · margin ${trimAmount(o.margin)} ${o.margin_asset}`);
       setPct(0); onDone();
     } catch (e) { setNote(e instanceof ApiError ? e.message : String(e)); } finally { setBusy(null); }
   }
@@ -131,6 +138,15 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
         <button className={!cross ? "on" : ""} onClick={() => setCross(false)}>Isolated</button>
         <button className={cross ? "on" : ""} onClick={() => setCross(true)}>Cross</button>
       </div>
+      <div className="fut-mode fut-margin-mode">
+        <button className={otype === "MARKET" ? "on" : ""} onClick={() => setOtype("MARKET")}>Market</button>
+        <button className={otype === "LIMIT" ? "on" : ""} onClick={() => setOtype("LIMIT")}>Limit</button>
+      </div>
+      {otype === "LIMIT" && (
+        <div className="of-field"><label>Limit price</label>
+          <div className="of-input"><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder="0" inputMode="decimal" /><span className="of-unit">USDT</span></div>
+        </div>
+      )}
       <div className="fut-lev">
         <label>Leverage</label>
         <div className="fut-lev-row">
@@ -158,9 +174,13 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
 
 function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null);
+  const [tab, setTab] = useState<"pos" | "orders">("pos");
+  const [orders, setOrders] = useState<FuturesOpenOrder[]>([]);
+  const loadOrders = useCallback(() => api.futuresOpenOrders().then(setOrders).catch(() => {}), []);
+  useEffect(() => { loadOrders(); const t = window.setInterval(loadOrders, 4000); return () => window.clearInterval(t); }, [loadOrders]);
   async function run(fn: () => Promise<unknown>) {
     setErr(null);
-    try { await fn(); onDone(); }
+    try { await fn(); onDone(); loadOrders(); }
     catch (e) { setErr(e instanceof ApiError ? e.message : String(e)); }
   }
   // ponytail: prompt() for amounts — dev-grade, swap for inline inputs when the UX matters.
@@ -176,12 +196,30 @@ function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () =
   return (
     <>
       <div className="oo-tabs">
-        <button className="on">Positions ({positions.length})</button>
+        <button className={tab === "pos" ? "on" : ""} onClick={() => setTab("pos")}>Positions ({positions.length})</button>
+        <button className={tab === "orders" ? "on" : ""} onClick={() => setTab("orders")}>Open Orders ({orders.length})</button>
         {/* Dev: charge one 8h funding interval now instead of waiting — longs pay shorts. */}
         <button className="mgt-hbtn" style={{ marginLeft: "auto" }} title="Dev: charge one funding interval now"
                 onClick={() => { void api.futuresApplyFunding().then(onDone).catch(() => {}); }}>Charge funding (dev)</button>
       </div>
       {err && <p className="mgt-err">{err}</p>}
+      {tab === "orders" && (
+        <div className="oo-table">
+          <div className="fut-h"><span>Symbol</span><span>Type</span><span className="num">Side</span><span className="num">Size</span><span className="num">Limit price</span><span></span></div>
+          {orders.length === 0 && <p className="tp-empty">No open orders.</p>}
+          {orders.map((o) => (
+            <div className="fut-r" key={o.id}>
+              <span><b>{o.symbol}</b></span>
+              <span className="mono">{o.order_type}</span>
+              <span className={`num fut-side ${o.side.toLowerCase()}`}>{o.side}</span>
+              <span className="num mono">{trimAmount(o.size)}</span>
+              <span className="num mono">{Number(o.price).toFixed(2)}</span>
+              <span className="num fut-actions"><button className="cancel" onClick={() => run(() => api.futuresCancelOrder(o.id))}>Cancel</button></span>
+            </div>
+          ))}
+        </div>
+      )}
+      {tab === "pos" && (
       <div className="oo-table">
         <div className="fut-h"><span>Symbol</span><span>Size</span><span className="num">Entry</span><span className="num">Mark</span><span className="num">Liq. Price</span><span className="num">PnL (ROE)</span><span></span></div>
         {positions.length === 0 && <p className="tp-empty">No open positions.</p>}
@@ -205,6 +243,7 @@ function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () =
           );
         })}
       </div>
+      )}
     </>
   );
 }
