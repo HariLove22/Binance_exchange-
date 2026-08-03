@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "assets": "Assets",
+    "orders": "Orders",
+    "rewards": "Rewards Hub",
+    "referral": "Referral",
+    "account": "Account",
+    "subaccounts": "Sub Accounts",
+    "settings": "Settings"
+  },
+  "topnav": {
+    "buyCrypto": "Buy Crypto",
+    "markets": "Markets",
+    "trade": "Trade",
+    "futures": "Futures",
+    "earn": "Earn",
+    "more": "More"
+  },
+  "tradeMenu": {
+    "spot": "Spot",
+    "spotDesc": "Trade crypto on the order book",
+    "margin": "Margin",
+    "marginDesc": "Trade with leverage",
+    "p2p": "P2P",
+    "p2pDesc": "Buy & sell with bank transfer",
+    "options": "Options",
+    "optionsDesc": "Calls & puts, cash-settled",
+    "convert": "Convert",
+    "convertDesc": "Instant swap — not built yet",
+    "demo": "Demo Trading",
+    "demoDesc": "Practice with virtual funds — not built yet",
+    "soon": "soon"
+  },
+  "userMenu": {
+    "profile": "Profile",
+    "accounts": "Accounts",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "common": {
+    "deposit": "Deposit"
+  },
+  "auth": {
+    "welcomeBack": "Welcome back",
+    "loginSubtitle": "Log in to your Novex account to keep trading.",
+    "orContinueEmail": "or continue with email",
+    "accountCreated": "Account created — please log in to continue.",
+    "email": "Email",
+    "password": "Password",
+    "emailPlaceholder": "you@email.com",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "loggingIn": "Logging in…",
+    "login": "Log in",
+    "newToNovex": "New to Novex?",
+    "createAccount": "Create an account",
+    "invalidEmail": "Enter a valid email address",
+    "enterPassword": "Enter your password",
+    "genericError": "Something went wrong. Please try again."
+  }
+}

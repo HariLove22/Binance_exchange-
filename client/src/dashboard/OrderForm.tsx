@@ -11,6 +11,8 @@ import {
   withThousands,
 } from "../lib/amount";
 import { CoinSelect } from "./CoinSelect";
+import { FiatSelect } from "./FiatSelect";
+import { FIAT_CURRENCIES, ratePerUsd } from "../lib/fiat";
 
 const SCALE = 8; // BTC and USDT both track 8 decimals here
 
@@ -58,6 +60,10 @@ export function OrderForm({
   const [error, setError] = useState("");
   const [result, setResult] = useState<OrderRow | null>(null);
   const [balances, setBalances] = useState<Balance[] | null>(null);
+  // The currency the price is entered in. Defaults to the market's native quote (USDT). Picking a
+  // fiat lets the user think in their own currency; the order is still placed in the quote asset,
+  // converted at an approximate static rate (see lib/fiat) — the exchange only trades in USDT.
+  const [quoteCcy, setQuoteCcy] = useState(quote);
 
   useEffect(() => {
     if (presetPrice) setPrice(sanitizeAmount(presetPrice));
@@ -79,6 +85,35 @@ export function OrderForm({
   const spendAsset = side === "BUY" ? quote : base;
   const spendAvail = balances?.find((b) => b.asset === spendAsset)?.available ?? null;
 
+  // Selectable price currencies: the market's native quote (USDT) first, then every fiat.
+  const quoteOptions = [{ code: quote, name: "Tether", flag: "💵", perUsd: 1 }, ...FIAT_CURRENCIES];
+
+  /** Convert a price typed in `quoteCcy` to the market's quote (USDT). null if the rate is unknown. */
+  function toUsdtPrice(priceStr: string): string | null {
+    if (quoteCcy === quote) return priceStr;
+    const rate = ratePerUsd(quoteCcy);
+    if (!rate) return null;
+    const rateUnits = toUnits(String(rate), SCALE);
+    if (rateUnits === 0n) return null;
+    // priceUSDT = priceCcy / rate. The extra 10^SCALE keeps the quotient at SCALE precision.
+    return fromUnits((toUnits(priceStr, SCALE) * 10n ** BigInt(SCALE)) / rateUnits, SCALE);
+  }
+
+  // The USDT price actually sent to the engine, and used wherever balance math must be in USDT.
+  const usdtPrice = isPositive(price) ? toUsdtPrice(price) : null;
+
+  /** Switch price currency, converting any typed price so its real value is preserved. */
+  function changeQuote(next: string) {
+    if (next === quoteCcy) return;
+    const rFrom = ratePerUsd(quoteCcy);
+    const rTo = ratePerUsd(next);
+    if (isPositive(price) && rFrom && rTo) {
+      const units = (toUnits(price, SCALE) * toUnits(String(rTo), SCALE)) / toUnits(String(rFrom), SCALE);
+      setPrice(fromUnits(units, SCALE));
+    }
+    setQuoteCcy(next);
+  }
+
   /** Fill quantity with the most the balance allows. Selling: all the base. Buying: quote / price. */
   function fillMax() {
     if (spendAvail === null) return;
@@ -90,14 +125,20 @@ export function OrderForm({
       setError("Enter a price first to compute the max quantity");
       return;
     }
-    // maxQty = availableQuote / price, truncated to SCALE — floors, so it never exceeds the balance.
-    const maxUnits = (toUnits(spendAvail, SCALE) * 10n ** BigInt(SCALE)) / toUnits(price, SCALE);
+    if (!usdtPrice) {
+      setError(`No conversion rate for ${quoteCcy}`);
+      return;
+    }
+    // maxQty = availableQuote / priceUSDT, truncated to SCALE — floors, so it never exceeds balance.
+    const maxUnits = (toUnits(spendAvail, SCALE) * 10n ** BigInt(SCALE)) / toUnits(usdtPrice, SCALE);
     setQuantity(fromUnits(maxUnits, SCALE));
   }
 
   const valid = isPositive(price) && isPositive(quantity);
-  // Preview only — the server computes the real numbers.
+  // Preview only — the server computes the real numbers. `total` is in the display currency;
+  // `usdtTotal` is the same order in the quote asset it actually settles in.
   const total = valid ? multiply(price, quantity, SCALE) : "";
+  const usdtTotal = valid && usdtPrice ? multiply(usdtPrice, quantity, SCALE) : "";
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -108,15 +149,19 @@ export function OrderForm({
     if (!isPositive(price)) return setError("Enter a price greater than zero");
     if (!isPositive(quantity)) return setError("Enter a quantity greater than zero");
 
+    const usdt = toUsdtPrice(price);
+    if (!usdt) return setError(`No conversion rate for ${quoteCcy}`);
+
     setBusy(true);
     try {
-      // The order book / matching engine speaks in symbols ("BTCUSDT"); the form in pairs.
+      // The engine speaks in symbols ("BTCUSDT") and prices in the quote asset (USDT). The form may
+      // display a fiat, so send the converted USDT price — never the raw fiat number.
       const res = await api.placeOrder({
         symbol: pair.replace("/", "").toUpperCase(),
         side,
         type: "LIMIT",
         quantity,
-        price,
+        price: usdt,
       });
       setResult(res);
       setQuantity("");
@@ -163,8 +208,13 @@ export function OrderForm({
             placeholder="0.00"
             inputMode="decimal"
           />
-          <em>{quote}</em>
+          <FiatSelect value={quoteCcy} items={quoteOptions} onChange={changeQuote} />
         </div>
+        {quoteCcy !== quote && usdtPrice && (
+          <div className="of-quote-hint">
+            ≈ {withThousands(trimZeros(usdtPrice, 2))} {quote} per {base}
+          </div>
+        )}
       </label>
 
       <label className="of-field">
@@ -191,8 +241,13 @@ export function OrderForm({
 
       <div className="of-total">
         <span>Total</span>
-        <strong>{total ? `${withThousands(total)} ${quote}` : "—"}</strong>
+        <strong>{total ? `${withThousands(total)} ${quoteCcy}` : "—"}</strong>
       </div>
+      {quoteCcy !== quote && usdtTotal && (
+        <div className="of-total-sub">
+          ≈ {withThousands(trimZeros(usdtTotal, 2))} {quote} · settles in {quote}
+        </div>
+      )}
 
       {/* Not disabled on invalid input — a dead button with no explanation reads as "the app
           is broken". Let the click through and say what's missing. */}

@@ -509,15 +509,15 @@ function Deposit() {
       {note && <p className="assets-note mono">{note}</p>}
 
       {deposits.length > 0 && (
-        <div className="assets-table" style={{ marginTop: "1.25rem" }}>
-          <div className="at-head" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+        <div className="assets-table dep-table" style={{ marginTop: "1.25rem" }}>
+          <div className="at-head">
             <span>Asset</span>
             <span>Chain</span>
             <span className="num">Amount</span>
             <span>Status</span>
           </div>
           {deposits.map((d) => (
-            <div className="at-row" key={d.id} style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+            <div className="at-row" key={d.id}>
               <span className="mono">{d.asset}</span>
               <span className="mono">{d.chain}</span>
               <span className="num">{trimAmount(d.amount)}</span>

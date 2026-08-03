@@ -82,6 +82,7 @@ class AccountType(str, enum.Enum):
 WALLET_FUNDING = "FUNDING"
 WALLET_SPOT = "SPOT"
 WALLET_MARGIN = "MARGIN"
+# The futures sub-wallet: margin locked against open positions lives here, ring-fenced from spot.
 WALLET_FUTURES = "FUTURES"
 
 
@@ -173,7 +174,7 @@ class Account(TimestampMixin, Base):
         # A negative user balance means we let someone spend money they did not have. The margin
         # pool is the sanctioned exception alongside EXTERNAL/TDS.
         CheckConstraint(
-            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE', 'MARGIN_BORROWED')",
+            "balance >= 0 OR account_type IN ('EXTERNAL', 'TDS_PAYABLE', 'MARGIN_BORROWED', 'FUTURES_INSURANCE')",
             name="ck_accounts_no_negative_user_balance",
         ),
     )

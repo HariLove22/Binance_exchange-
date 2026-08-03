@@ -28,20 +28,29 @@ POLL_SECONDS = 3.0
 async def _sweep_once() -> None:
     async with AsyncSessionLocal() as db:
         fired = await trading.sweep_triggers(db, marketmaker.fetch_reference_price)
-        # Same loop liquidates underwater futures positions against the live mark price.
-        liquidated = await futures.sweep_liquidations(db, marketmaker.fetch_reference_price)
+        # Same loop liquidates underwater futures positions against the smoothed MARK price (not the
+        # raw last price) — so a single wick can't trigger a liquidation.
+        liquidated = await futures.sweep_liquidations(db, futures.mark_price)
         # And settles options that have expired, at the mark price.
         settled = await options.sweep_expiries(db, now=datetime.now(timezone.utc), price_of=marketmaker.fetch_reference_price)
-        if fired or liquidated or settled:
+        # And charges perpetual funding to positions whose 8h interval is due (on the mark price).
+        funded = await futures.apply_funding(db, now=datetime.now(timezone.utc), price_of=futures.mark_price)
+        # And fills resting futures LIMIT orders the last price has reached.
+        fut_filled = await futures.sweep_orders(db, futures.last_price)
+        if fired or liquidated or settled or funded or fut_filled:
             await db.commit()
             for symbol in fired:
                 pubsub.publish(pubsub.market_channel(symbol))  # wake live subscribers
             if liquidated:
                 log.info("liquidated futures positions: %s", liquidated)
+            if funded:
+                log.info("charged funding on %s positions", funded)
             if settled:
                 log.info("settled options: %s", settled)
             if fired:
                 log.info("fired stops: %s", fired)
+            if fut_filled:
+                log.info("filled futures limit orders: %s", fut_filled)
         else:
             await db.rollback()
 

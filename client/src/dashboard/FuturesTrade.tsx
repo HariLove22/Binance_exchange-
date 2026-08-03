@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, trimAmount, type FuturesAccount, type MarketInfo } from "../lib/api";
+import { api, ApiError, trimAmount, type FuturesAccount, type FuturesOpenOrder, type MarketInfo } from "../lib/api";
 import { useTicker } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
@@ -18,7 +18,7 @@ export function FuturesTrade() {
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [interval, setInterval] = useState("1m");
   const [acct, setAcct] = useState<FuturesAccount | null>(null);
-  const [clickedPrice, setClickedPrice] = useState<string | null>(null);
+  const [, setClickedPrice] = useState<string | null>(null);
   const [xfer, setXfer] = useState(false);
   const [mode, setMode] = useState<"USDTM" | "COINM">("USDTM");
 
@@ -63,6 +63,8 @@ export function FuturesTrade() {
           ) : <span className="tk-loading">connecting…</span>}
           <div className="tk-spacer" />
           <div className="mgt-ml"><span>Futures Balance</span><b>{acct ? (inverse ? `${trimAmount(String(coinBal))} ${base}` : `${usdtBal.toFixed(2)} USDT`) : "—"}</b></div>
+          {/* Dev only: one click to fund spot + auto-approve KYC so a position can be opened instantly. */}
+          <button className="mgt-hbtn" title="Dev: credit 50k USDT + approve KYC" onClick={() => { void api.futuresDevSetup().then(loadAcct).catch(() => {}); }}>Dev fund</button>
           <button className="mgt-hbtn" onClick={() => setXfer(true)}>Transfer</button>
         </div>
 
@@ -98,10 +100,14 @@ export function FuturesTrade() {
 function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: string; inverse: boolean; balance: number; livePrice: number | null; onDone: () => void }) {
   const [lev, setLev] = useState("10");
   const [pct, setPct] = useState(0);
+  const [cross, setCross] = useState(false);
+  const [otype, setOtype] = useState<"MARKET" | "LIMIT">("MARKET");
+  const [limitPrice, setLimitPrice] = useState("");
   const [busy, setBusy] = useState<"LONG" | "SHORT" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const base = symbol.replace(/USDT$/, "");
-  const price = livePrice ?? 0;
+  // A LIMIT order sizes off its limit price; a market order off the live price.
+  const price = otype === "LIMIT" && Number(limitPrice) > 0 ? Number(limitPrice) : (livePrice ?? 0);
   const leverage = Number(lev) || 1;
   // COIN-M: balance is in coin; size = USD notional, margin in coin. USDT-M: size = base qty, margin USDT.
   const marginUnit = inverse ? base : "USDT";
@@ -114,16 +120,33 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
 
   async function submit(side: "LONG" | "SHORT") {
     if (size <= 0) { setNote("choose a size with the slider"); return; }
+    if (otype === "LIMIT" && !(Number(limitPrice) > 0)) { setNote("enter a limit price"); return; }
     setBusy(side); setNote("");
     try {
-      const o = await api.futuresOrder({ symbol, side, size: sizeStr, leverage: lev, inverse });
-      setNote(`${side} opened @ ${trimAmount(o.entry_price)} · margin ${trimAmount(o.margin)} ${o.margin_asset}`);
+      const o = await api.futuresOrder({ symbol, side, size: sizeStr, leverage: lev, inverse, cross,
+                                         type: otype, price: otype === "LIMIT" ? limitPrice : undefined });
+      setNote(otype === "LIMIT"
+        ? `${side} limit resting @ ${trimAmount(limitPrice)}`
+        : `${side} opened @ ${trimAmount(o.entry_price)} · margin ${trimAmount(o.margin)} ${o.margin_asset}`);
       setPct(0); onDone();
     } catch (e) { setNote(e instanceof ApiError ? e.message : String(e)); } finally { setBusy(null); }
   }
 
   return (
     <div className="fut-form">
+      <div className="fut-mode fut-margin-mode">
+        <button className={!cross ? "on" : ""} onClick={() => setCross(false)}>Isolated</button>
+        <button className={cross ? "on" : ""} onClick={() => setCross(true)}>Cross</button>
+      </div>
+      <div className="fut-mode fut-margin-mode">
+        <button className={otype === "MARKET" ? "on" : ""} onClick={() => setOtype("MARKET")}>Market</button>
+        <button className={otype === "LIMIT" ? "on" : ""} onClick={() => setOtype("LIMIT")}>Limit</button>
+      </div>
+      {otype === "LIMIT" && (
+        <div className="of-field"><label>Limit price</label>
+          <div className="of-input"><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder="0" inputMode="decimal" /><span className="of-unit">USDT</span></div>
+        </div>
+      )}
       <div className="fut-lev">
         <label>Leverage</label>
         <div className="fut-lev-row">
@@ -151,16 +174,52 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
 
 function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null);
-  async function close(id: number) {
+  const [tab, setTab] = useState<"pos" | "orders">("pos");
+  const [orders, setOrders] = useState<FuturesOpenOrder[]>([]);
+  const loadOrders = useCallback(() => api.futuresOpenOrders().then(setOrders).catch(() => {}), []);
+  useEffect(() => { loadOrders(); const t = window.setInterval(loadOrders, 4000); return () => window.clearInterval(t); }, [loadOrders]);
+  async function run(fn: () => Promise<unknown>) {
     setErr(null);
-    try { await api.futuresClose(id); onDone(); }
+    try { await fn(); onDone(); loadOrders(); }
     catch (e) { setErr(e instanceof ApiError ? e.message : String(e)); }
+  }
+  // ponytail: prompt() for amounts — dev-grade, swap for inline inputs when the UX matters.
+  function adjustMargin(id: number, add: boolean) {
+    const v = window.prompt(`${add ? "Add" : "Remove"} margin (USDT)`);
+    if (v && Number(v) > 0) void run(() => api.futuresAdjustMargin(id, v, add));
+  }
+  function setLev(id: number, cur: string) {
+    const v = window.prompt("New leverage (1–100x)", cur);
+    if (v && Number(v) >= 1) void run(() => api.futuresSetLeverage(id, v));
   }
   const positions = acct?.positions ?? [];
   return (
     <>
-      <div className="oo-tabs"><button className="on">Positions ({positions.length})</button></div>
+      <div className="oo-tabs">
+        <button className={tab === "pos" ? "on" : ""} onClick={() => setTab("pos")}>Positions ({positions.length})</button>
+        <button className={tab === "orders" ? "on" : ""} onClick={() => setTab("orders")}>Open Orders ({orders.length})</button>
+        {/* Dev: charge one 8h funding interval now instead of waiting — longs pay shorts. */}
+        <button className="mgt-hbtn" style={{ marginLeft: "auto" }} title="Dev: charge one funding interval now"
+                onClick={() => { void api.futuresApplyFunding().then(onDone).catch(() => {}); }}>Charge funding (dev)</button>
+      </div>
       {err && <p className="mgt-err">{err}</p>}
+      {tab === "orders" && (
+        <div className="oo-table">
+          <div className="fut-h"><span>Symbol</span><span>Type</span><span className="num">Side</span><span className="num">Size</span><span className="num">Limit price</span><span></span></div>
+          {orders.length === 0 && <p className="tp-empty">No open orders.</p>}
+          {orders.map((o) => (
+            <div className="fut-r" key={o.id}>
+              <span><b>{o.symbol}</b></span>
+              <span className="mono">{o.order_type}</span>
+              <span className={`num fut-side ${o.side.toLowerCase()}`}>{o.side}</span>
+              <span className="num mono">{trimAmount(o.size)}</span>
+              <span className="num mono">{Number(o.price).toFixed(2)}</span>
+              <span className="num fut-actions"><button className="cancel" onClick={() => run(() => api.futuresCancelOrder(o.id))}>Cancel</button></span>
+            </div>
+          ))}
+        </div>
+      )}
+      {tab === "pos" && (
       <div className="oo-table">
         <div className="fut-h"><span>Symbol</span><span>Size</span><span className="num">Entry</span><span className="num">Mark</span><span className="num">Liq. Price</span><span className="num">PnL (ROE)</span><span></span></div>
         {positions.length === 0 && <p className="tp-empty">No open positions.</p>}
@@ -168,17 +227,23 @@ function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () =
           const pnl = Number(p.unrealized_pnl ?? 0);
           return (
             <div className="fut-r" key={p.id}>
-              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`}>{p.side} {trimAmount(p.leverage)}x</span></span>
+              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`} onClick={() => setLev(p.id, trimAmount(p.leverage))} style={{ cursor: "pointer" }} title="Click to change leverage">{p.side} {trimAmount(p.leverage)}x · {p.cross ? "Cross" : "Iso"}</span></span>
               <span className="mono">{trimAmount(p.size)}</span>
               <span className="num mono">{Number(p.entry_price).toFixed(2)}</span>
-              <span className="num mono">{p.mark ? Number(p.mark).toFixed(2) : "—"}</span>
+              <span className="num mono" title={p.last ? `Last (fill) price ${Number(p.last).toFixed(2)} · mark drives PnL/liq` : undefined}>{p.mark ? Number(p.mark).toFixed(2) : "—"}</span>
               <span className="num mono warn">{Number(p.liquidation_price).toFixed(2)}</span>
-              <span className={`num mono ${pnl >= 0 ? "up" : "down"}`}>{pnl >= 0 ? "+" : ""}{p.inverse ? `${trimAmount(p.unrealized_pnl ?? "0")} ${p.margin_asset}` : pnl.toFixed(2)} <em>({Number(p.roe ?? 0).toFixed(1)}%)</em></span>
-              <span className="num"><button className="cancel" onClick={() => close(p.id)}>Close</button></span>
+              <span className={`num mono ${pnl >= 0 ? "up" : "down"}`}>{pnl >= 0 ? "+" : ""}{p.inverse ? `${trimAmount(p.unrealized_pnl ?? "0")} ${p.margin_asset}` : pnl.toFixed(2)} <em>({Number(p.roe ?? 0).toFixed(1)}%)</em>{Number(p.funding_accrued) !== 0 && <em title="Funding paid(-)/received(+)"> · fund {Number(p.funding_accrued) >= 0 ? "+" : ""}{Number(p.funding_accrued).toFixed(4)}</em>}</span>
+              <span className="num fut-actions">
+                <button className="cancel" title="Add margin" onClick={() => adjustMargin(p.id, true)}>+M</button>
+                <button className="cancel" title="Remove margin" onClick={() => adjustMargin(p.id, false)}>−M</button>
+                <button className="cancel" title="Close half" onClick={() => run(() => api.futuresClose(p.id, trimAmount(String(Number(p.size) / 2))))}>½</button>
+                <button className="cancel" onClick={() => run(() => api.futuresClose(p.id))}>Close</button>
+              </span>
             </div>
           );
         })}
       </div>
+      )}
     </>
   );
 }

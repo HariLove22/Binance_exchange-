@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext";
 import { navigate } from "../router";
 import { Overview, Placeholder } from "./pages";
@@ -61,15 +62,16 @@ const NAV: NavItem[] = [
   { key: "settings", label: "Settings", icon: IGear },
 ];
 
-// The Trade dropdown, like Binance's top nav. Spot is live; the rest are not built yet and say so.
-type TradeOption = { label: string; desc: string; to?: string; tag?: string };
+// The Trade dropdown, like Binance's top nav. `key` maps to tradeMenu.<key>/<key>Desc in the
+// translation files; items with no `to` aren't built yet and show a "soon" tag.
+type TradeOption = { key: string; to?: string };
 const TRADE_OPTIONS: TradeOption[] = [
-  { label: "Spot", desc: "Trade crypto on the order book", to: "/dashboard/trade" },
-  { label: "Margin", desc: "Trade with leverage", to: "/dashboard/margin" },
-  { label: "P2P", desc: "Buy & sell with bank transfer", to: "/dashboard/p2p" },
-  { label: "Options", desc: "Calls & puts, cash-settled", to: "/dashboard/options" },
-  { label: "Convert", desc: "Instant swap — not built yet", tag: "soon" },
-  { label: "Demo Trading", desc: "Practice with virtual funds — not built yet", tag: "soon" },
+  { key: "spot", to: "/dashboard/trade" },
+  { key: "margin", to: "/dashboard/margin" },
+  { key: "p2p", to: "/dashboard/p2p" },
+  { key: "options", to: "/dashboard/options" },
+  { key: "convert" },
+  { key: "demo" },
 ];
 
 function segmentOf(path: string): string {
@@ -78,6 +80,7 @@ function segmentOf(path: string): string {
 }
 
 export function Dashboard({ path }: { path: string }) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const seg = segmentOf(path);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -107,21 +110,21 @@ export function Dashboard({ path }: { path: string }) {
           <span className="brand-mark" aria-hidden>◈</span> Novex
         </a>
         <nav className="dash-topnav">
-          <a href="#/dashboard/p2p" className={seg === "p2p" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/p2p"); }}>Buy Crypto</a>
-          <a href="#/dashboard/markets" className={seg === "markets" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/markets"); }}>Markets</a>
+          <a href="#/dashboard/p2p" className={seg === "p2p" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/p2p"); }}>{t("topnav.buyCrypto")}</a>
+          <a href="#/dashboard/markets" className={seg === "markets" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/markets"); }}>{t("topnav.markets")}</a>
 
           <div className="topnav-drop" ref={tradeRef}>
             <button
               className={`topnav-trigger ${seg === "trade" ? "active" : ""}`}
               onClick={() => setTradeOpen((o) => !o)}
             >
-              Trade ▾
+              {t("topnav.trade")} ▾
             </button>
             {tradeOpen && (
               <div className="trade-dropdown">
                 {TRADE_OPTIONS.map((opt) => (
                   <button
-                    key={opt.label}
+                    key={opt.key}
                     className={`td-item ${opt.to ? "" : "disabled"}`}
                     disabled={!opt.to}
                     onClick={() => {
@@ -132,19 +135,19 @@ export function Dashboard({ path }: { path: string }) {
                     }}
                   >
                     <span className="td-label">
-                      {opt.label}
-                      {opt.tag && <span className="td-tag">{opt.tag}</span>}
+                      {t(`tradeMenu.${opt.key}`)}
+                      {!opt.to && <span className="td-tag">{t("tradeMenu.soon")}</span>}
                     </span>
-                    <span className="td-desc">{opt.desc}</span>
+                    <span className="td-desc">{t(`tradeMenu.${opt.key}Desc`)}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          <a href="#/dashboard/futures" className={seg === "futures" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/futures"); }}>Futures</a>
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>Earn</a>
-          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>More</a>
+          <a href="#/dashboard/futures" className={seg === "futures" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/futures"); }}>{t("topnav.futures")}</a>
+          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>{t("topnav.earn")}</a>
+          <a href="#/dashboard" onClick={(e) => e.preventDefault()}>{t("topnav.more")}</a>
         </nav>
 
         <div className="dash-top-right">
@@ -152,7 +155,7 @@ export function Dashboard({ path }: { path: string }) {
           <LangCurrency />
           <ThemeToggle />
           <button className="dash-deposit" onClick={() => { sessionStorage.setItem("assets_tab", "deposit"); navigate("/dashboard/assets"); }}>
-            <IDeposit style={{ width: 16, height: 16 }} /> Deposit
+            <IDeposit style={{ width: 16, height: 16 }} /> {t("common.deposit")}
           </button>
 
           <div className="user-menu" ref={menuRef}>
@@ -165,10 +168,10 @@ export function Dashboard({ path }: { path: string }) {
                   <div className="ud-name">{user.full_name}</div>
                   <div className="ud-email">{user.email}</div>
                 </div>
-                <button className="ud-item" onClick={() => navigate("/dashboard/profile")}>Profile</button>
-                <button className="ud-item" onClick={() => navigate("/dashboard/account")}>Accounts</button>
-                <button className="ud-item" onClick={() => navigate("/dashboard/settings")}>Settings</button>
-                <button className="ud-item danger" onClick={logout}>Log out</button>
+                <button className="ud-item" onClick={() => navigate("/dashboard/profile")}>{t("userMenu.profile")}</button>
+                <button className="ud-item" onClick={() => navigate("/dashboard/account")}>{t("userMenu.accounts")}</button>
+                <button className="ud-item" onClick={() => navigate("/dashboard/settings")}>{t("userMenu.settings")}</button>
+                <button className="ud-item danger" onClick={logout}>{t("userMenu.logout")}</button>
               </div>
             )}
           </div>
@@ -188,7 +191,7 @@ export function Dashboard({ path }: { path: string }) {
                   <div key={n.key} className="side-group">
                     <button className={`side-item ${childActive ? "active" : ""}`} onClick={() => setAccOpen((o) => !o)}>
                       <Icon />
-                      {n.label}
+                      {t(`nav.${n.key || "dashboard"}`)}
                       <span className={`side-caret ${open ? "open" : ""}`}>⌄</span>
                     </button>
                     {open && (
@@ -211,7 +214,7 @@ export function Dashboard({ path }: { path: string }) {
                   onClick={() => navigate(`/dashboard${n.key ? `/${n.key}` : ""}`)}
                 >
                   <Icon />
-                  {n.label}
+                  {t(`nav.${n.key || "dashboard"}`)}
                 </button>
               );
             })}
