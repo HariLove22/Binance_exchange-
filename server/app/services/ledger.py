@@ -477,6 +477,37 @@ async def transfer_wallet(
     )
 
 
+async def transfer_between(
+    db: AsyncSession,
+    *,
+    from_user_id: int,
+    from_wallet: str,
+    to_user_id: int,
+    to_wallet: str,
+    asset_id: int,
+    amount: Decimal,
+    kind: TransactionKind = TransactionKind.ADJUSTMENT,
+    idempotency_key: str,
+    reference: str | None = None,
+) -> LedgerTransaction | None:
+    """Move one asset's AVAILABLE funds between any two (user, wallet) accounts. Balances to zero.
+
+    The general cross-user, same-asset move — escrow (buyer -> launchpad), pool funding (user ->
+    POOL:{id}), payouts. `transfer_wallet` is the same-user special case of this.
+    """
+    if amount <= 0:
+        raise LedgerError("transfer amount must be positive")
+    src = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, from_user_id, wallet=from_wallet)
+    dst = await get_or_create_account(db, asset_id, AccountType.AVAILABLE, to_user_id, wallet=to_wallet)
+    if src.balance < amount:
+        asset = await db.get(Asset, asset_id)
+        raise InsufficientFunds(asset.symbol if asset else str(asset_id), amount, src.balance)
+    return await post(
+        db, idempotency_key=idempotency_key, kind=kind, reference=reference,
+        movements=[Movement(src, -amount), Movement(dst, amount)],
+    )
+
+
 async def margin_borrow(
     db: AsyncSession,
     *,

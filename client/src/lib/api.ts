@@ -606,7 +606,47 @@ export const api = {
     request<MarginAccount>("/margin/repay", { method: "POST", body: JSON.stringify(body) }),
   marginOrder: (body: { mode?: string; symbol: string; side: "BUY" | "SELL"; type?: "LIMIT" | "MARKET"; quantity: string; price?: string | null; auto_borrow?: boolean }) =>
     request<{ id: number; status: string; filled_quantity: string; quantity: string; wallet: string }>("/margin/order", { method: "POST", body: JSON.stringify(body) }),
+
+  // --- launchpad: create coin, run ICO/STO, pool + swap ---
+  lpCreateToken: (body: { symbol: string; name: string; total_supply: string; purpose?: string; target_audience?: string; offering_type?: "ICO" | "STO" }) =>
+    request<LpToken>("/launchpad/token", { method: "POST", body: JSON.stringify(body) }),
+  lpMyTokens: () => request<LpToken[]>("/launchpad/tokens"),
+  lpOpenOffering: (body: { token_symbol: string; sale_price: string; tokens_for_sale: string; soft_cap?: string; duration_hours?: number; requires_whitelist?: boolean; lockup_days?: number }) =>
+    request<LpOffering>("/launchpad/offering", { method: "POST", body: JSON.stringify(body) }),
+  lpOfferings: () => request<LpOffering[]>("/launchpad/offerings"),
+  lpBuyOffering: (id: number, usdt_amount: string) =>
+    request<{ tokens_bought: string; usdt_paid: string }>(`/launchpad/offering/${id}/buy`, { method: "POST", body: JSON.stringify({ usdt_amount }) }),
+  lpCloseOffering: (id: number) => request<{ status: string }>(`/launchpad/offering/${id}/close`, { method: "POST" }),
+  lpWhitelist: (id: number, user_email: string) =>
+    request<{ whitelisted: string }>(`/launchpad/offering/${id}/whitelist`, { method: "POST", body: JSON.stringify({ user_email }) }),
+  lpCreatePool: (body: { token_symbol: string; token_amt: string; quote_amt: string }) =>
+    request<{ pool_id: number; shares: string; price: string }>("/launchpad/pool", { method: "POST", body: JSON.stringify(body) }),
+  lpPools: () => request<LpPool[]>("/launchpad/pools"),
+  lpAddLiquidity: (poolId: number, body: { token_amt: string; quote_amt?: string }) =>
+    request<{ shares: string; price: string }>(`/launchpad/pool/${poolId}/add`, { method: "POST", body: JSON.stringify(body) }),
+  lpRemoveLiquidity: (poolId: number, shares: string) =>
+    request<{ token_out: string; quote_out: string }>(`/launchpad/pool/${poolId}/remove`, { method: "POST", body: JSON.stringify({ shares }) }),
+  lpSwapQuote: (poolId: number, side: "BUY" | "SELL", amountIn: string) =>
+    request<{ amount_out: string; price_impact: string }>(`/launchpad/swap/quote?pool_id=${poolId}&side=${side}&amount_in=${amountIn}`),
+  lpSwap: (body: { pool_id: number; side: "BUY" | "SELL"; amount_in: string; min_out?: string }) =>
+    request<{ amount_out: string; price: string }>("/launchpad/swap", { method: "POST", body: JSON.stringify(body) }),
 };
+
+export interface LpToken {
+  id: number; symbol: string; name: string; total_supply: string;
+  offering_type: "ICO" | "STO"; purpose?: string; target_audience?: string; balance: string;
+}
+export interface LpOffering {
+  id: number; symbol?: string; type: "ICO" | "STO"; status: string;
+  sale_price: string; tokens_for_sale: string; hard_cap: string; soft_cap: string;
+  raised: string; tokens_sold: string; start_at: string; end_at: string;
+  requires_whitelist: boolean; lockup_until: string | null;
+}
+export interface LpPool {
+  id: number; symbol: string; name: string; reserve_token: string; reserve_quote: string;
+  price: string | null; fee_bps: number; lp_supply: string; tvl_usd: string | null;
+  fdv_usd: string | null; my_shares: string;
+}
 
 export interface MarginLoanRow {
   id: number;

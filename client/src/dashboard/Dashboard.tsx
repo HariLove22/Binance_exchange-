@@ -9,6 +9,7 @@ import { Trade } from "./Trade";
 import { P2P } from "./P2P";
 import { MarginTrade } from "./MarginTrade";
 import { FuturesTrade } from "./FuturesTrade";
+import { Launchpad } from "./Launchpad";
 import { Options } from "./Options";
 import { Account } from "./Account";
 import { Settings } from "./Settings";
@@ -146,6 +147,7 @@ export function Dashboard({ path }: { path: string }) {
           </div>
 
           <a href="#/dashboard/futures" className={seg === "futures" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/futures"); }}>{t("topnav.futures")}</a>
+          <a href="#/dashboard/launchpad" className={seg === "launchpad" ? "active" : ""} onClick={(e) => { e.preventDefault(); navigate("/dashboard/launchpad"); }}>Launchpad</a>
           <a href="#/dashboard" onClick={(e) => e.preventDefault()}>{t("topnav.earn")}</a>
           <a href="#/dashboard" onClick={(e) => e.preventDefault()}>{t("topnav.more")}</a>
         </nav>
@@ -236,6 +238,8 @@ export function Dashboard({ path }: { path: string }) {
             <MarginTrade />
           ) : seg === "futures" ? (
             <FuturesTrade />
+          ) : seg === "launchpad" ? (
+            <Launchpad />
           ) : seg === "options" ? (
             <Options />
           ) : seg === "assets" ? (
