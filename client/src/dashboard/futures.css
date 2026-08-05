@@ -46,6 +46,10 @@
 .of-est { margin-top: 0.3rem; font-size: 0.72rem; opacity: 0.85; }
 .of-est .warn { color: #f0b90b; }
 
+/* account-summary PnL colour in the header (beats the base .mgt-ml b colour) */
+.mgt-ml b.up { color: #0ecb81; }
+.mgt-ml b.down { color: #f6465d; }
+
 /* Market Trades tab: 2 columns per row (spot's narrow left panel keeps auto-fill). */
 .mgt .mt-cols, .mgt .mt-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 

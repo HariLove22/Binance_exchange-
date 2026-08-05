@@ -37,6 +37,12 @@ export function FuturesTrade() {
   const inverse = mode === "COINM";
   const coinBal = Number(acct?.balances?.[base] ?? 0);
   const usdtBal = Number(acct?.balance_usdt ?? 0);
+  // Account summary for the current margin mode: available + locked margin + unrealized PnL = equity.
+  const availBal = inverse ? coinBal : usdtBal;
+  const modePos = (acct?.positions ?? []).filter((p) => p.inverse === inverse);
+  const upnl = modePos.reduce((s, p) => s + Number(p.unrealized_pnl ?? 0), 0);
+  const lockedMargin = modePos.reduce((s, p) => s + Number(p.margin ?? 0), 0);
+  const fmtBal = (v: number) => (inverse ? `${v.toFixed(4)} ${base}` : `${v.toFixed(2)} USDT`);
 
   return (
     <div className="trade">
@@ -61,7 +67,9 @@ export function FuturesTrade() {
             </>
           ) : <span className="tk-loading">connecting…</span>}
           <div className="tk-spacer" />
-          <div className="mgt-ml"><span>Futures Balance</span><b>{acct ? (inverse ? `${coinBal.toFixed(4)} ${base}` : `${usdtBal.toFixed(2)} USDT`) : "—"}</b></div>
+          <div className="mgt-ml"><span>Margin Balance</span><b title="Available + locked margin + unrealized PnL">{acct ? fmtBal(availBal + lockedMargin + upnl) : "—"}</b></div>
+          <div className="mgt-ml"><span>Unrealized PnL</span><b className={upnl > 0 ? "up" : upnl < 0 ? "down" : ""}>{acct ? `${upnl >= 0 ? "+" : ""}${fmtBal(upnl)}` : "—"}</b></div>
+          <div className="mgt-ml"><span>Available</span><b>{acct ? fmtBal(availBal) : "—"}</b></div>
           {/* Dev only: one click to fund spot + auto-approve KYC so a position can be opened instantly. */}
           <button className="mgt-hbtn" title="Dev: credit 50k USDT + approve KYC" onClick={() => { void api.futuresDevSetup().then(loadAcct).catch(() => {}); }}>Dev fund</button>
           <button className="mgt-hbtn" onClick={() => setXfer(true)}>Transfer</button>
