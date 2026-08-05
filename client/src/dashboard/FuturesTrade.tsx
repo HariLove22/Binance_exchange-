@@ -120,6 +120,21 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
   const maxSize = inverse ? maxNotionalUsd : (price > 0 ? maxNotionalUsd / price : 0);
   const size = Number(sizeInput) || 0;
   const margin = price > 0 && size > 0 ? (inverse ? (size / price) / leverage : (size * price) / leverage) : 0;
+  // Live estimates (same maths the server uses). entry ≈ the ref price; shown for both sides since
+  // the side isn't chosen until Buy/Sell is clicked. MMR 0.5%, taker fee 0.04%.
+  const estLiq = (side: "LONG" | "SHORT") => {
+    if (price <= 0 || size <= 0 || margin <= 0) return 0;
+    const mmr = 0.005;
+    if (inverse) {
+      if (side === "LONG") return (size * (1 + mmr)) / (margin + size / price);
+      const denom = size / price - margin;
+      return denom > 0 ? (size * (1 - mmr)) / denom : 0;
+    }
+    if (side === "LONG") return (price * size - margin) / (size * (1 - mmr));
+    return (margin + price * size) / (size * (1 + mmr));
+  };
+  const fee = size > 0 && price > 0 ? (inverse ? size / price : size * price) * 0.0004 : 0;
+  const px = (v: number) => (v > 0 ? fmtPx(v) : "—");
   const applyPct = (p: number) => {
     setPct(p);
     const s = (maxSize * p) / 100;
@@ -184,6 +199,12 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
         <span>Avbl <span className="mono">{inverse ? `${balance.toFixed(4)} ${base}` : `${balance.toFixed(2)} USDT`}</span></span>
         <span>Margin <span className="mono">{margin > 0 ? `${inverse ? trimAmount(String(Number(margin.toFixed(8)))) : margin.toFixed(2)} ${marginUnit}` : "—"}</span></span>
       </div>
+      {size > 0 && price > 0 && (
+        <div className="of-row of-est">
+          <span title="Estimated liquidation price for a Long / Short at this size and leverage">Liq. est. <span className="mono">L {px(estLiq("LONG"))} · S {px(estLiq("SHORT"))}</span></span>
+          <span title="Taker fee (0.04%), charged on close">Fee <span className="mono">{inverse ? `${trimAmount(String(Number(fee.toFixed(8))))} ${base}` : `${fee.toFixed(2)} USDT`}</span></span>
+        </div>
+      )}
       <div className="fut-btns">
         <button className="fut-long" disabled={busy !== null} onClick={() => submit("LONG")}>{busy === "LONG" ? "…" : "Buy / Long"}</button>
         <button className="fut-short" disabled={busy !== null} onClick={() => submit("SHORT")}>{busy === "SHORT" ? "…" : "Sell / Short"}</button>

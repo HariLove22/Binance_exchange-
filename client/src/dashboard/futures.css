@@ -42,6 +42,10 @@
 /* isolated / cross margin-mode toggle on the order form */
 .fut-margin-mode { margin-bottom: 0.6rem; }
 
+/* order-form live estimates (liq price + fee) — dimmer than the avbl/margin row */
+.of-est { margin-top: 0.3rem; font-size: 0.72rem; opacity: 0.85; }
+.of-est .warn { color: #f0b90b; }
+
 /* Market Trades tab: 2 columns per row (spot's narrow left panel keeps auto-fill). */
 .mgt .mt-cols, .mgt .mt-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
