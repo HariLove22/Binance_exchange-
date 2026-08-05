@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { api, ApiError, trimAmount, type FuturesAccount, type FuturesClosedPosition, type FuturesOpenOrder, type MarketInfo, type TradeTick } from "../lib/api";
 import { useTicker } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
@@ -207,28 +207,36 @@ function Positions({ acct, onDone, symbol, trades }: { acct: FuturesAccount | nu
     try { await fn(); onDone(); loadOrders(); }
     catch (e) { setErr(e instanceof ApiError ? e.message : String(e)); }
   }
-  // ponytail: prompt() for amounts — dev-grade, swap for inline inputs when the UX matters.
-  function adjustMargin(id: number, add: boolean) {
-    const v = window.prompt(`${add ? "Add" : "Remove"} margin (USDT)`);
-    if (v && Number(v) > 0) void run(() => api.futuresAdjustMargin(id, v, add));
+  // Inline editor: one open at a time, keyed by position. `a` is the single value (margin/leverage
+  // or take-profit); `b` is the stop-loss when the kind is tpsl.
+  const [edit, setEdit] = useState<null | { id: number; kind: "addM" | "remM" | "lev" | "tpsl" }>(null);
+  const [ev, setEv] = useState({ a: "", b: "" });
+  const num = (s: string) => s.replace(/[^\d.]/g, "");
+  function openEdit(id: number, kind: "addM" | "remM" | "lev" | "tpsl", presetA = "") {
+    setErr(null); setEv({ a: presetA, b: "" }); setEdit({ id, kind });
   }
-  function setLev(id: number, cur: string) {
-    const v = window.prompt("New leverage (1–100x)", cur);
-    if (v && Number(v) >= 1) void run(() => api.futuresSetLeverage(id, v));
-  }
-  // Attach take-profit / stop-loss as reduce-only trigger orders on an open position. The closing
-  // side is the opposite of the position; TP fires in profit, SL in loss (direction is derived
-  // server-side from type+side). ponytail: prompt()-driven like the others — inline UI is A3.
-  function tpsl(p: FuturesAccount["positions"][number]) {
-    const tp = window.prompt(`Take-Profit price for ${p.symbol} ${p.side} (blank to skip)`);
-    const sl = window.prompt(`Stop-Loss price for ${p.symbol} ${p.side} (blank to skip)`);
-    const closeSide: "LONG" | "SHORT" = p.side === "LONG" ? "SHORT" : "LONG";
-    const base = { symbol: p.symbol, side: closeSide, size: trimAmount(p.size), leverage: trimAmount(p.leverage),
-                   inverse: p.inverse, cross: p.cross, reduce_only: true } as const;
-    const jobs: Promise<unknown>[] = [];
-    if (tp && Number(tp) > 0) jobs.push(api.futuresOrder({ ...base, type: "TAKE_PROFIT", trigger_price: tp }));
-    if (sl && Number(sl) > 0) jobs.push(api.futuresOrder({ ...base, type: "STOP_MARKET", trigger_price: sl }));
-    if (jobs.length) void run(() => Promise.all(jobs));
+  function commitEdit(p: FuturesAccount["positions"][number]) {
+    if (!edit) return;
+    const { a, b } = ev;
+    if (edit.kind === "addM" || edit.kind === "remM") {
+      if (!(Number(a) > 0)) return;
+      void run(() => api.futuresAdjustMargin(p.id, a, edit.kind === "addM"));
+    } else if (edit.kind === "lev") {
+      if (!(Number(a) >= 1)) return;
+      void run(() => api.futuresSetLeverage(p.id, a));
+    } else {
+      // TP/SL as reduce-only triggers; closing side is the opposite of the position. Direction (TP
+      // fires in profit, SL in loss) is derived server-side from type+side.
+      const closeSide: "LONG" | "SHORT" = p.side === "LONG" ? "SHORT" : "LONG";
+      const base = { symbol: p.symbol, side: closeSide, size: trimAmount(p.size), leverage: trimAmount(p.leverage),
+                     inverse: p.inverse, cross: p.cross, reduce_only: true } as const;
+      const jobs: Promise<unknown>[] = [];
+      if (Number(a) > 0) jobs.push(api.futuresOrder({ ...base, type: "TAKE_PROFIT", trigger_price: a }));
+      if (Number(b) > 0) jobs.push(api.futuresOrder({ ...base, type: "STOP_MARKET", trigger_price: b }));
+      if (!jobs.length) return;
+      void run(() => Promise.all(jobs));
+    }
+    setEdit(null);
   }
   const positions = acct?.positions ?? [];
   return (
@@ -265,22 +273,43 @@ function Positions({ acct, onDone, symbol, trades }: { acct: FuturesAccount | nu
         {positions.length === 0 && <p className="tp-empty">No open positions.</p>}
         {positions.map((p) => {
           const pnl = Number(p.unrealized_pnl ?? 0);
+          const editing = edit?.id === p.id;
           return (
-            <div className="fut-r" key={p.id}>
-              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`} onClick={() => setLev(p.id, trimAmount(p.leverage))} style={{ cursor: "pointer" }} title="Click to change leverage">{p.side} {trimAmount(p.leverage)}x · {p.cross ? "Cross" : "Iso"}</span></span>
+            <Fragment key={p.id}>
+            <div className="fut-r">
+              <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`} onClick={() => openEdit(p.id, "lev", trimAmount(p.leverage))} style={{ cursor: "pointer" }} title="Click to change leverage">{p.side} {trimAmount(p.leverage)}x · {p.cross ? "Cross" : "Iso"}</span></span>
               <span className="mono">{trimAmount(p.size)}</span>
               <span className="num mono">{Number(p.entry_price).toFixed(2)}</span>
               <span className="num mono" title={p.last ? `Last (fill) price ${Number(p.last).toFixed(2)} · mark drives PnL/liq` : undefined}>{p.mark ? Number(p.mark).toFixed(2) : "—"}</span>
               <span className="num mono warn">{Number(p.liquidation_price).toFixed(2)}</span>
               <span className={`num mono ${pnl >= 0 ? "up" : "down"}`}>{pnl >= 0 ? "+" : ""}{p.inverse ? `${trimAmount(p.unrealized_pnl ?? "0")} ${p.margin_asset}` : pnl.toFixed(2)} <em>({Number(p.roe ?? 0).toFixed(1)}%)</em>{Number(p.funding_accrued) !== 0 && <em title="Funding paid(-)/received(+)"> · fund {Number(p.funding_accrued) >= 0 ? "+" : ""}{Number(p.funding_accrued).toFixed(4)}</em>}</span>
               <span className="num fut-actions">
-                <button className="cancel" title="Add margin" onClick={() => adjustMargin(p.id, true)}>+M</button>
-                <button className="cancel" title="Remove margin" onClick={() => adjustMargin(p.id, false)}>−M</button>
-                <button className="cancel" title="Set take-profit / stop-loss" onClick={() => tpsl(p)}>TP/SL</button>
+                <button className={`cancel ${editing && edit.kind === "addM" ? "on" : ""}`} title="Add margin" onClick={() => openEdit(p.id, "addM")}>+M</button>
+                <button className={`cancel ${editing && edit.kind === "remM" ? "on" : ""}`} title="Remove margin" onClick={() => openEdit(p.id, "remM")}>−M</button>
+                <button className={`cancel ${editing && edit.kind === "tpsl" ? "on" : ""}`} title="Set take-profit / stop-loss" onClick={() => openEdit(p.id, "tpsl")}>TP/SL</button>
                 <button className="cancel" title="Close half" onClick={() => run(() => api.futuresClose(p.id, trimAmount(String(Number(p.size) / 2))))}>½</button>
                 <button className="cancel" onClick={() => run(() => api.futuresClose(p.id))}>Close</button>
               </span>
             </div>
+            {editing && (
+              <div className="fut-edit">
+                {edit.kind === "tpsl" ? (
+                  <>
+                    <label>Take-Profit <input autoFocus value={ev.a} onChange={(e) => setEv((s) => ({ ...s, a: num(e.target.value) }))} placeholder="price" inputMode="decimal" /></label>
+                    <label>Stop-Loss <input value={ev.b} onChange={(e) => setEv((s) => ({ ...s, b: num(e.target.value) }))} placeholder="price" inputMode="decimal" /></label>
+                  </>
+                ) : (
+                  <label>
+                    {edit.kind === "lev" ? "Leverage (1–100x)" : edit.kind === "addM" ? "Add margin" : "Remove margin"}
+                    <input autoFocus value={ev.a} onChange={(e) => setEv((s) => ({ ...s, a: num(e.target.value) }))}
+                           onKeyDown={(e) => { if (e.key === "Enter") commitEdit(p); }} placeholder="amount" inputMode="decimal" />
+                  </label>
+                )}
+                <button className="fut-edit-ok" onClick={() => commitEdit(p)}>Confirm</button>
+                <button className="cancel" onClick={() => setEdit(null)}>Cancel</button>
+              </div>
+            )}
+            </Fragment>
           );
         })}
       </div>

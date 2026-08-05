@@ -27,6 +27,17 @@
 /* position action buttons (add/remove margin, partial + full close) */
 .fut-actions { display: flex; gap: 0.25rem; justify-content: flex-end; flex-wrap: wrap; }
 .fut-actions button { padding: 0.15rem 0.4rem; font-size: 0.72rem; }
+.fut-actions button.on { background: var(--gold); color: #1a1400; border-color: var(--gold); }
+
+/* inline editor row under a position (replaces the prompt() dialogs) */
+.fut-edit { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem 0.9rem; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); background: rgba(240,185,11,0.06); }
+.fut-edit label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; color: var(--text-faint); }
+.fut-edit input { background: #090e0c; border: 1px solid var(--border); border-radius: 6px; color: #e6efe9;
+  font: inherit; font-size: 0.82rem; padding: 0.32rem 0.55rem; width: 8rem; }
+.fut-edit input:focus { outline: none; border-color: var(--gold); }
+.fut-edit-ok { background: var(--gold); color: #1a1400; border: none; border-radius: 6px;
+  padding: 0.32rem 0.9rem; font: inherit; font-weight: 600; font-size: 0.76rem; cursor: pointer; }
 
 /* isolated / cross margin-mode toggle on the order form */
 .fut-margin-mode { margin-bottom: 0.6rem; }
