@@ -184,6 +184,20 @@ export interface FuturesOpenOrder {
   cross: boolean;
 }
 
+export interface FuturesClosedPosition {
+  id: number;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  inverse: boolean;
+  margin_asset: string;
+  size: string;
+  entry_price: string;
+  leverage: string;
+  realized_pnl: string;
+  status: string; // CLOSED | LIQUIDATED
+  closed_at: string | null;
+}
+
 export interface ApiKeyRow {
   id: number;
   label: string;
@@ -439,6 +453,7 @@ export const api = {
   futuresDevSetup: () => request<{ credited: string; kyc: string }>("/futures/dev/setup", { method: "POST" }),
   futuresApplyFunding: () => request<{ funded: number; rate: string }>("/futures/dev/apply-funding", { method: "POST" }),
   futuresOpenOrders: () => request<FuturesOpenOrder[]>("/futures/orders"),
+  futuresClosed: () => request<FuturesClosedPosition[]>("/futures/positions/closed"),
   futuresCancelOrder: (id: number) => request<{ status: string }>(`/futures/order/${id}`, { method: "DELETE" }),
 
   apiKeys: () => request<ApiKeyRow[]>("/apikeys"),

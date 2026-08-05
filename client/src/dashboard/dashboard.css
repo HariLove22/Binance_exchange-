@@ -1605,13 +1605,14 @@
   font-size: .72rem; text-transform: uppercase; letter-spacing: .05em;
   color: var(--text-faint); border-bottom: 1px solid var(--border);
 }
-/* Deposit history: 4 even columns, one rule for head + rows so they can never diverge. */
-.dep-table .at-head, .dep-table .at-row { grid-template-columns: 1fr 1fr 1fr 1fr; }
 .at-row { border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
 .at-row:last-child { border-bottom: none; }
 .at-row:hover { background: rgba(255,255,255,.03); }
 .num { text-align: right; }
 .at-asset { display: flex; align-items: center; gap: .6rem; font-weight: 600; }
+/* Deposit history: header and cells share one alignment per column (text left, numbers right). */
+.deposits-table .at-head > span, .deposits-table .at-row > span { text-align: left; }
+.deposits-table .at-head > .num, .deposits-table .at-row > .num { text-align: right; }
 .at-badge {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border-radius: 50%; background: rgba(43,217,124,.15);

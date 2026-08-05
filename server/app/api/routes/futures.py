@@ -13,6 +13,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.db import get_db
 from app.models import Asset, KycApplication, KycStatus, PositionSide, User, WALLET_FUTURES
+from app.models.futures import FuturesPosition, PositionStatus
 from app.services import futures, kyc, ledger, marketmaker
 from app.services.futures import FuturesError
 from app.services.kyc import KycRequired
@@ -113,6 +114,37 @@ async def _account(db: AsyncSession, user_id: int) -> AccountResponse:
 @router.get("/account", response_model=AccountResponse)
 async def account(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return await _account(db, user.id)
+
+
+class ClosedRow(BaseModel):
+    id: int
+    symbol: str
+    side: str
+    inverse: bool
+    margin_asset: str
+    size: str
+    entry_price: str
+    leverage: str
+    realized_pnl: str
+    status: str  # CLOSED or LIQUIDATED
+    closed_at: str | None
+
+
+@router.get("/positions/closed", response_model=list[ClosedRow])
+async def closed_positions(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Finished positions — closed by the user or liquidated — with realized PnL, newest first."""
+    rows = (await db.execute(
+        select(FuturesPosition)
+        .where(FuturesPosition.user_id == user.id,
+               FuturesPosition.status.in_([PositionStatus.CLOSED, PositionStatus.LIQUIDATED]))
+        .order_by(FuturesPosition.id.desc()).limit(100)
+    )).scalars().all()
+    return [ClosedRow(
+        id=p.id, symbol=p.symbol, side=p.side.value, inverse=p.inverse, margin_asset=p.margin_asset,
+        size=_n(p.size), entry_price=_n(p.entry_price), leverage=_n(p.leverage),
+        realized_pnl=_n(p.realized_pnl), status=p.status.value,
+        closed_at=p.closed_at.isoformat() if p.closed_at else None,
+    ) for p in rows]
 
 
 @router.post("/dev/setup")

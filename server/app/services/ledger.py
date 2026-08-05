@@ -39,7 +39,7 @@ class LedgerError(Exception):
 
 class InsufficientFunds(LedgerError):
     def __init__(self, asset: str, requested: Decimal, available: Decimal) -> None:
-        super().__init__(f"insufficient {asset}: requested {requested}, available {available}")
+        super().__init__(f"insufficient {asset}: requested {requested:.2f}, available {available:.2f}")
         self.asset = asset
         self.requested = requested
         self.available = available

@@ -101,7 +101,7 @@
 .ivals { display: flex; gap: 0.1rem; }
 .ivals button { background: none; border: none; color: #7c8b83; font: inherit; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; }
 .ivals button.on { background: rgba(132,168,150,0.15); color: inherit; font-weight: 600; }
-.trade-chart { height: 24rem; }
+.trade-chart { height: 30rem; }
 
 /* order book */
 .book-box { display: flex; flex-direction: column; }
@@ -173,7 +173,9 @@
 
 /* market trades (full width below) */
 .trades-box { margin-top: 0.6rem; }
-.mt-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; padding: 0.3rem 0.8rem; font-size: 0.62rem; color: #7c8b83; text-transform: uppercase; }
+/* One header per data column: same auto-fill track as the list, clipped to a single row. */
+.mt-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); align-content: start; max-height: 1.15rem; overflow: hidden; margin: 0.3rem 0; }
+.mt-colhead { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; padding: 0 0.8rem; font-size: 0.62rem; color: #7c8b83; text-transform: uppercase; white-space: nowrap; }
 .mt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
 .mt-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; padding: 0.12rem 0.8rem; font-family: ui-monospace, monospace; font-size: 0.72rem; font-variant-numeric: tabular-nums; }
 
@@ -199,6 +201,17 @@
 .mkt-dot { display: inline-block; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: #0ecb81; margin-right: 0.35rem; vertical-align: middle; }
 .mkt-row.tradeable .mkt-name { color: #e6efe9; }
 .mkt-row:not(.tradeable) { opacity: 0.72; }
+.mkt-fav { color: #4a5a52; margin-right: 0.3rem; cursor: pointer; font-size: 0.8rem; }
+.mkt-fav:hover { color: #7c8b83; }
+.mkt-fav.on { color: #f0b90b; }
+
+/* header pair selector — a searchable dropdown over the live market list */
+.sym-picker { position: relative; }
+.sym-trigger { display: inline-flex; align-items: center; gap: 0.35rem; background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.sym-trigger:hover .tk-name { opacity: 0.85; }
+.sym-caret { font-size: 0.65rem; color: #7c8b83; }
+.sym-pop { position: absolute; top: calc(100% + 0.5rem); left: 0; z-index: 60; width: 23rem; border-radius: 10px; box-shadow: 0 12px 34px rgba(0,0,0,0.55); }
+.sym-pop .mkt-box { max-height: 26rem; }
 
 /* ticker bar symbol + view-only */
 .tk-symbol { display: flex; align-items: center; gap: 0.6rem; }

@@ -34,8 +34,8 @@ export function Trade() {
   // Opened from the Markets page? Pick up the symbol it stashed, then clear it.
   const [symbol, setSymbol] = useState(() => {
     const picked = sessionStorage.getItem("trade_symbol");
-    if (picked) sessionStorage.removeItem("trade_symbol");
-    return picked || "ETHUSDT";
+    if (picked) { sessionStorage.removeItem("trade_symbol"); return picked; }
+    return localStorage.getItem("trade_symbol_last") || "ETHUSDT"; // survive refresh
   });
   const [interval, setInterval] = useState("1m");
   const [balances, setBalances] = useState<Balance[]>([]);
@@ -51,10 +51,13 @@ export function Trade() {
   useEffect(() => {
     api.marketSymbols().then((m) => {
       setMarkets(m);
-      if (m.length && !m.find((x) => x.symbol === "ETHUSDT")) setSymbol(m[0].symbol);
+      // Only fall back off the ETHUSDT default when it isn't listed — never clobber a restored pair.
+      setSymbol((cur) => (m.length && cur === "ETHUSDT" && !m.find((x) => x.symbol === "ETHUSDT")) ? m[0].symbol : cur);
     }).catch(() => {});
     loadBalances();
   }, [loadBalances]);
+
+  useEffect(() => { localStorage.setItem("trade_symbol_last", symbol); }, [symbol]);
 
   useEffect(() => {
     const h = () => loadBalances();
@@ -77,7 +80,7 @@ export function Trade() {
         {/* ── ticker bar (full width) ── */}
         <div className="g-ticker tk-bar">
           <div className="tk-symbol">
-            <span className="tk-name">{symbol.replace(/USDT$/, "")}<span className="tk-quote">/USDT</span></span>
+            <SymbolPicker symbol={symbol} base={market?.base} quote={market?.quote} onPick={setSymbol} />
             {!tradeable && <span className="tk-viewonly">view only</span>}
           </div>
           {ticker ? (
@@ -177,11 +180,58 @@ export function fmtPx(p: number): string {
  * universe is thousands of rows — too many for individual WebSocket subscriptions, so the snapshot
  * is polled and the *selected* pair alone gets the live WS ticker in the header).
  */
-export function MarketList({ current, onPick }: { current: string; onPick: (s: string) => void }) {
+const QUOTES = ["USDT", "USDC", "FDUSD", "BNB", "ETH"];
+function splitSymbol(symbol: string, base?: string, quote?: string) {
+  if (base && quote) return { base, quote };
+  const q = QUOTES.find((x) => symbol.endsWith(x)) ?? "USDT";
+  return { base: symbol.slice(0, symbol.length - q.length) || symbol, quote: q };
+}
+
+/**
+ * Header pair selector: click the symbol to drop the market list down as a searchable popover.
+ * The list itself is <MarketList> — same live data (api.marketUniverse), tabs and rows as the
+ * right-side panel — so nothing here is hardcoded. Closes on pick, outside click, or Escape.
+ */
+function SymbolPicker({ symbol, base, quote, onPick }: { symbol: string; base?: string; quote?: string; onPick: (s: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const p = splitSymbol(symbol, base, quote);
+  return (
+    <div className="sym-picker" ref={ref}>
+      <button className="sym-trigger" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="tk-name">{p.base}<span className="tk-quote">/{p.quote}</span></span>
+        <span className="sym-caret">▾</span>
+      </button>
+      {open && (
+        <div className="sym-pop">
+          <MarketList current={symbol} onPick={(s) => { onPick(s); setOpen(false); }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MarketList({ current, onPick, inverse = false }: { current: string; onPick: (s: string) => void; inverse?: boolean }) {
   const [segments, setSegments] = useState<string[]>(["USDT"]);
   const [seg, setSeg] = useState("USDT");
   const [rows, setRows] = useState<UniverseRow[]>([]);
   const [q, setQ] = useState("");
+  const [favs, setFavs] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("mkt_favs") || "[]"); } catch { return []; }
+  });
+  const toggleFav = (sym: string) => setFavs((f) => {
+    const n = f.includes(sym) ? f.filter((x) => x !== sym) : [...f, sym];
+    localStorage.setItem("mkt_favs", JSON.stringify(n));
+    return n;
+  });
 
   const load = useCallback(() => {
     api.marketUniverse(q ? undefined : seg, q || undefined)
@@ -208,22 +258,33 @@ export function MarketList({ current, onPick }: { current: string; onPick: (s: s
       <div className="mkt-cols"><span>Pair</span><span className="num">Price</span><span className="num">24h</span></div>
       <div className="mkt-list">
         {rows.length === 0 && <p className="tp-empty">loading markets…</p>}
-        {rows.map((m) => {
+        {[...rows]
+          .sort((a, b) => Number(favs.includes(b.symbol)) - Number(favs.includes(a.symbol)))
+          .map((m) => {
           const up = m.change_percent >= 0;
+          const fav = favs.includes(m.symbol);
           return (
-            <button
+            <div
               key={m.symbol}
+              role="button"
+              tabIndex={0}
               className={`mkt-row ${m.symbol === current ? "on" : ""} ${m.tradeable ? "tradeable" : ""}`}
               onClick={() => onPick(m.symbol)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(m.symbol); } }}
               title={m.tradeable ? "Tradeable here" : "View only — not listed for trading"}
             >
               <span className="mkt-name">
+                <span
+                  className={`mkt-fav ${fav ? "on" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); toggleFav(m.symbol); }}
+                  title={fav ? "Remove favourite" : "Add favourite"}
+                >{fav ? "★" : "☆"}</span>
                 {m.tradeable && <span className="mkt-dot" />}
-                {m.base}<span className="mkt-quote">/{m.quote}</span>
+                {m.base}<span className="mkt-quote">/{inverse ? "USD" : m.quote}</span>
               </span>
               <span className="num mono">{fmtPx(m.price)}</span>
               <span className={`num ${up ? "bid" : "ask"}`}>{up ? "+" : ""}{m.change_percent.toFixed(2)}%</span>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -638,8 +699,16 @@ function SideForm({
 export function RecentTrades({ symbol, trades }: { symbol: string; trades: TradeTick[] }) {
   return (
     <div className="tp trades-box">
-      <div className="tp-head"><span className="tp-title">Market trades</span><span className="tp-sub">ours · live</span></div>
-      <div className="mt-cols"><span>Price(USDT)</span><span className="num">Amount({symbol.replace(/USDT$/, "")})</span><span className="num">Time</span></div>
+      {/* <div className="tp-head"><span className="tp-title">Market trades</span><span className="tp-sub">ours · live</span></div> */}
+      {/* The list flows into as many 16rem columns as fit; give each one its own header.
+          8 triplets cover any realistic width — CSS clips the ones past the last column. */}
+      <div className="mt-cols">
+        {Array.from({ length: 8 }, (_, i) => (
+          <span className="mt-colhead" key={i}>
+            <span>Price(USDT)</span><span className="num">Amount({symbol.replace(/USDT$/, "")})</span><span className="num">Time</span>
+          </span>
+        ))}
+      </div>
       <div className="mt-list">
         {trades.length === 0 && <p className="tp-empty">no trades yet</p>}
         {trades.map((t) => (

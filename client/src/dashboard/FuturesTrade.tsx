@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, trimAmount, type FuturesAccount, type FuturesOpenOrder, type MarketInfo } from "../lib/api";
+import { api, ApiError, trimAmount, type FuturesAccount, type FuturesClosedPosition, type FuturesOpenOrder, type MarketInfo, type TradeTick } from "../lib/api";
 import { useTicker } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
@@ -44,7 +44,6 @@ export function FuturesTrade() {
       <div className="term-grid mgt">
         <div className="g-ticker tk-bar">
           <div className="tk-symbol">
-            <span className="tk-name">{base}<span className="tk-quote">{inverse ? "USD" : "/USDT"}</span></span>
             <span className="mgt-lev">PERP</span>
             <div className="fut-mode">
               <button className={mode === "USDTM" ? "on" : ""} onClick={() => setMode("USDTM")}>USDⓈ-M</button>
@@ -62,7 +61,7 @@ export function FuturesTrade() {
             </>
           ) : <span className="tk-loading">connecting…</span>}
           <div className="tk-spacer" />
-          <div className="mgt-ml"><span>Futures Balance</span><b>{acct ? (inverse ? `${trimAmount(String(coinBal))} ${base}` : `${usdtBal.toFixed(2)} USDT`) : "—"}</b></div>
+          <div className="mgt-ml"><span>Futures Balance</span><b>{acct ? (inverse ? `${coinBal.toFixed(4)} ${base}` : `${usdtBal.toFixed(2)} USDT`) : "—"}</b></div>
           {/* Dev only: one click to fund spot + auto-approve KYC so a position can be opened instantly. */}
           <button className="mgt-hbtn" title="Dev: credit 50k USDT + approve KYC" onClick={() => { void api.futuresDevSetup().then(loadAcct).catch(() => {}); }}>Dev fund</button>
           <button className="mgt-hbtn" onClick={() => setXfer(true)}>Transfer</button>
@@ -70,7 +69,7 @@ export function FuturesTrade() {
 
         <aside className="g-left">
           {tradeable ? (
-            <><OrderBookPanel book={book} onPick={setClickedPrice} live={ticker?.price ?? null} /><RecentTrades symbol={symbol} trades={trades} /></>
+            <OrderBookPanel book={book} onPick={setClickedPrice} live={ticker?.price ?? null} />
           ) : <div className="tp fill"><div className="tp-head"><span className="tp-title">Order book</span></div><p className="tp-empty">List this pair on Spot first.</p></div>}
         </aside>
 
@@ -87,10 +86,10 @@ export function FuturesTrade() {
                          livePrice={ticker?.price ?? null} onDone={loadAcct} />}
         </section>
 
-        <aside className="g-market"><MarketList current={symbol} onPick={setSymbol} /></aside>
+        <aside className="g-market"><MarketList current={symbol} onPick={setSymbol} inverse={inverse} /></aside>
 
         <section className="g-orders tp">
-          <Positions acct={acct} onDone={loadAcct} />
+          <Positions acct={acct} onDone={loadAcct} symbol={symbol} trades={trades} />
         </section>
       </div>
     </div>
@@ -100,6 +99,7 @@ export function FuturesTrade() {
 function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: string; inverse: boolean; balance: number; livePrice: number | null; onDone: () => void }) {
   const [lev, setLev] = useState("10");
   const [pct, setPct] = useState(0);
+  const [sizeInput, setSizeInput] = useState("");
   const [cross, setCross] = useState(false);
   const [otype, setOtype] = useState<"MARKET" | "LIMIT">("MARKET");
   const [limitPrice, setLimitPrice] = useState("");
@@ -112,35 +112,43 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
   // COIN-M: balance is in coin; size = USD notional, margin in coin. USDT-M: size = base qty, margin USDT.
   const marginUnit = inverse ? base : "USDT";
   const sizeUnit = inverse ? "USD" : base;
-  const maxNotionalUsd = price > 0 ? balance * (inverse ? price : 1) * leverage : 0; // balance*price for coin, balance for USDT
-  const notionalUsd = (maxNotionalUsd * pct) / 100;
-  const size = inverse ? notionalUsd : (price > 0 ? notionalUsd / price : 0); // inverse: size IS the USD notional
-  const sizeStr = size > 0 ? String(Number(size.toFixed(inverse ? 2 : 6))) : "";
+  // Size is a typed input; the % slider just fills it from the max the balance allows.
+  // Inverse: size = USD notional. Linear: size = base qty.
+  const maxNotionalUsd = price > 0 ? balance * (inverse ? price : 1) * leverage : 0;
+  const maxSize = inverse ? maxNotionalUsd : (price > 0 ? maxNotionalUsd / price : 0);
+  const size = Number(sizeInput) || 0;
   const margin = price > 0 && size > 0 ? (inverse ? (size / price) / leverage : (size * price) / leverage) : 0;
+  const applyPct = (p: number) => {
+    setPct(p);
+    const s = (maxSize * p) / 100;
+    setSizeInput(s > 0 ? String(Number(s.toFixed(inverse ? 2 : 6))) : "");
+  };
 
   async function submit(side: "LONG" | "SHORT") {
     if (size <= 0) { setNote("choose a size with the slider"); return; }
     if (otype === "LIMIT" && !(Number(limitPrice) > 0)) { setNote("enter a limit price"); return; }
     setBusy(side); setNote("");
     try {
-      const o = await api.futuresOrder({ symbol, side, size: sizeStr, leverage: lev, inverse, cross,
+      const o = await api.futuresOrder({ symbol, side, size: sizeInput, leverage: lev, inverse, cross,
                                          type: otype, price: otype === "LIMIT" ? limitPrice : undefined });
       setNote(otype === "LIMIT"
         ? `${side} limit resting @ ${trimAmount(limitPrice)}`
         : `${side} opened @ ${trimAmount(o.entry_price)} · margin ${trimAmount(o.margin)} ${o.margin_asset}`);
-      setPct(0); onDone();
+      setPct(0); setSizeInput(""); onDone();
     } catch (e) { setNote(e instanceof ApiError ? e.message : String(e)); } finally { setBusy(null); }
   }
 
   return (
     <div className="fut-form">
-      <div className="fut-mode fut-margin-mode">
-        <button className={!cross ? "on" : ""} onClick={() => setCross(false)}>Isolated</button>
-        <button className={cross ? "on" : ""} onClick={() => setCross(true)}>Cross</button>
-      </div>
-      <div className="fut-mode fut-margin-mode">
-        <button className={otype === "MARKET" ? "on" : ""} onClick={() => setOtype("MARKET")}>Market</button>
-        <button className={otype === "LIMIT" ? "on" : ""} onClick={() => setOtype("LIMIT")}>Limit</button>
+      <div className="fut-mode-row">
+        <div className="fut-mode">
+          <button className={!cross ? "on" : ""} onClick={() => setCross(false)}>Isolated</button>
+          <button className={cross ? "on" : ""} onClick={() => setCross(true)}>Cross</button>
+        </div>
+        <div className="fut-mode">
+          <button className={otype === "MARKET" ? "on" : ""} onClick={() => setOtype("MARKET")}>Market</button>
+          <button className={otype === "LIMIT" ? "on" : ""} onClick={() => setOtype("LIMIT")}>Limit</button>
+        </div>
       </div>
       {otype === "LIMIT" && (
         <div className="of-field"><label>Limit price</label>
@@ -155,14 +163,16 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
         </div>
       </div>
       <div className="of-field"><label>Size ({sizeUnit})</label>
-        <div className="of-input readonly"><input value={sizeStr} readOnly placeholder="0" /><span className="of-unit">{sizeUnit}</span></div>
+        <div className="of-input"><input value={sizeInput} onChange={(e) => setSizeInput(e.target.value.replace(/[^\d.]/g, ""))} placeholder="0" inputMode="decimal" /><span className="of-unit">{sizeUnit}</span></div>
       </div>
       <div className="of-slider">
-        <input type="range" min={0} max={100} step={1} value={pct} onChange={(e) => setPct(Number(e.target.value))} />
-        <div className="of-pcts">{[0, 25, 50, 75, 100].map((p) => <button key={p} className={pct === p ? "on" : ""} onClick={() => setPct(p)}>{p}%</button>)}</div>
+        <input type="range" min={0} max={100} step={1} value={pct} onChange={(e) => applyPct(Number(e.target.value))} />
+        <div className="of-pcts">{[0, 25, 50, 75, 100].map((p) => <button key={p} className={pct === p ? "on" : ""} onClick={() => applyPct(p)}>{p}%</button>)}</div>
       </div>
-      <div className="of-row"><span>Avbl</span><span className="mono">{inverse ? `${trimAmount(String(balance))} ${base}` : `${balance.toFixed(2)} USDT`}</span></div>
-      <div className="of-row"><span>Margin</span><span className="mono">{margin > 0 ? `${inverse ? trimAmount(String(Number(margin.toFixed(8)))) : margin.toFixed(2)} ${marginUnit}` : "—"}</span></div>
+      <div className="of-row">
+        <span>Avbl <span className="mono">{inverse ? `${balance.toFixed(4)} ${base}` : `${balance.toFixed(2)} USDT`}</span></span>
+        <span>Margin <span className="mono">{margin > 0 ? `${inverse ? trimAmount(String(Number(margin.toFixed(8)))) : margin.toFixed(2)} ${marginUnit}` : "—"}</span></span>
+      </div>
       <div className="fut-btns">
         <button className="fut-long" disabled={busy !== null} onClick={() => submit("LONG")}>{busy === "LONG" ? "…" : "Buy / Long"}</button>
         <button className="fut-short" disabled={busy !== null} onClick={() => submit("SHORT")}>{busy === "SHORT" ? "…" : "Sell / Short"}</button>
@@ -172,12 +182,15 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
   );
 }
 
-function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () => void }) {
+function Positions({ acct, onDone, symbol, trades }: { acct: FuturesAccount | null; onDone: () => void; symbol: string; trades: TradeTick[] }) {
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<"pos" | "orders">("pos");
+  const [tab, setTab] = useState<"pos" | "orders" | "closed" | "trades">("pos");
   const [orders, setOrders] = useState<FuturesOpenOrder[]>([]);
+  const [closed, setClosed] = useState<FuturesClosedPosition[]>([]);
   const loadOrders = useCallback(() => api.futuresOpenOrders().then(setOrders).catch(() => {}), []);
   useEffect(() => { loadOrders(); const t = window.setInterval(loadOrders, 4000); return () => window.clearInterval(t); }, [loadOrders]);
+  // Closed positions refresh when the tab is opened and whenever a position is closed (onDone bumps acct).
+  useEffect(() => { if (tab === "closed") api.futuresClosed().then(setClosed).catch(() => {}); }, [tab, acct]);
   async function run(fn: () => Promise<unknown>) {
     setErr(null);
     try { await fn(); onDone(); loadOrders(); }
@@ -198,6 +211,8 @@ function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () =
       <div className="oo-tabs">
         <button className={tab === "pos" ? "on" : ""} onClick={() => setTab("pos")}>Positions ({positions.length})</button>
         <button className={tab === "orders" ? "on" : ""} onClick={() => setTab("orders")}>Open Orders ({orders.length})</button>
+        <button className={tab === "closed" ? "on" : ""} onClick={() => setTab("closed")}>Closed</button>
+        <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Market Trades</button>
         {/* Dev: charge one 8h funding interval now instead of waiting — longs pay shorts. */}
         <button className="mgt-hbtn" style={{ marginLeft: "auto" }} title="Dev: charge one funding interval now"
                 onClick={() => { void api.futuresApplyFunding().then(onDone).catch(() => {}); }}>Charge funding (dev)</button>
@@ -244,6 +259,26 @@ function Positions({ acct, onDone }: { acct: FuturesAccount | null; onDone: () =
         })}
       </div>
       )}
+      {tab === "closed" && (
+        <div className="oo-table">
+          <div className="fut-h"><span>Symbol</span><span>Size</span><span className="num">Entry</span><span className="num">Realized PnL</span><span>Status</span><span className="num">Closed</span></div>
+          {closed.length === 0 && <p className="tp-empty">No closed positions yet.</p>}
+          {closed.map((p) => {
+            const pnl = Number(p.realized_pnl);
+            return (
+              <div className="fut-r" key={p.id}>
+                <span><b>{p.symbol}</b> <span className={`fut-side ${p.side.toLowerCase()}`}>{p.side} {trimAmount(p.leverage)}x</span></span>
+                <span className="mono">{trimAmount(p.size)}</span>
+                <span className="num mono">{Number(p.entry_price).toFixed(2)}</span>
+                <span className={`num mono ${pnl >= 0 ? "up" : "down"}`}>{pnl >= 0 ? "+" : ""}{p.inverse ? `${trimAmount(p.realized_pnl)} ${p.margin_asset}` : pnl.toFixed(2)}</span>
+                <span className={p.status === "LIQUIDATED" ? "down" : "dim"}>{p.status}</span>
+                <span className="num dim">{p.closed_at ? new Date(p.closed_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {tab === "trades" && <RecentTrades symbol={symbol} trades={trades} />}
     </>
   );
 }
