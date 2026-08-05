@@ -13,7 +13,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.db import get_db
 from app.models import Asset, KycApplication, KycStatus, PositionSide, User, WALLET_FUTURES
-from app.models.futures import FuturesPosition, PositionStatus
+from app.models.futures import FuturesOrderType, FuturesPosition, PositionStatus
 from app.services import futures, kyc, ledger, marketmaker
 from app.services.futures import FuturesError
 from app.services.kyc import KycRequired
@@ -49,8 +49,10 @@ class OrderRequest(BaseModel):
     leverage: str
     inverse: bool = False  # True = COIN-M (coin-margined, inverse); size is USD notional
     cross: bool = False    # True = cross margin (shared bucket); default isolated
-    type: str = "MARKET"   # MARKET fills now; LIMIT rests at `price`
+    type: str = "MARKET"   # MARKET fills now; LIMIT rests at `price`; STOP_MARKET/TAKE_PROFIT trigger
     price: str | None = None  # required for LIMIT
+    trigger_price: str | None = None  # required for STOP_MARKET / TAKE_PROFIT
+    reduce_only: bool = False  # trigger closes the matching open position instead of opening one
 
 
 class PositionRow(BaseModel):
@@ -205,8 +207,9 @@ async def open_order(body: OrderRequest, user: User = Depends(get_current_user),
     except KycRequired as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
 
+    t = body.type.upper()
     try:
-        if body.type.upper() == "LIMIT":
+        if t == "LIMIT":
             if body.price is None:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "limit order needs a price")
             order = await futures.place_limit_order(
@@ -217,6 +220,20 @@ async def open_order(body: OrderRequest, user: User = Depends(get_current_user),
             await db.commit()
             return {"id": order.id, "type": "LIMIT", "status": order.status.value,
                     "symbol": order.symbol, "side": order.side.value, "price": _n(order.price), "size": _n(order.size)}
+
+        if t in ("STOP_MARKET", "TAKE_PROFIT"):
+            if body.trigger_price is None:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "trigger order needs a trigger_price")
+            order = await futures.place_trigger_order(
+                db, user_id=user.id, symbol=body.symbol, side=body.side, order_type=FuturesOrderType[t],
+                trigger_price=_dec(body.trigger_price, "trigger_price"),
+                size=_dec(body.size, "size"),
+                leverage=None if body.reduce_only else _dec(body.leverage, "leverage"),
+                reduce_only=body.reduce_only, inverse=body.inverse, cross=body.cross,
+            )
+            await db.commit()
+            return {"id": order.id, "type": t, "status": order.status.value, "symbol": order.symbol,
+                    "side": order.side.value, "trigger_price": _n(order.price), "reduce_only": order.reduce_only}
 
         pos = await futures.open_position(
             db, user_id=user.id, symbol=body.symbol, side=body.side, size=_dec(body.size, "size"),
@@ -239,13 +256,15 @@ class OpenOrderRow(BaseModel):
     leverage: str
     inverse: bool
     cross: bool
+    reduce_only: bool
 
 
 @router.get("/orders", response_model=list[OpenOrderRow])
 async def list_orders(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return [
         OpenOrderRow(id=o.id, symbol=o.symbol, side=o.side.value, order_type=o.order_type.value,
-                     size=_n(o.size), price=_n(o.price), leverage=_n(o.leverage), inverse=o.inverse, cross=o.cross)
+                     size=_n(o.size), price=_n(o.price), leverage=_n(o.leverage), inverse=o.inverse,
+                     cross=o.cross, reduce_only=o.reduce_only)
         for o in await futures.open_orders(db, user.id)
     ]
 

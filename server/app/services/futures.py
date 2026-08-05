@@ -482,6 +482,36 @@ async def place_limit_order(
     return order
 
 
+async def place_trigger_order(
+    db: AsyncSession, *, user_id: int, symbol: str, side: PositionSide,
+    order_type: FuturesOrderType, trigger_price: Decimal, size: Decimal | None = None,
+    leverage: Decimal | None = None, reduce_only: bool = False,
+    inverse: bool = False, cross: bool = False,
+) -> FuturesOrder:
+    """Rest a STOP_MARKET or TAKE_PROFIT order. It fires at market when the last price crosses the
+    trigger (direction implied by type+side, Binance-style — see `_trigger_hit`). A reduce_only order
+    closes the matching open position; otherwise it opens a new one at market. Margin locks at fill,
+    not at placement."""
+    if order_type not in (FuturesOrderType.STOP_MARKET, FuturesOrderType.TAKE_PROFIT):
+        raise FuturesError("not a trigger order type")
+    if trigger_price <= 0:
+        raise FuturesError("trigger price must be positive")
+    if size is None or size <= 0:
+        raise FuturesError("size must be positive")
+    # A stop-entry opens a fresh position at market, so it needs a real leverage; a reduce_only
+    # trigger just closes the existing one — leverage is irrelevant, store 1x to satisfy the check.
+    if not reduce_only and (leverage is None or leverage < 1 or leverage > MAX_LEVERAGE):
+        raise FuturesError(f"leverage must be between 1x and {MAX_LEVERAGE}x")
+    order = FuturesOrder(
+        user_id=user_id, symbol=symbol.upper(), side=side, order_type=order_type,
+        size=size, price=trigger_price, leverage=leverage or Decimal(1),
+        inverse=inverse, cross=cross, reduce_only=reduce_only, status=FuturesOrderStatus.PENDING,
+    )
+    db.add(order)
+    await db.flush()
+    return order
+
+
 async def cancel_order(db: AsyncSession, *, user_id: int, order_id: int) -> FuturesOrder:
     order = (await db.execute(select(FuturesOrder).where(FuturesOrder.id == order_id))).scalar_one_or_none()
     if order is None or order.user_id != user_id:
@@ -506,28 +536,67 @@ def _limit_crossed(side: PositionSide, last: Decimal, price: Decimal) -> bool:
     return last <= price if side is PositionSide.LONG else last >= price
 
 
+def _trigger_hit(order_type: FuturesOrderType, side: PositionSide, last: Decimal, trigger: Decimal) -> bool:
+    """When a STOP/TP trigger fires, Binance-style. A stop-buy or take-profit-sell sits above the
+    market and fires as the price rises to it; a stop-sell or take-profit-buy sits below and fires as
+    it falls. (LONG ≡ buy, SHORT ≡ sell — matching the position/close direction.)"""
+    above = ((order_type is FuturesOrderType.STOP_MARKET and side is PositionSide.LONG)
+             or (order_type is FuturesOrderType.TAKE_PROFIT and side is PositionSide.SHORT))
+    return last >= trigger if above else last <= trigger
+
+
+async def _find_open_position(db: AsyncSession, user_id: int, symbol: str, inverse: bool) -> FuturesPosition | None:
+    return (await db.execute(
+        select(FuturesPosition).where(
+            FuturesPosition.user_id == user_id, FuturesPosition.symbol == symbol.upper(),
+            FuturesPosition.inverse == inverse, FuturesPosition.status == PositionStatus.OPEN,
+        )
+    )).scalar_one_or_none()
+
+
 async def sweep_orders(db: AsyncSession, price_of: PriceOf) -> list[int]:
-    """Fill every resting LIMIT order the price has reached, opening it at the order's price. Caller
-    commits. An order whose fill fails (e.g. not enough margin yet) is left PENDING to retry."""
+    """Fill every resting order the price has reached. LIMIT opens at the order's price; STOP_MARKET
+    and TAKE_PROFIT fire at market when their trigger is crossed — a reduce_only trigger closes the
+    matching open position, otherwise it opens a new one. Caller commits. A fill that fails (e.g. not
+    enough margin yet) is left PENDING to retry.
+
+    ponytail: triggers key off the last price, same feed as LIMIT — fine for our own market feed.
+    Switch to the mark price here if wick manipulation ever becomes a concern.
+    """
     orders = (await db.execute(
         select(FuturesOrder).where(FuturesOrder.status == FuturesOrderStatus.PENDING)
     )).scalars().all()
     filled: list[int] = []
     for o in orders:
-        if o.order_type is not FuturesOrderType.LIMIT:
-            continue  # stop / take-profit handled in Phase B
         last = await price_of(o.symbol)
-        if last is None or last <= 0 or not _limit_crossed(o.side, last, o.price):
+        if last is None or last <= 0:
             continue
 
-        async def _at(_sym: str, _p: Decimal = o.price) -> Decimal:
-            return _p  # fill at the limit price
-
         try:
-            await open_position(db, user_id=o.user_id, symbol=o.symbol, side=o.side, size=o.size,
-                                leverage=o.leverage, price_of=_at, inverse=o.inverse, cross=o.cross)
+            if o.order_type is FuturesOrderType.LIMIT:
+                if not _limit_crossed(o.side, last, o.price):
+                    continue
+
+                async def _at(_sym: str, _p: Decimal = o.price) -> Decimal:
+                    return _p  # fill at the limit price
+
+                await open_position(db, user_id=o.user_id, symbol=o.symbol, side=o.side, size=o.size,
+                                    leverage=o.leverage, price_of=_at, inverse=o.inverse, cross=o.cross)
+            else:  # STOP_MARKET / TAKE_PROFIT — fire at market when the trigger is crossed
+                if not _trigger_hit(o.order_type, o.side, last, o.price):
+                    continue
+                if o.reduce_only:
+                    pos = await _find_open_position(db, o.user_id, o.symbol, o.inverse)
+                    if pos is None:  # position already gone — this TP/SL is orphaned
+                        o.status = FuturesOrderStatus.CANCELLED
+                        continue
+                    await close_position(db, user_id=o.user_id, position_id=pos.id, price_of=price_of)
+                else:
+                    await open_position(db, user_id=o.user_id, symbol=o.symbol, side=o.side, size=o.size,
+                                        leverage=o.leverage, price_of=price_of, inverse=o.inverse, cross=o.cross)
         except FuturesError:
             continue  # leave PENDING — retries next sweep once fundable
+
         o.status = FuturesOrderStatus.FILLED
         o.filled_at = datetime.now(timezone.utc)
         filled.append(o.id)

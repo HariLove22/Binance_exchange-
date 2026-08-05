@@ -182,6 +182,7 @@ export interface FuturesOpenOrder {
   leverage: string;
   inverse: boolean;
   cross: boolean;
+  reduce_only: boolean;
 }
 
 export interface FuturesClosedPosition {
@@ -441,8 +442,8 @@ export const api = {
   futuresAccount: () => request<FuturesAccount>("/futures/account"),
   futuresTransfer: (amount: string, deposit: boolean, asset = "USDT") =>
     request<FuturesAccount>("/futures/transfer", { method: "POST", body: JSON.stringify({ amount, deposit, asset }) }),
-  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string; inverse?: boolean; cross?: boolean; type?: "MARKET" | "LIMIT"; price?: string }) =>
-    request<{ id: number; entry_price: string; margin: string; margin_asset: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
+  futuresOrder: (body: { symbol: string; side: "LONG" | "SHORT"; size: string; leverage: string; inverse?: boolean; cross?: boolean; type?: "MARKET" | "LIMIT" | "STOP_MARKET" | "TAKE_PROFIT"; price?: string; trigger_price?: string; reduce_only?: boolean }) =>
+    request<{ id: number; entry_price?: string; margin?: string; margin_asset?: string; type?: string; trigger_price?: string }>("/futures/order", { method: "POST", body: JSON.stringify(body) }),
   futuresClose: (id: number, size?: string) =>
     request<{ status: string; close_price: string; realized_pnl: string; size: string }>(
       `/futures/close/${id}${size ? `?size=${size}` : ""}`, { method: "POST" }),

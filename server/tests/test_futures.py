@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import AccountType, Asset, AssetKind, FuturesOrderStatus, PositionSide, PositionStatus, WALLET_FUTURES
+from app.models import AccountType, Asset, AssetKind, FuturesOrderStatus, FuturesOrderType, PositionSide, PositionStatus, WALLET_FUTURES
 from app.services import futures, ledger
 from tests.test_trading import make_user
 
@@ -402,3 +402,63 @@ class TestLimitOrders:
         await futures.cancel_order(db, user_id=u.id, order_id=o.id)
         assert o.status is FuturesOrderStatus.CANCELLED
         assert await futures.open_orders(db, u.id) == []
+
+
+class TestTriggerOrders:
+    async def _u(self, db, email):
+        u = await make_user(db, email)
+        a = await usdt(db)
+        await fund_futures(db, u, a, "2000")
+        return u, a
+
+    async def test_stop_market_entry_fires_on_rise(self, db):
+        # A stop-buy (LONG) sits above the market and fires as price rises to it, opening AT market.
+        u, a = await self._u(db, "stop-entry@example.com")
+        o = await futures.place_trigger_order(
+            db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+            order_type=FuturesOrderType.STOP_MARKET, trigger_price=Decimal("61000"),
+            size=Decimal("0.1"), leverage=Decimal("10"))
+        assert o.status is FuturesOrderStatus.PENDING
+        # Below the trigger → no fire.
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("60000"))) == []
+        # Rises to/above 61000 → fires at the market price (62000), not the trigger.
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("62000"))) == [o.id]
+        positions = await futures.open_positions(db, u.id)
+        assert len(positions) == 1 and positions[0].entry_price == Decimal("62000")
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+    async def test_take_profit_closes_long_on_rise(self, db):
+        # TP on a LONG = a reduce-only SELL trigger above entry; fires as price rises, closing it.
+        u, a = await self._u(db, "tp-long@example.com")
+        pos = await futures.open_position(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+                                          size=Decimal("0.1"), leverage=Decimal("10"), price_of=price_book())
+        o = await futures.place_trigger_order(
+            db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.SHORT,
+            order_type=FuturesOrderType.TAKE_PROFIT, trigger_price=Decimal("63000"), size=Decimal("0.1"), reduce_only=True)
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("61000"))) == []
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("63000"))) == [o.id]
+        assert pos.status is PositionStatus.CLOSED
+        assert await futures.open_positions(db, u.id) == []
+        assert (await ledger.trial_balance(db))["USDT"] == Decimal(0)
+
+    async def test_stop_loss_closes_long_on_drop(self, db):
+        # SL on a LONG = a reduce-only SELL stop below entry; fires as price falls, closing it.
+        u, a = await self._u(db, "sl-long@example.com")
+        pos = await futures.open_position(db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.LONG,
+                                          size=Decimal("0.1"), leverage=Decimal("10"), price_of=price_book())
+        o = await futures.place_trigger_order(
+            db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.SHORT,
+            order_type=FuturesOrderType.STOP_MARKET, trigger_price=Decimal("58000"), size=Decimal("0.1"), reduce_only=True)
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("59000"))) == []
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("58000"))) == [o.id]
+        assert pos.status is PositionStatus.CLOSED
+        assert await futures.open_positions(db, u.id) == []
+
+    async def test_orphaned_reduce_only_is_cancelled(self, db):
+        # A reduce-only trigger with no matching position cancels itself when it would fire.
+        u, a = await self._u(db, "orphan@example.com")
+        o = await futures.place_trigger_order(
+            db, user_id=u.id, symbol="BTCUSDT", side=PositionSide.SHORT,
+            order_type=FuturesOrderType.TAKE_PROFIT, trigger_price=Decimal("63000"), size=Decimal("0.1"), reduce_only=True)
+        assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("63000"))) == []
+        assert o.status is FuturesOrderStatus.CANCELLED
