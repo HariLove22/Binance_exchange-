@@ -235,9 +235,23 @@ async def open_order(body: OrderRequest, user: User = Depends(get_current_user),
             return {"id": order.id, "type": t, "status": order.status.value, "symbol": order.symbol,
                     "side": order.side.value, "trigger_price": _n(order.price), "reduce_only": order.reduce_only}
 
+        # MARKET: walk the live order book for a depth-realistic VWAP fill (Track B1) and fall back
+        # to the last price when the book is too thin. base qty for the walk — a linear size is
+        # already in base units; an inverse size is USD notional, so approximate via the last price.
+        size_dec = _dec(body.size, "size")
+        base_qty = size_dec
+        if body.inverse:
+            ref = await last_of(body.symbol)
+            if ref and ref > 0:
+                base_qty = size_dec / ref
+        vwap = await futures.market_fill_price(db, symbol=body.symbol, side=body.side, base_qty=base_qty)
+
+        async def fill_of(_sym: str) -> Decimal | None:
+            return vwap if vwap else await last_of(_sym)
+
         pos = await futures.open_position(
-            db, user_id=user.id, symbol=body.symbol, side=body.side, size=_dec(body.size, "size"),
-            leverage=_dec(body.leverage, "leverage"), price_of=last_of, inverse=body.inverse, cross=body.cross,
+            db, user_id=user.id, symbol=body.symbol, side=body.side, size=size_dec,
+            leverage=_dec(body.leverage, "leverage"), price_of=fill_of, inverse=body.inverse, cross=body.cross,
         )
     except FuturesError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

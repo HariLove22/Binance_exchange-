@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { api, ApiError, trimAmount, type FuturesAccount, type FuturesClosedPosition, type FuturesOpenOrder, type MarketInfo, type TradeTick } from "../lib/api";
+import { api, ApiError, trimAmount, type FuturesAccount, type FuturesClosedPosition, type FuturesOpenOrder, type MarketInfo, type OrderBook, type TradeTick } from "../lib/api";
 import { useTicker } from "../lib/useLive";
 import { useMarketWs } from "../lib/marketWs";
 import { TradeChart } from "./TradeChart";
@@ -91,7 +91,7 @@ export function FuturesTrade() {
         <section className="g-form tp">
           {kycOk === false ? <KycRequiredNotice /> :
             <FuturesForm symbol={symbol} inverse={inverse} balance={inverse ? coinBal : usdtBal}
-                         livePrice={ticker?.price ?? null} onDone={loadAcct} />}
+                         livePrice={ticker?.price ?? null} book={book} onDone={loadAcct} />}
         </section>
 
         <aside className="g-market"><MarketList current={symbol} onPick={setSymbol} inverse={inverse} /></aside>
@@ -104,7 +104,7 @@ export function FuturesTrade() {
   );
 }
 
-function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: string; inverse: boolean; balance: number; livePrice: number | null; onDone: () => void }) {
+function FuturesForm({ symbol, inverse, balance, livePrice, book, onDone }: { symbol: string; inverse: boolean; balance: number; livePrice: number | null; book: OrderBook | null; onDone: () => void }) {
   const [lev, setLev] = useState("10");
   const [pct, setPct] = useState(0);
   const [sizeInput, setSizeInput] = useState("");
@@ -143,6 +143,20 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
   };
   const fee = size > 0 && price > 0 ? (inverse ? size / price : size * price) * 0.0004 : 0;
   const px = (v: number) => (v > 0 ? fmtPx(v) : "—");
+  // Track B1 preview: VWAP the visible book for a slippage-aware fill price (same walk as the
+  // server). A LONG lifts asks, a SHORT hits bids. Only meaningful for a MARKET order.
+  const estEntry = (side: "LONG" | "SHORT") => {
+    const levels = side === "LONG" ? book?.asks : book?.bids; // asks lowest-first, bids highest-first
+    let need = inverse ? (price > 0 ? size / price : 0) : size;
+    if (!levels?.length || need <= 0) return 0;
+    let cost = 0, filled = 0;
+    for (const l of levels) {
+      if (need <= 0) break;
+      const take = Math.min(need, Number(l.quantity));
+      cost += take * Number(l.price); filled += take; need -= take;
+    }
+    return need > 0 || filled <= 0 ? 0 : cost / filled; // 0 = book too thin
+  };
   const applyPct = (p: number) => {
     setPct(p);
     const s = (maxSize * p) / 100;
@@ -207,6 +221,11 @@ function FuturesForm({ symbol, inverse, balance, livePrice, onDone }: { symbol: 
         <span>Avbl <span className="mono">{inverse ? `${balance.toFixed(4)} ${base}` : `${balance.toFixed(2)} USDT`}</span></span>
         <span>Margin <span className="mono">{margin > 0 ? `${inverse ? trimAmount(String(Number(margin.toFixed(8)))) : margin.toFixed(2)} ${marginUnit}` : "—"}</span></span>
       </div>
+      {otype === "MARKET" && size > 0 && (estEntry("LONG") > 0 || estEntry("SHORT") > 0) && (
+        <div className="of-row of-est">
+          <span title="Estimated fill price walking the live book — bigger size slips further">Entry est. <span className="mono">L {px(estEntry("LONG"))} · S {px(estEntry("SHORT"))}</span></span>
+        </div>
+      )}
       {size > 0 && price > 0 && (
         <div className="of-row of-est">
           <span title="Estimated liquidation price for a Long / Short at this size and leverage">Liq. est. <span className="mono">L {px(estLiq("LONG"))} · S {px(estLiq("SHORT"))}</span></span>

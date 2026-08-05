@@ -19,6 +19,10 @@ from app.models import (
     FuturesOrderStatus,
     FuturesOrderType,
     FuturesPosition,
+    Market,
+    OPEN_STATUSES,
+    Order as SpotOrder,
+    OrderSide,
     PositionSide,
     PositionStatus,
     WALLET_FUTURES,
@@ -66,6 +70,41 @@ MAINTENANCE_MARGIN_RATE = Decimal("0.005")  # 0.5% — liquidate when equity fal
 # interest imbalance or a premium index when realism matters.
 FUNDING_INTERVAL = timedelta(hours=8)
 FUNDING_RATE = Decimal("0.0001")     # 0.01% per 8h, Binance's default baseline
+
+
+async def market_fill_price(db: AsyncSession, *, symbol: str, side: PositionSide, base_qty: Decimal) -> Decimal | None:
+    """VWAP a taker of `base_qty` base units pays walking the live order book: a LONG lifts asks
+    (lowest first), a SHORT hits bids (highest first). Returns None if the resting depth can't cover
+    the whole size — the caller then falls back to the last price.
+
+    This is a price *oracle*: it reads the book's depth so a bigger order gets a worse (slipped)
+    fill, but it does not consume it — a futures fill delivers no coin, so the spot book is untouched.
+    That's Track B phase 1; a real futures CLOB that consumes its own book is phase 2.
+    """
+    if base_qty <= 0:
+        return None
+    market = (await db.execute(select(Market).where(Market.symbol == symbol.upper()))).scalar_one_or_none()
+    if market is None:
+        return None
+    book_side = OrderSide.SELL if side is PositionSide.LONG else OrderSide.BUY
+    price_order = SpotOrder.price.asc() if side is PositionSide.LONG else SpotOrder.price.desc()
+    remaining = SpotOrder.quantity - SpotOrder.filled_quantity
+    rows = (await db.execute(
+        select(SpotOrder.price, remaining)
+        .where(SpotOrder.market_id == market.id, SpotOrder.side == book_side,
+               SpotOrder.status.in_(OPEN_STATUSES))
+        .order_by(price_order, SpotOrder.created_at.asc())
+    )).all()
+    need, cost = base_qty, Decimal(0)
+    for price, rem in rows:
+        if need <= 0:
+            break
+        take = min(need, Decimal(rem))
+        cost += take * price
+        need -= take
+    if need > 0:  # book too thin to fill the whole size
+        return None
+    return cost / base_qty
 
 
 def liquidation_price(pos) -> Decimal:

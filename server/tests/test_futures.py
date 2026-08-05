@@ -9,9 +9,9 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import AccountType, Asset, AssetKind, FuturesOrderStatus, FuturesOrderType, PositionSide, PositionStatus, WALLET_FUTURES
-from app.services import futures, ledger
-from tests.test_trading import make_user
+from app.models import AccountType, Asset, AssetKind, FuturesOrderStatus, FuturesOrderType, OrderSide, OrderType, PositionSide, PositionStatus, WALLET_FUTURES
+from app.services import futures, ledger, trading
+from tests.test_trading import fund, make_market, make_user
 
 PRICES = {"BTCUSDT": Decimal("60000")}
 
@@ -462,3 +462,36 @@ class TestTriggerOrders:
             order_type=FuturesOrderType.TAKE_PROFIT, trigger_price=Decimal("63000"), size=Decimal("0.1"), reduce_only=True)
         assert await futures.sweep_orders(db, price_book(BTCUSDT=Decimal("63000"))) == []
         assert o.status is FuturesOrderStatus.CANCELLED
+
+
+class TestBookFill:
+    """Track B1: market fills VWAP the live order book, so bigger orders slip further."""
+
+    async def _asks(self, db):
+        m = await make_market(db)
+        seller = await make_user(db, "book-seller@example.com")
+        await fund(db, seller, m.base_asset_id, "100")
+        await trading.place_order(db, user_id=seller.id, market=m, side=OrderSide.SELL,
+                                  order_type=OrderType.LIMIT, quantity=Decimal("2"), price=Decimal("100"))
+        await trading.place_order(db, user_id=seller.id, market=m, side=OrderSide.SELL,
+                                  order_type=OrderType.LIMIT, quantity=Decimal("3"), price=Decimal("101"))
+        return m
+
+    async def test_long_vwaps_asks_and_slips_with_size(self, db):
+        m = await self._asks(db)
+        # 3 units: 2@100 + 1@101 = 301 → VWAP 100.33…
+        assert await futures.market_fill_price(db, symbol=m.symbol, side=PositionSide.LONG, base_qty=Decimal("3")) == Decimal("301") / Decimal("3")
+        # 5 units slips further: 2@100 + 3@101 = 503 → 100.6.
+        assert await futures.market_fill_price(db, symbol=m.symbol, side=PositionSide.LONG, base_qty=Decimal("5")) == Decimal("503") / Decimal("5")
+
+    async def test_returns_none_when_book_too_thin(self, db):
+        m = await self._asks(db)  # only 5 units of depth
+        assert await futures.market_fill_price(db, symbol=m.symbol, side=PositionSide.LONG, base_qty=Decimal("6")) is None
+
+    async def test_short_hits_bids(self, db):
+        m = await make_market(db)
+        buyer = await make_user(db, "book-buyer@example.com")
+        await fund(db, buyer, m.quote_asset_id, "10000")
+        await trading.place_order(db, user_id=buyer.id, market=m, side=OrderSide.BUY,
+                                  order_type=OrderType.LIMIT, quantity=Decimal("2"), price=Decimal("99"))
+        assert await futures.market_fill_price(db, symbol=m.symbol, side=PositionSide.SHORT, base_qty=Decimal("1")) == Decimal("99")
