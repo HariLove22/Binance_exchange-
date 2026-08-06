@@ -10,3 +10,8 @@ bcrypt==4.3.0
 pyjwt==2.13.0
 email-validator==2.3.0
 httpx==0.28.1
+
+# On-chain launchpad (real ERC-20 deploy)
+web3>=7.0
+py-solc-x>=2.0
+eth-tester>=0.12
